@@ -1,14 +1,16 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import * as core from '@astro-simulator/core';
 import { EVENT_FILTER_DEFAULTS } from '@/lib/event-filters';
 import {
-  TIME_EVENT_CHUNKS,
+  TIME_EVENTS_URL,
   getTimeEventsSnapshot,
   resetTimeEventsForTest,
+  subscribeTimeEvents,
 } from '@/lib/time-events';
-import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
 import { useSimStore } from '@/store/sim-store';
 import {
   EVENTS_NBODY_DISABLED_REASON,
@@ -20,10 +22,11 @@ import {
 
 /**
  * #1347 — 타임바 시간 이벤트 마커 (ADR `docs/decisions/20261016-1347-event-markers.md`).
- * M5 (선택 — 명령 순서 · 거리 자) · M6 (조작 — 필터 · 이전/다음 · listbox 키보드 · 계산 전 열기) · M7 (꺼짐 = 계산 0회 spy) ·
+ * M5 (선택 — 명령 순서 · 거리 자) · M6 (조작 — 필터 · 이전/다음 · listbox 키보드 · 반영 전 열기) · M7 (꺼짐 = 불러오기 0회 · 계산 0회 spy) ·
  * M9 (N-body 비활성 · 런타임 전환) 의 단위 부분.
  * #1354 (ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md`) — U1 (식 선택 — 달 포커스 · 거리 자 · 배율 고지) ·
- * U2 (종류명 · 배지 · 미포함 안내 제거) · E6 (식 필터 기본 꺼짐) · E9 (식 10년 청크) 의 단위 부분.
+ * U2 (종류명 · 배지 · 미포함 안내 제거) · E6 (식 필터 기본 꺼짐) 의 단위 부분.
+ * #1377 — 사건은 사전 계산 파일을 1회 불러와 1회 반영한다 (런타임 계산 0회 — `computeEventsForKind` spy 로 고정).
  */
 
 let sentCommands: CoreCommand[] = [];
@@ -71,13 +74,25 @@ function renderEvents() {
   );
 }
 
-/** idle 청크 (jsdom 은 `requestIdleCallback` 이 없어 `setTimeout` 폴백) 를 전부 돌린다. */
-async function flushChunks() {
-  for (let i = 0; i < TIME_EVENT_CHUNKS.length + 1; i += 1) {
+/**
+ * 파일 로더 spy — 불러오기 횟수를 센다 (#1377 M7: 꺼짐 = 0회). 내용은 **실제 커밋된 파일** 이다 (fs 로 읽는다). spy 는 그 값을
+ * `Promise.resolve` 로 돌려준다 — microtask 만으로 끝나 fake timer 와 섞여도 결정적이다 (CI flake 실측, PR #1379). 기본 로더
+ * (`fetch`) 경로는 아래 「기본 로더 (fetch)」 묶음이 `fetch` stub 으로 지난다.
+ */
+const committedFile: unknown = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../public/data/events/time-events.json'), 'utf8'),
+);
+const loaderSpy = vi.fn(() => Promise.resolve(committedFile));
+
+/** 사건 파일 반영까지 기다린다 (로더가 `Promise.resolve` 라 microtask 몇 번이면 끝난다). 계속 loading 이면 throw. */
+async function flushEvents() {
+  for (let i = 0; i < 50 && getTimeEventsSnapshot().status === 'loading'; i += 1) {
     await act(async () => {
-      vi.runOnlyPendingTimers();
+      await Promise.resolve();
     });
   }
+  if (getTimeEventsSnapshot().status === 'loading')
+    throw new Error('[1377] 사건 파일이 반영되지 않았다');
 }
 
 const trigger = () => screen.getByTestId('time-events-toggle');
@@ -85,7 +100,8 @@ const panel = () => screen.queryByTestId('time-events-panel');
 
 beforeEach(() => {
   vi.useFakeTimers();
-  resetTimeEventsForTest();
+  loaderSpy.mockClear();
+  resetTimeEventsForTest(loaderSpy);
   computeSpy.mockClear();
   sentCommands = [];
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
@@ -118,11 +134,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('M7 — 꺼짐이면 계산 0회', () => {
-  it('?events=off (eventsVisible=false) — 눈금 · 버튼 없음, 계산 함수 호출 0회', async () => {
+describe('M7 — 꺼짐이면 불러오기 0회 · 켜짐이어도 런타임 계산 0회 (#1377)', () => {
+  it('?events=off (eventsVisible=false) — 눈금 · 버튼 없음, 파일 불러오기 0회 · 계산 함수 호출 0회', async () => {
     useSimStore.setState({ eventsVisible: false });
     const { container } = renderEvents();
-    await flushChunks();
+    await flushEvents();
+    expect(loaderSpy).not.toHaveBeenCalled();
     expect(computeSpy).not.toHaveBeenCalled();
     expect(screen.queryByTestId('time-events-toggle')).toBeNull();
     expect(screen.queryByTestId('time-event-ticks')).toBeNull();
@@ -131,48 +148,91 @@ describe('M7 — 꺼짐이면 계산 0회', () => {
     expect(within(container).getByTestId('track').childElementCount).toBe(0);
   });
 
-  it('장면 준비 전 (displayCapabilities=null) 에도 계산을 시작하지 않는다 — URL 의도가 store 에 들어가기 전', async () => {
+  it('장면 준비 전 (displayCapabilities=null) 에도 불러오기를 시작하지 않는다 — URL 의도가 store 에 들어가기 전', async () => {
     useSimStore.setState({ displayCapabilities: null });
     renderEvents();
-    await flushChunks();
+    await flushEvents();
+    expect(loaderSpy).not.toHaveBeenCalled();
     expect(computeSpy).not.toHaveBeenCalled();
   });
 
-  it('켜짐 — 청크마다 1회 (식 외 종류는 1청크, 식은 10년 청크 20개씩), 다시 그려도 재계산 없음 (모듈 메모)', async () => {
-    // 청크 계획 — 식 외 6종 × 1 + 식 2종 × 20 (1900 ~ 2100 / 10년).
-    expect(TIME_EVENT_CHUNKS).toHaveLength(6 + 2 * 20);
+  it('켜짐 — 파일 1회 불러오기 · 반영 1회 (구독 알림 loading → ready 2회) · 계산 0회, 다시 그려도 재요청 없음 (모듈 메모)', async () => {
+    const notified: string[] = [];
+    const off = subscribeTimeEvents(() => notified.push(getTimeEventsSnapshot().status));
     const { unmount } = renderEvents();
-    expect(computeSpy).not.toHaveBeenCalled(); // 동기 경로에서 돌지 않는다 — idle 로 넘긴다
-    await flushChunks();
-    expect(computeSpy).toHaveBeenCalledTimes(TIME_EVENT_CHUNKS.length);
+    await flushEvents();
+    expect(loaderSpy).toHaveBeenCalledTimes(1);
+    expect(computeSpy).not.toHaveBeenCalled();
+    // 부분 목록 단계가 없다 — 구 경로는 청크마다 알렸다 (46회 + 시작 1회).
+    expect(notified).toEqual(['loading', 'ready']);
+    off();
     unmount();
     renderEvents();
-    await flushChunks();
-    expect(computeSpy).toHaveBeenCalledTimes(TIME_EVENT_CHUNKS.length);
+    await flushEvents();
+    expect(loaderSpy).toHaveBeenCalledTimes(1);
+    expect(computeSpy).not.toHaveBeenCalled();
   });
 
-  it('E9 — 식 청크를 이어 붙인 목록 = 200년 한 번에 계산한 목록 (청크 경계에서 빠지거나 겹치는 사건 0)', async () => {
+  it('불러오기 실패 — 패널은 「불러오지 못했습니다」 · 눈금 없음 · 활성 조건 재진입 (재마운트) 이 다시 시도한다', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing = vi.fn(() => Promise.reject(new Error('network error')));
+    resetTimeEventsForTest(failing);
+    const { unmount } = renderEvents();
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('error');
+    expect(screen.queryByTestId('time-event-ticks')).toBeNull();
+    expect(consoleSpy).toHaveBeenCalled();
+    unmount();
     renderEvents();
-    await flushChunks();
-    const actual = await vi.importActual<typeof core>('@astro-simulator/core');
-    const bodiesById = new Map(actual.ephemeris.getSolarSystem().bodies.map((b) => [b.id, b]));
-    for (const id of ['solar-eclipse', 'lunar-eclipse'] as const) {
-      const whole = actual
-        .computeEventsForKind(bodiesById, actual.getEventKind(id), SCRUBBER_MIN_JD, SCRUBBER_MAX_JD)
-        .map((e) => e.id);
-      const chunked = getTimeEventsSnapshot()
-        .events.filter((e) => e.kind === id)
-        .map((e) => e.id);
-      expect(chunked).toEqual(whole);
-      expect(chunked.length).toBeGreaterThan(450);
-    }
+    await flushEvents();
+    expect(failing).toHaveBeenCalledTimes(2);
+  });
+
+  it('불러오기 실패 → 패널을 **다시 열면** 1회 재시도 · 열어 둔 동안은 재요청 없음 · 성공하면 ready (PR #1379 B1)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // 1회째는 실패, 2회째부터는 실제 파일 — 호출마다 결과를 정한다.
+    let calls = 0;
+    const flaky = vi.fn(() => {
+      calls += 1;
+      return calls === 1
+        ? Promise.reject(new Error('network error'))
+        : Promise.resolve(committedFile);
+    });
+    resetTimeEventsForTest(flaky);
+    renderEvents();
+    // 불러오는 중에 연다 → 실패가 열린 패널에 도착한다.
+    fireEvent.click(trigger());
+    expect(screen.getByTestId('time-events-loading')).toBeInTheDocument();
+    await flushEvents();
+    expect(screen.getByTestId('time-events-error')).toHaveTextContent('불러오지 못했습니다');
+    // 연 채로 패널을 다시 그려도 (필터 칩 토글) 재요청하지 않는다 — 무한 재시도 0.
+    fireEvent.click(screen.getByTestId('time-event-filter-jupiter-opposition'));
+    await flushEvents();
+    expect(flaky).toHaveBeenCalledTimes(1);
+    expect(getTimeEventsSnapshot().status).toBe('error');
+    // 닫기 → 다시 열기 = 재시도 1회.
+    fireEvent.click(trigger());
+    expect(panel()).toBeNull();
+    expect(flaky).toHaveBeenCalledTimes(1);
+    fireEvent.click(trigger());
+    expect(flaky).toHaveBeenCalledTimes(2);
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+    expect(screen.queryByTestId('time-events-error')).toBeNull();
+    // 목성 충 필터를 켜 둔 상태 — 기본 221 + 목성 충 183.
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(221 + 183);
+    // 성공한 뒤 다시 여닫아도 추가 요청 없음.
+    fireEvent.click(trigger());
+    fireEvent.click(trigger());
+    await flushEvents();
+    expect(flaky).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('눈금', () => {
   it('필터 기본값 — 화성 충 · 금성 내합 · 혜성 근일점만 (목성 · 토성 충 꺼짐)', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     const kinds = new Set(screen.getAllByTestId('time-event-tick').map((t) => t.dataset.kind));
     expect(kinds).toEqual(
       new Set([
@@ -190,19 +250,20 @@ describe('눈금', () => {
 });
 
 describe('사건 패널 — 조작 (M6)', () => {
-  it('계산 전에 열면 「계산 중」 상태 — 빈 목록이 아니다 (§교차검증 합의 4)', async () => {
+  it('반영 전에 열면 「불러오는 중」 상태 — 빈 목록이 아니다 (§교차검증 합의 4)', async () => {
     renderEvents();
     fireEvent.click(trigger());
     expect(panel()).not.toBeNull();
-    expect(screen.getByTestId('time-events-computing')).toHaveTextContent('사건 계산 중');
+    expect(screen.getByTestId('time-events-loading')).toHaveTextContent('사건 불러오는 중');
     expect(screen.queryByTestId('time-events-list')).toBeNull();
-    await flushChunks();
-    expect(screen.queryByTestId('time-events-computing')).toBeNull();
+    await flushEvents();
+    expect(screen.queryByTestId('time-events-loading')).toBeNull();
     expect(screen.getAllByTestId('time-event-option')).toHaveLength(221);
   });
 
   it('#1354 E7 — 일 · 월식 미포함 안내는 없다 · 식 필터가 꺼져 있으면 배율 고지도 없다', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     expect(screen.queryByTestId('time-events-eclipse-note')).toBeNull();
     expect(screen.queryByTestId('time-events-scale-note')).toBeNull();
@@ -211,7 +272,7 @@ describe('사건 패널 — 조작 (M6)', () => {
 
   it('#1354 E6 — 식 필터 칩 2개는 기본 꺼짐 · 켜면 눈금 · 목록에 들어온다', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     const solar = screen.getByTestId('time-event-filter-solar-eclipse');
     const lunar = screen.getByTestId('time-event-filter-lunar-eclipse');
@@ -233,7 +294,7 @@ describe('사건 패널 — 조작 (M6)', () => {
 
   it('필터 토글 — 목성 충 켜면 목록 · 눈금에 들어온다', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     const jupiter = screen.getByTestId('time-event-filter-jupiter-opposition');
     expect(jupiter).toHaveAttribute('aria-pressed', 'false');
@@ -270,7 +331,7 @@ describe('사건 패널 — 조작 (M6)', () => {
       julianDate: 2_415_020.5, // 1900 — 첫 사건부터
     });
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     const list = screen.getByTestId('time-events-list');
     const options = screen.getAllByTestId('time-event-option');
@@ -341,6 +402,7 @@ describe('사건 패널 — 조작 (M6)', () => {
 
   it('Esc — 패널 닫고 트리거로 포커스 · 기본 동작 차단 (자유시점 Esc 와 충돌 0)', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     act(() => {
@@ -351,8 +413,9 @@ describe('사건 패널 — 조작 (M6)', () => {
     expect(document.activeElement).toBe(trigger());
   });
 
-  it('패널 밖 pointerdown 으로 닫힌다', () => {
+  it('패널 밖 pointerdown 으로 닫힌다', async () => {
     renderEvents();
+    await flushEvents();
     fireEvent.click(trigger());
     fireEvent.pointerDown(screen.getByText('after'));
     expect(panel()).toBeNull();
@@ -368,7 +431,7 @@ describe('선택 (M5)', () => {
 
   it('화성 충 2003 — 시각 → 포커스 → 일시정지 순서 · 거리 자 기준점 = 지구 (S3 (b))', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     const event = getTimeEventsSnapshot().events.find((e) =>
       e.id.startsWith('mars-opposition:2003-'),
@@ -385,7 +448,7 @@ describe('선택 (M5)', () => {
   it('핼리 1986 — 혜성 근일점은 거리 자를 바꾸지 않는다 (S3 (a))', async () => {
     useSimStore.setState({ rulerAnchorId: 'jupiter' });
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     chooseOption('halley-perihelion:1986-02-17');
     const halley = getTimeEventsSnapshot().events.find(
@@ -401,7 +464,7 @@ describe('선택 (M5)', () => {
 
   it('listbox Enter 로 활성 사건 선택', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     const list = screen.getByTestId('time-events-list');
     fireEvent.keyDown(list, { key: 'Home' });
@@ -414,7 +477,7 @@ describe('선택 (M5)', () => {
 
   it('이전 / 다음 사건 — 현재 시각 기준, 같은 사건은 건너뛴다', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     fireEvent.click(screen.getByTestId('time-event-next'));
     const jumps = () =>
@@ -450,7 +513,7 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
   it('U2 — 목록에 종류명 (「개기일식」 · 「금환일식」 · 「부분일식」 · 「개기월식」 · 「부분월식」 · 「반영월식」) · ±0.3일 배지', async () => {
     useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON });
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     // NASA 목록의 종류 (2017-08-21 개기 · 2023-10-14 금환 · 2022-10-25 부분 · 2025-03-14 개기월식 · 2023-10-28 부분월식 ·
     // 2024-03-25 반영월식) — 모델 판정도 같다.
@@ -481,7 +544,7 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
     async (id, focusBodyId) => {
       useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON, rulerAnchorId: null });
       renderEvents();
-      await flushChunks();
+      await flushEvents();
       fireEvent.click(trigger());
       const event = getTimeEventsSnapshot().events.find((e) => e.id === id)!;
       fireEvent.click(option(id));
@@ -506,7 +569,7 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
     async (id, expected) => {
       useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON });
       renderEvents();
-      await flushChunks();
+      await flushEvents();
       fireEvent.click(trigger());
       // 포커스 명령이 나가는 순간의 요청 — sim-canvas 의 포커스 동기가 이 시점에 소비한다.
       let atFocus: unknown = 'not-sent';
@@ -538,7 +601,7 @@ describe('#1354 식 — 표기 (U2) · 선택 (U1)', () => {
     try {
       useSimStore.setState({ eventFilters: ECLIPSE_FILTERS_ON, rulerAnchorId: null });
       renderEvents();
-      await flushChunks();
+      await flushEvents();
       fireEvent.click(trigger());
       fireEvent.click(option('solar-eclipse:2024-04-08'));
       const note = screen.getByTestId('time-events-scale-note');
@@ -555,7 +618,7 @@ describe('N-body 엔진 (M9 단위 부분)', () => {
   it('Newton — 눈금 0개 · 버튼 aria-disabled + 사유 · 클릭해도 열리지 않음 · 계산 0회', async () => {
     useSimStore.setState({ physicsEngine: 'newton' });
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     expect(screen.queryByTestId('time-event-ticks')).toBeNull();
     expect(trigger()).toHaveAttribute('aria-disabled', 'true');
     expect(trigger()).toHaveAttribute('title', EVENTS_NBODY_DISABLED_REASON);
@@ -567,7 +630,7 @@ describe('N-body 엔진 (M9 단위 부분)', () => {
 
   it('패널을 연 채 Newton 으로 전환 → 패널 닫힘 · 눈금 숨김 → Kepler 복귀 시 눈금 복원', async () => {
     renderEvents();
-    await flushChunks();
+    await flushEvents();
     fireEvent.click(trigger());
     expect(panel()).not.toBeNull();
     act(() => useSimStore.setState({ physicsEngine: 'newton' }));
@@ -580,5 +643,86 @@ describe('N-body 엔진 (M9 단위 부분)', () => {
     // 전환으로 닫힌 패널은 Kepler 로 돌아와도 닫혀 있다 — 열림 의도가 남아 있으면 복귀 순간 저절로 다시 열린다.
     expect(panel()).toBeNull();
     expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('기본 로더 (fetch) — #1377 qa 차단 (dynamic import 는 실패 promise 를 캐시해 재시도 불가)', () => {
+  type FetchResult = { ok: boolean; status: number; json: () => Promise<unknown> };
+  const ok = (body: unknown): FetchResult => ({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(body),
+  });
+
+  function useFetch(...results: Array<FetchResult | Error>) {
+    const fetchSpy = vi.fn((_url: string) => {
+      const next = results.shift() ?? ok(committedFile);
+      return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    resetTimeEventsForTest(); // 기본 로더 (fetch)
+    return fetchSpy;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('성공 — `TIME_EVENTS_URL` 1회 요청 · ready · 눈금 221 · 다시 그려도 재요청 0', async () => {
+    const fetchSpy = useFetch(ok(committedFile));
+    const { unmount } = renderEvents();
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(TIME_EVENTS_URL);
+    expect(TIME_EVENTS_URL).toBe('/data/events/time-events.json');
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+    expect(screen.getAllByTestId('time-event-tick')).toHaveLength(221);
+    unmount();
+    renderEvents();
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['네트워크 실패 (reject)', () => new Error('network error')],
+    [
+      '비-2xx (404)',
+      (): FetchResult => ({ ok: false, status: 404, json: () => Promise.resolve({}) }),
+    ],
+    [
+      'JSON 파싱 실패',
+      (): FetchResult => ({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      }),
+    ],
+    ['형식 불일치 (decode throw)', () => ok({ format: 'TEV0' })],
+  ])('실패 — %s → error · 「불러오지 못했습니다」', async (_name, make) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    useFetch(make());
+    renderEvents();
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('error');
+    fireEvent.click(trigger()); // 여는 순간 재시도 — 2회째는 성공 파일
+    await flushEvents();
+    expect(getTimeEventsSnapshot().status).toBe('ready');
+  });
+
+  it('B1 (fetch) — 실패 도착 후 연 채로는 재요청 0 · 닫고 다시 열면 재요청 1회 → 목록 표시', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchSpy = useFetch(new Error('network error'), ok(committedFile));
+    renderEvents();
+    fireEvent.click(trigger()); // 불러오는 중에 연다
+    await flushEvents();
+    expect(screen.getByTestId('time-events-error')).toHaveTextContent('불러오지 못했습니다');
+    fireEvent.click(screen.getByTestId('time-event-filter-jupiter-opposition')); // 연 채로 다시 그리기
+    await flushEvents();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fireEvent.click(trigger()); // 닫기
+    fireEvent.click(trigger()); // 다시 열기
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    await flushEvents();
+    expect(screen.getAllByTestId('time-event-option')).toHaveLength(221 + 183);
   });
 });

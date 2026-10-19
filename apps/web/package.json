@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "generate:time-events": "pnpm --filter @astro-simulator/shared build && pnpm --filter @astro-simulator/core build && TIME_EVENTS_WRITE=1 vitest run src/lib/time-events-data.test.ts",
     "r1:guard": "node scripts/r1-ui-regression-guard.mjs",
     "r1:guard:px-ratio": "node scripts/r1-ui-regression-guard.mjs --measure-px-ratio",
     "verify:378-focus": "node scripts/browser-verify-378-focus.mjs",
