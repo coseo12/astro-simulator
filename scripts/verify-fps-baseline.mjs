@@ -46,7 +46,7 @@
  *   (3) 5 페르소나 self-consistency — 본 PR 범위 밖
  *   (4) 메타 안정성 — rAF noise ±5% 인지, 회귀 임계 ±10% margin 적용
  */
-import { openBodyMenu, withBrowser } from './browser-verify-utils.mjs';
+import { openBodyMenu, setTimePlayback, withBrowser } from './browser-verify-utils.mjs';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -109,6 +109,21 @@ const REGRESSION_MARGIN = 0.3; // baseline 대비 30% 저하 허용 (rAF noise �
 //   레벨 1회 자동 재시도 (fps-baseline-guard.yml, 시간차/새 시도로 spike 회피 + 메일 차단).
 const LOD_SETTLE_TIMEOUT_MS = 8_000;
 const MEASURE_MAX_ATTEMPTS = 3;
+
+// #1378 — 측정 창 정지 보장. 이 가드의 측정 대상은 **정지 상태**다 — 모든 셀이 같은 시작점에서 재도록 pause 를 누른다
+//   (아래 `measureViewport` · `enterScenarioQuery` 주석이 처음부터 그 의도를 적어 두었다). 그런데 종전 절차는
+//   `click({ timeout: 1000 })` 실패를 `catch {}` 로 삼켜, CI 에서 측정 창의 40~80% 가 시간이 흐르는 상태로 재졌다
+//   (#1377 Phase 0 — 시간이 흐르면 앱 UI 전체가 프레임마다 재렌더된다). 그래서 측정값이 「정지 비용」 과 「진행 비용」 의
+//   확률 혼합이었다.
+//   - `ensurePaused` — 클릭의 성공이 아니라 **코어 시계 상태** (`__simCore.time.scale === 0`) 를 확인한다. 아니면
+//     재시도하고, `PAUSE_MAX_ATTEMPTS` 회 뒤에도 아니면 throw (fail-fast).
+//   - 측정 창마다 시작 · 끝의 시계를 기록하고, 정지가 아닌 창이 하나라도 있으면 그 셀은 판정 전에 실패다 (fail-closed).
+//   판정식 · 임계는 바꾸지 않는다 — 측정 전제만 보강한다.
+//   ⚠️ 타임아웃 값의 근거: 로컬(M1 · CPU 4x) 클릭 실측 238~421 ms. CI 러너의 클릭 소요는 재지 않았다
+//   — 종전 `1000` 실패가 이 타임아웃 초과 때문이었는지는 [가정] 이다 (#1386 리뷰 권고 1). 이 값들은 **상한**일 뿐 정상 경로에서는 정지가 확인되는 즉시 반환한다.
+const PAUSE_MAX_ATTEMPTS = 3;
+const PAUSE_CLICK_TIMEOUT_MS = 5_000;
+const PAUSE_SETTLE_TIMEOUT_MS = 5_000;
 
 // #820 Phase 1 — vsync 30Hz 반속 락 감지·분류 상수 (ADR 20260710-820-fps-vsync-lock-forensic.md §5).
 //   판정식: vsyncLock(viewport, sc) := rafFps ∈ [VSYNC_BAND_LO, VSYNC_BAND_HI]
@@ -231,9 +246,111 @@ const scenariosFor = (viewportId) =>
 async function enterScenarioQuery(page, query) {
   await page.goto(`${baseUrl}/${query}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
-  try {
-    await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
-  } catch {}
+  await ensurePaused(page, `재진입 ${query}`);
+}
+
+/** #1378 — 코어 시계 (`__simCore.time`) 를 읽는다. 코어 부재 · 평가 실패는 `null` (정지 아님으로 취급 — 실패 방향). */
+async function readSimClock(page) {
+  return page
+    .evaluate(() => {
+      const t = /** @type {any} */ (window).__simCore?.time;
+      if (!t) return null;
+      return { scale: t.scale, julianDate: t.julianDate };
+    })
+    .catch(() => null);
+}
+
+/**
+ * #1378 — 시간을 정지 상태로 만들고 **코어 시계로 확인**한다. 이미 정지면 클릭하지 않는다 (멱등).
+ *
+ * 클릭이 「성공」 해도 정지가 보장되지 않는다 — 판정은 클릭 결과가 아니라 `scale === 0` 이다. 클릭 실패 (타임아웃 ·
+ * 버튼 부재) 는 삼키지 않고 시도 기록에 남긴 뒤 재시도한다. `PAUSE_MAX_ATTEMPTS` 회 뒤에도 정지가 아니면 throw — 정지가
+ * 아닌 장면을 재고 통과하는 경로를 없앤다 (fail-fast).
+ *
+ * @returns 정지까지 누른 클릭 수 (`0` = 이미 정지)
+ */
+async function ensurePaused(page, context) {
+  const tries = [];
+  for (let attempt = 1; attempt <= PAUSE_MAX_ATTEMPTS; attempt += 1) {
+    const before = await readSimClock(page);
+    if (before?.scale === 0) return logPauseResult(context, attempt - 1, tries);
+    try {
+      // 상태 단언 헬퍼 (#1209) — 「이미 정지 (time-play)」 와 「시간 컨트롤 부재」 를 구분한다.
+      await setTimePlayback(page, 'paused', { timeout: PAUSE_CLICK_TIMEOUT_MS });
+      await page.waitForFunction(
+        () => /** @type {any} */ (window).__simCore?.time?.scale === 0,
+        undefined,
+        { timeout: PAUSE_SETTLE_TIMEOUT_MS },
+      );
+      return logPauseResult(context, attempt, tries);
+    } catch (error) {
+      tries.push(
+        `#${attempt} scale=${before?.scale ?? 'n/a'}: ${String(error?.message ?? error).split('\n')[0]}`,
+      );
+    }
+  }
+  const last = await readSimClock(page);
+  throw new Error(
+    `[#1378] 정지 실패 (${context}) — pause ${PAUSE_MAX_ATTEMPTS}회 시도 후 scale=${last?.scale ?? 'n/a'}. ` +
+      `정지가 아닌 장면은 재지 않는다. 시도: ${tries.join(' / ')}`,
+  );
+}
+
+/** #1378 — 정지 확인 결과 1줄 (클릭 수 · 실패했던 시도). 첫 클릭 실패가 얼마나 잦은지 CI 로그로 판독한다. */
+function logPauseResult(context, clicks, tries) {
+  console.log(
+    `    └ #1378 정지 확인 (${context}): 클릭 ${clicks}회` +
+      (tries.length > 0 ? ` — 실패 시도: ${tries.join(' / ')}` : ''),
+  );
+  return clicks;
+}
+
+/**
+ * #1378 — rAF 측정 창 1개를 재고, 창 시작 · 끝의 코어 시계로 「정지였는가」 를 함께 낸다.
+ * 정지 = 시작 · 끝 모두 `scale === 0` 이고 `julianDate` 가 같다 (창 안에서 재생됐다가 다시 멈춘 경우도 JD 차이로 잡힌다).
+ */
+async function measurePausedWindow(page, durationMs, viewportId, measure = measureFpsInjectable) {
+  const start = await readSimClock(page);
+  const fps = await measure(page, durationMs, viewportId);
+  const end = await readSimClock(page);
+  const paused =
+    start !== null &&
+    end !== null &&
+    start.scale === 0 &&
+    end.scale === 0 &&
+    start.julianDate === end.julianDate;
+  return {
+    fps,
+    window: {
+      jdStart: start?.julianDate ?? null,
+      jdEnd: end?.julianDate ?? null,
+      scaleStart: start?.scale ?? null,
+      scaleEnd: end?.scale ?? null,
+      paused,
+    },
+  };
+}
+
+/** #1378 — 측정 창 기록 1줄 (로그 · 실패 메시지 공용). */
+function formatPauseWindow(w, index) {
+  return (
+    `창${index + 1} jd ${w.jdStart ?? 'n/a'}→${w.jdEnd ?? 'n/a'} ` +
+    `scale ${w.scaleStart ?? 'n/a'}/${w.scaleEnd ?? 'n/a'} ${w.paused ? '정지' : '✗ 정지 아님'}`
+  );
+}
+
+/**
+ * #1378 — 셀의 측정 창이 **전부** 정지였는가. 창 기록이 없거나 시도 수와 어긋나면 거짓이다 — 빈 배열의 `every` 는
+ * 공허하게 참이므로 (기록 누락이 통과로 읽히는 fail-open) 길이를 먼저 본다.
+ */
+function allWindowsPaused(diag) {
+  const windows = diag?.pauseWindows;
+  return (
+    Array.isArray(windows) &&
+    windows.length > 0 &&
+    windows.length === diag?.attempts?.length &&
+    windows.every((w) => w.paused === true)
+  );
 }
 
 async function measureFps(page, durationMs) {
@@ -387,8 +504,14 @@ async function setupScenario(page, scenario) {
     }
   }
 
+  // #1378 — 측정 직전 정지 확인. 진입 시 이미 정지했으면 클릭 0회로 통과한다 (멱등). 위 `?focus=moon` 재진입처럼
+  //   진입 뒤 페이지를 다시 연 경로는 종전에 pause 를 누르지 않았다 — 이 호출이 그 경로까지 덮는다.
+  const pauseClicks = await ensurePaused(page, `${currentViewportId}/${scenario.id} 측정 직전`);
+
   // #680 — tier-c 면 override='low' 정착 대기 (race 제3 윈도우 처치) + 측정 시점 LOD 진단.
-  return waitForLodSettle(page);
+  const diag = await waitForLodSettle(page);
+  diag.pauseClicks = pauseClicks;
+  return diag;
 }
 
 /**
@@ -425,11 +548,18 @@ async function measureScenario(page, scenario) {
   // #680 — 1차 측정이 임계 미달이면 1회 재측정 (transient 흡수). best (max) 채택.
   //   진짜 회귀는 두 번 다 fail → 은폐 불가. 두 값 모두 attempts 에 로깅.
   const attempts = [];
+  // #1378 — 창마다 시작 · 끝 시계 기록 (attempts 와 같은 길이). `compareBaseline` 이 판정 전에 본다.
+  const pauseWindows = [];
   let fps = 0;
   for (let i = 0; i < MEASURE_MAX_ATTEMPTS; i += 1) {
-    const v = +(await measureFpsInjectable(page, MEASURE_DURATION_MS, currentViewportId)).toFixed(
-      1,
+    const { fps: raw, window: pauseWindow } = await measurePausedWindow(
+      page,
+      MEASURE_DURATION_MS,
+      currentViewportId,
     );
+    const v = +raw.toFixed(1);
+    pauseWindows.push(pauseWindow);
+    console.log(`    └ #1378 ${formatPauseWindow(pauseWindow, i)} (rafFps=${v})`);
     attempts.push(v);
     fps = Math.max(fps, v);
     if (scenario.fpsJudged === false) break; // #1335 — 판정 제외 셀은 1회 측정 · 기록만
@@ -458,7 +588,7 @@ async function measureScenario(page, scenario) {
     );
   }
 
-  return { fps, attempts, diag, vsyncLock, renderCapacity };
+  return { fps, attempts, pauseWindows, diag, vsyncLock, renderCapacity };
 }
 
 // 재측정 판정에 쓰는 현재 viewport/baseline (measureScenario 가 모듈 스코프에서 참조).
@@ -471,24 +601,26 @@ async function measureViewport(page, client, viewport) {
   await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(2000);
 
-  // 정지 (pause) 로 시작점 안정화 — 모든 시나리오 동일 시작
-  try {
-    await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
-  } catch {}
+  // 정지 (pause) 로 시작점 안정화 — 모든 시나리오 동일 시작 (#1378 — 클릭 결과가 아니라 코어 시계로 확인)
+  await ensurePaused(page, `${viewport.id} 진입`);
 
   const results = {};
   const diagnostics = {};
   for (const sc of scenariosFor(viewport.id)) {
     console.log(`  ${viewport.id} / ${sc.label} 측정 중...`);
-    const { fps, attempts, diag, vsyncLock, renderCapacity } = await measureScenario(page, sc);
+    const { fps, attempts, pauseWindows, diag, vsyncLock, renderCapacity } = await measureScenario(
+      page,
+      sc,
+    );
     results[sc.id] = fps;
     // #820 — vsyncLock/renderCapacity 를 진단에 병기 (compareBaseline 이 흡수 판정에 참조).
-    diagnostics[sc.id] = { attempts, vsyncLock, renderCapacity, ...diag };
+    // #1378 — pauseWindows 도 병기 (compareBaseline 이 정지 전제를 판정 전에 본다).
+    diagnostics[sc.id] = { attempts, pauseWindows, vsyncLock, renderCapacity, ...diag };
     // #680 진단 로깅 — fail 분석의 핵심 (tier/override/lodCounts + 재측정 attempts).
     console.log(
       `    └ LOD diag: tier=${diag.tier} override=${diag.override} ` +
         `lod=${diag.lodCounts ? `${diag.lodCounts.high}/${diag.lodCounts.mid}/${diag.lodCounts.low}` : 'n/a'} ` +
-        `attempts=[${attempts.join(', ')}]` +
+        `attempts=[${attempts.join(', ')}] pauseClicks=${diag.pauseClicks}` +
         (diag.requiredMeshesEnabled === null
           ? ''
           : ` requiredMeshes=${diag.requiredMeshesEnabled}`),
@@ -508,6 +640,20 @@ function compareBaseline(current, baseline) {
       const fpsJudged = sc.fpsJudged !== false;
       if (cur === undefined || (fpsJudged && base === undefined)) {
         failures.push(`[${vp.id}/${sc.id}] baseline 또는 측정 누락`);
+        continue;
+      }
+      // #1378 — 측정 전제: 모든 측정 창이 정지 상태였는가. 아니면 그 셀의 fps 는 「진행 비용」 이 섞인 값이라 판정에
+      // 쓰지 않고 실패로 낸다 (아래 필수 메시 전제와 같은 처리 — 새 임계 0). 판정 제외 셀 (`fpsJudged: false`) 에도 적용한다.
+      const cellDiag = current.diagnostics?.[vp.id]?.[sc.id];
+      if (!allWindowsPaused(cellDiag)) {
+        const windows = cellDiag?.pauseWindows ?? [];
+        failures.push(
+          `[${vp.id}/${sc.id}] 측정 전제 실패: 정지 아닌 측정 창 — ` +
+            (windows.length > 0
+              ? windows.map((w, i) => formatPauseWindow(w, i)).join(' · ')
+              : '창 기록 없음') +
+            ` (시도 ${cellDiag?.attempts?.length ?? 0}회)`,
+        );
         continue;
       }
       // #1319 PR3 (리뷰 R1) — 측정 전제: 시나리오가 요구한 메시가 전부 활성이었는가. 아니면 그 셀의 fps 는 다른
@@ -623,9 +769,7 @@ const measured = await withBrowser({}, async (browser) => {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle' });
       await page.waitForTimeout(2000);
-      try {
-        await page.locator('[data-testid="time-pause"]').click({ timeout: 1000 });
-      } catch {}
+      await ensurePaused(page, `[diagnose] ${vp.id} 진입`);
       report.viewports[vp.id] = {};
       console.log(`\n[${vp.id}] ${vp.width}×${vp.height}`);
       for (const sc of scenariosFor(vp.id)) {
@@ -636,8 +780,17 @@ const measured = await withBrowser({}, async (browser) => {
         // #820 Phase 0 — rafFps 샘플과 나란히 render-capacity 프로브를 캡처. null(scene 부재)은
         //   제외 수집 → 전 샘플 null 이면 renderCapacity=null 박제(실패 방향 fail-safe).
         const capacitySamples = [];
+        // #1378 — 진단 모드도 표본마다 정지 여부를 기록한다 (판정은 없지만 분포가 정지 / 진행 혼합인지 판독 가능하게).
+        const pauseWindows = [];
         for (let i = 0; i < VARIANCE_SAMPLES; i += 1) {
-          samples.push(+(await measureFps(page, MEASURE_DURATION_MS)).toFixed(1));
+          const { fps: raw, window: pauseWindow } = await measurePausedWindow(
+            page,
+            MEASURE_DURATION_MS,
+            vp.id,
+            measureFps,
+          );
+          pauseWindows.push(pauseWindow);
+          samples.push(+raw.toFixed(1));
           const cap = await measureRenderCapacity(page);
           if (cap !== null) capacitySamples.push(+cap.toFixed(1));
         }
@@ -651,6 +804,8 @@ const measured = await withBrowser({}, async (browser) => {
           override: diag.override,
           requiredMeshesEnabled,
           renderCapacity: capStats ? { samples: capacitySamples, ...capStats } : null,
+          pausedSamples: pauseWindows.filter((w) => w.paused).length,
+          pauseWindows,
         };
         const capStr = capStats
           ? `min=${capStats.min} max=${capStats.max} mean=${capStats.mean} std=${capStats.std} cv=${capStats.cv}% p50=${capStats.p50}`
@@ -660,6 +815,7 @@ const measured = await withBrowser({}, async (browser) => {
             `(tier=${diag.tier} override=${diag.override}` +
             (requiredMeshesEnabled === null ? '' : ` requiredMeshes=${requiredMeshesEnabled}`) +
             `)\n    rafFps samples=[${samples.join(', ')}]` +
+            `\n    #1378 정지 표본 ${pauseWindows.filter((w) => w.paused).length}/${pauseWindows.length}` +
             `\n    renderCapacity: ${capStr}` +
             (capStats ? `\n    capacity samples=[${capacitySamples.join(', ')}]` : ''),
         );
@@ -735,8 +891,25 @@ for (const vp of VIEWPORTS) {
   }
 }
 
+// #1378 — 전 셀 측정 창의 정지 비율 (CI 로그 1줄로 판독). 분모는 실제로 잰 창 수다.
+const allPauseWindows = VIEWPORTS.flatMap((vp) =>
+  scenariosFor(vp.id).flatMap((sc) => current.diagnostics[vp.id]?.[sc.id]?.pauseWindows ?? []),
+);
+const pausedWindowCount = allPauseWindows.filter((w) => w.paused).length;
+console.log(`\n[#1378] 정지 측정 창 ${pausedWindowCount}/${allPauseWindows.length}`);
+
 // baseline 모드 — diagnostics 는 baseline 에 박제하지 않음 (#680, 측정마다 달라지는 진단값).
 if (UPDATE_BASELINE) {
+  // #1378 — 정지가 아닌 창이 섞인 측정은 baseline 으로 박제하지 않는다 (baseline 의 의미 = 정지 상태 비용).
+  const unpaused = VIEWPORTS.flatMap((vp) =>
+    scenariosFor(vp.id)
+      .filter((sc) => !allWindowsPaused(current.diagnostics[vp.id]?.[sc.id]))
+      .map((sc) => `${vp.id}/${sc.id}`),
+  );
+  if (unpaused.length > 0) {
+    console.log(`\n✗ baseline 박제 거부 — 정지 아닌 측정 창: ${unpaused.join(', ')}`);
+    process.exit(1);
+  }
   const { diagnostics: _omit, ...baselineDoc } = current;
   // #1335 — 판정 제외 셀은 baseline 에 남기지 않는다 (판정에 쓰이지 않는 수치는 오독된다).
   for (const vp of VIEWPORTS) {
