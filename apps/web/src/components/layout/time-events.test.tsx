@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import * as core from '@astro-simulator/core';
 import { EVENT_FILTER_DEFAULTS } from '@/lib/event-filters';
+import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import {
   TIME_EVENTS_URL,
   getTimeEventsSnapshot,
@@ -250,6 +251,20 @@ describe('눈금', () => {
 });
 
 describe('사건 패널 — 조작 (M6)', () => {
+  it('#1380 — 열린 패널의 칩 · 트리거는 캔버스 refocus 보호 대상이다 (ARIA 계약), 닫히면 트리거도 대상이 아니다', async () => {
+    renderEvents();
+    await flushEvents();
+    fireEvent.click(trigger());
+    const mars = screen.getByTestId('time-event-filter-mars-opposition');
+    expect(isFocusInExpandedPopup(mars)).toBe(true);
+    expect(isFocusInExpandedPopup(screen.getByTestId('time-events-list'))).toBe(true);
+    expect(isFocusInExpandedPopup(trigger())).toBe(true);
+    expect(isFocusInExpandedPopup(screen.getByText('after'))).toBe(false);
+    fireEvent.click(trigger());
+    expect(panel()).toBeNull();
+    expect(isFocusInExpandedPopup(trigger())).toBe(false);
+  });
+
   it('반영 전에 열면 「불러오는 중」 상태 — 빈 목록이 아니다 (§교차검증 합의 4)', async () => {
     renderEvents();
     fireEvent.click(trigger());

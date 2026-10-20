@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as AstroCore from '@astro-simulator/core';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
+import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import { BODY_MENU_ITEMS, BodyMenu } from './body-menu';
 
 /**
@@ -57,6 +58,17 @@ beforeEach(() => {
 });
 
 describe('BodyMenu — 열기 · 닫기 · ARIA', () => {
+  it('#1380 — 열린 메뉴의 항목 · 트리거는 캔버스 refocus 보호 대상이다 (ARIA 계약), 닫히면 트리거도 대상이 아니다', () => {
+    renderWithNeighbors();
+    fireEvent.click(trigger());
+    expect(isFocusInExpandedPopup(item('earth'))).toBe(true);
+    expect(isFocusInExpandedPopup(trigger())).toBe(true);
+    expect(isFocusInExpandedPopup(screen.getByTestId('after'))).toBe(false);
+    fireEvent.click(trigger());
+    expect(screen.queryByTestId('body-menu')).toBeNull();
+    expect(isFocusInExpandedPopup(trigger())).toBe(false);
+  });
+
   it('닫힘: 메뉴 · 항목 언마운트, 트리거 aria-expanded=false · aria-controls 없음', () => {
     renderWithNeighbors();
     expect(trigger()).toHaveAttribute('aria-haspopup', 'menu');

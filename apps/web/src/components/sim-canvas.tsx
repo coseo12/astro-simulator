@@ -47,6 +47,7 @@ import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
 import { useSimStore } from '@/store/sim-store';
+import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
 // #1234 C2-H3 — 부팅 단계 계측 (dev 전용 기록기. prod 에서는 호출이 즉시 반환하고
@@ -162,13 +163,21 @@ const FOCUS_PRESERVE_SELECTOR =
  *   가 keyboard 로 바뀌어 시나리오 전제가 깨지기 때문이다(가드 스크립트 자체 주석). 즉 본 경계는
  *   가드 커버리지 **밖**이며, 관련 회귀 신고가 오면 "이미 알고 있는 경계" 로 즉시 분류한다.
  */
-function shouldPreserveFocus(active: HTMLElement): boolean {
+export function shouldPreserveFocus(active: HTMLElement): boolean {
   // 텍스트 입력 — 입력 중 문자 유실 방지 (#699 기존 가드 유지).
   if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) {
     return true;
   }
   // 모달 열림 중에는 캔버스가 포커스를 가져가면 focus trap 이 무의미해진다 (#848 모달 계약).
   if (active.closest('[data-modal-open="true"]') !== null) return true;
+  // #1380 — 펼쳐진 비모달 팝업의 트리거 또는 본체 안 포커스는 **입력 방식과 무관하게** 보존한다. 판정은 ARIA 계약만 보므로
+  // 대상은 넷이다 — 사건 패널 · 표시 패널 · 천체 메뉴 · 상단 「⋯」 오버플로 (`top-bar.tsx`, 640px 미만). 앞 셋은 「포커스가
+  // 트리거 · 팝업을 둘 다 벗어나면 닫힘」 규칙이라, 캔버스가 포커스를 가져가면 포인터가 캔버스를 스치기만 해도 닫혔다 (사건
+  // 패널은 필터를 끄면 패널이 줄어 멈춘 포인터 아래로 캔버스가 들어왔다). 「⋯」 는 blur 로 닫히지 않아 그 결함은 없었지만
+  // 같은 보존을 받는다 — 캔버스 pointerdown · sm 이상 확장으로 닫히므로 보존이 영구화되지 않는다. 팝업이 열린
+  // 동안 캔버스 키보드 조작은 캔버스 클릭으로 돌아온다 — 클릭은 팝업을 닫고 (패널 밖 pointerdown) Babylon 이 캔버스에
+  // 포커스를 준다. 팝업이 닫혀 있으면 이 분기는 거짓이라 #699 의 마우스 클릭 포커스 회수는 그대로다.
+  if (isFocusInExpandedPopup(active)) return true;
   if (!active.matches(FOCUS_PRESERVE_SELECTOR)) return false;
   try {
     return active.matches(':focus-visible');

@@ -5,7 +5,7 @@ import {
   isRPhaseFocusable,
   R_PHASE_BODY_ALLOWLIST,
 } from '@astro-simulator/core';
-import type { SimMode } from '@astro-simulator/shared';
+import { J2000_JD, type SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
 import { useSimStore } from '@/store/sim-store';
@@ -22,16 +22,20 @@ type PhysicsEngineUrl = (typeof ENGINE_VALUES)[number];
 /**
  * URL ↔ 시뮬레이션 상태 동기화.
  *  - mode, focus, speed, ruler (#1341 PR2): store ↔ URL 양방향
- *  - t (Julian Date): 초기 로드 시에만 URL → store (매 프레임 쓰기 하면 리렌더 폭주)
+ *  - t (Julian Date): 초기 로드 시 URL → store. store → URL 은 **일시정지 (`timeScale === 0`) 중에만** 쓴다 (#1381).
+ *    재생 중에는 쓰지 않는다 — 시각이 매 프레임 바뀌어 URL 쓰기가 리렌더 폭주가 된다. 일시정지 중 시각은 사용자의
+ *    이산 조작 (사건 선택 · 스크러버 · 「지금」 · 날짜 입력) 으로만 바뀌므로 쓰기 횟수가 조작 횟수다.
+ *    재생으로 돌아가도 `t` 는 지우지 않는다 — 마지막 정지 시각이 재로드 시작점으로 남는다 (`?t=` 직접 입력과 같은 성질).
+ *    J2000 이면 키를 지운다 (`t` 부재 = J2000 — `speed` 의 기본값 삭제 규약과 같다).
  *
- * 시간 공유는 향후 "스냅샷/북마크" 기능으로 분리.
+ * 재생 중 임의 시점의 공유는 북마크 버튼 (`bookmark-button.tsx`) 이 스냅샷으로 담는다.
  */
 export function UrlSync() {
   const [urlMode, setUrlMode] = useQueryState(
     'mode',
     parseAsStringEnum<SimMode>(MODE_VALUES).withOptions({ history: 'replace' }),
   );
-  const [urlT] = useQueryState('t', parseAsFloat.withOptions({ history: 'replace' }));
+  const [urlT, setUrlT] = useQueryState('t', parseAsFloat.withOptions({ history: 'replace' }));
   const [urlFocus, setUrlFocus] = useQueryState(
     'focus',
     parseAsString.withOptions({ history: 'replace' }),
@@ -54,6 +58,9 @@ export function UrlSync() {
   );
 
   const mode = useSimStore((s) => s.mode);
+  // #1381 — 정지 중 시각만 구독한다. 재생 중에는 `null` 로 고정돼 매 프레임 `timeChanged` 가 이 컴포넌트를 다시 그리지 않는다
+  // (`pausedUrlTime(null, …)` 은 `undefined` = 쓰지 않음이라 의미는 같다 — PR #1384 리뷰 권고 2).
+  const pausedJulianDate = useSimStore((s) => (s.timeScale === 0 ? s.julianDate : null));
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
   const timeScale = useSimStore((s) => s.timeScale);
   const physicsEngine = useSimStore((s) => s.physicsEngine);
@@ -156,6 +163,14 @@ export function UrlSync() {
     setUrlSpeed(timeScale === 86_400 ? null : timeScale);
   }, [timeScale, setUrlSpeed]);
 
+  // #1381 — 일시정지 중에만 store → URL `t` (모듈 머리 주석). 사건 선택은 `setTimeScale(0)` 으로 끝나므로 여기서 실린다.
+  useEffect(() => {
+    if (!initialized.current) return;
+    const target = pausedUrlTime(pausedJulianDate, timeScale);
+    if (target === undefined || target === urlT) return;
+    setUrlT(target);
+  }, [pausedJulianDate, timeScale, urlT, setUrlT]);
+
   useEffect(() => {
     if (!initialized.current) return;
     setUrlEngine(physicsEngine === 'kepler' ? null : physicsEngine);
@@ -167,4 +182,16 @@ export function UrlSync() {
   }, [rulerAnchorId, setUrlRuler]);
 
   return null;
+}
+
+/**
+ * #1381 — 일시정지 중 URL `t` 에 쓸 값. `undefined` = 쓰지 않는다 (재생 중 · 시각 미정), `null` = 키 삭제 (J2000 기본값).
+ * 순수 함수로 둔 이유: 「재생 중에는 쓰지 않는다」 를 배속 부호 · 크기 전반에 대해 싸게 단언하기 위해서다 (`url-sync.test.tsx`).
+ */
+export function pausedUrlTime(
+  julianDate: number | null,
+  timeScale: number,
+): number | null | undefined {
+  if (timeScale !== 0 || julianDate === null || !Number.isFinite(julianDate)) return undefined;
+  return julianDate === J2000_JD ? null : julianDate;
 }
