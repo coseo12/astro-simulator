@@ -19,6 +19,9 @@ Semantic Versioning을 따른다.
   - 수정: 판정을 클릭 결과가 아니라 코어 시계 (`__simCore.time.scale === 0`) 로 한다. 아니면 3회까지 다시 누르고, 그래도 정지가 아니면 실행을 멈춘다 (fail-fast). 측정 창마다 시작 · 끝의 JD · scale 을 로그로 남기고, 정지가 아닌 창이 있는 셀은 판정 전에 「측정 전제 실패」 다 (fail-closed — 판정 제외 셀 포함). 정지가 아닌 측정은 `--update-baseline` 이 박제하지 않는다.
   - 판정식 · 임계는 그대로다 — 락 대역 `28 ~ 36` · #820 capacity 흡수 · 절대 `30` · margin `30%`. 셀 구성 · 창 길이도 같다.
   - baseline (`docs/benchmarks/fps-lowend-baseline.json`) 은 갱신하지 않았다. 근거와 CI 실측 표는 PR [#1386](https://github.com/coseo12/astro-simulator/pull/1386) 코멘트에 있다.
+- **[#1385] 북마크를 누르면 상단 바가 좌우로 흔들리고, 그 사이 열린 표시 패널이 닫히던 결함** ([#1385](https://github.com/coseo12/astro-simulator/issues/1385)). 이제 복사 표시 (`✓`) 와 평소 표시 (`🔖`) 가 바뀌어도 버튼 폭이 그대로다.
+  - 원인: 북마크 버튼이 복사 직후 `✓` 를 보이고 1500 ms 뒤 `🔖` 로 되돌릴 때 **글자를 갈아 끼웠다**. 두 글리프의 폭이 달라 버튼 폭이 바뀌고, 오른쪽 정렬된 상단 바의 다른 트리거들이 그만큼 밀렸다 (실 Chrome macOS `4.875` px, CI SwiftShader `8` px). 표시 패널은 「트리거가 움직였으면 닫는다」 (#1268) 라, 북마크 직후 1.5 s 안에 연 패널을 스크롤하면 닫혔다. `verify:1265-display-panel` D11 의 간헐 실패 (PR #1384 CI `verify` attempt 1) 가 이 경로였다.
+  - 수정: 두 글리프를 한 칸 (`inline-grid`) 에 겹쳐 두고 `visibility` 만 바꾼다. 칸 폭은 항상 넓은 쪽 (`🔖`) 이라 평소 상태의 버튼 크기 · 위치는 종전과 같다 (1440 · 1280 · 600 · 375 에서 develop 과 좌표 동일). 접근 가능한 이름 (`북마크` ↔ `복사됨`) 과 글리프의 `aria-hidden` 은 그대로다.
 
 ### Behavior Changes
 
