@@ -47,6 +47,7 @@ import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
 import { useSimStore } from '@/store/sim-store';
+import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
 // #1234 C2-H3 — 부팅 단계 계측 (dev 전용 기록기. prod 에서는 호출이 즉시 반환하고
@@ -169,6 +170,12 @@ function shouldPreserveFocus(active: HTMLElement): boolean {
   }
   // 모달 열림 중에는 캔버스가 포커스를 가져가면 focus trap 이 무의미해진다 (#848 모달 계약).
   if (active.closest('[data-modal-open="true"]') !== null) return true;
+  // #1380 — 펼쳐진 비모달 팝업 (사건 패널 · 표시 패널 · 천체 메뉴) 의 트리거 또는 본체 안 포커스는 **입력 방식과 무관하게**
+  // 보존한다. 세 팝업은 「포커스가 트리거 · 팝업을 둘 다 벗어나면 닫힘」 규칙이라, 캔버스가 포커스를 가져가면 포인터가
+  // 캔버스를 스치기만 해도 닫혔다 (사건 패널은 필터를 끄면 패널이 줄어 멈춘 포인터 아래로 캔버스가 들어왔다). 팝업이 열린
+  // 동안 캔버스 키보드 조작은 캔버스 클릭으로 돌아온다 — 클릭은 팝업을 닫고 (패널 밖 pointerdown) Babylon 이 캔버스에
+  // 포커스를 준다. 팝업이 닫혀 있으면 이 분기는 거짓이라 #699 의 마우스 클릭 포커스 회수는 그대로다.
+  if (isFocusInExpandedPopup(active)) return true;
   if (!active.matches(FOCUS_PRESERVE_SELECTOR)) return false;
   try {
     return active.matches(':focus-visible');
