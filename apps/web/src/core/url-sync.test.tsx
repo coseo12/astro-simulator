@@ -95,6 +95,7 @@ vi.mock('@astro-simulator/core', async (importOriginal) => {
 
 // 동적 import — vi.mock 등록 후 평가되도록.
 const { UrlSync, pausedUrlTime } = await import('./url-sync');
+const { useQueryState } = await import('nuqs');
 
 beforeEach(() => {
   sentCommands = [];
@@ -340,16 +341,19 @@ describe('UrlSync — ?t= 일시정지 중 store → URL (#1381)', () => {
     expect(setUrlTMock).toHaveBeenLastCalledWith(EVENT_JD);
   });
 
-  it('재생 중 시각 변화 (프레임마다) — `t` 쓰기 0회 (리렌더 폭주 방지 규약 유지)', () => {
+  it('재생 중 시각 변화 (프레임마다) — `t` 쓰기 0회 · 리렌더 0회 (리렌더 폭주 방지 규약 유지)', () => {
     useSimStore.setState({ julianDate: J2000, timeScale: 86_400 });
     render(<UrlSync />);
     setUrlTMock.mockClear();
+    // 렌더 횟수 대리 지표 — `UrlSync` 는 렌더마다 `useQueryState` 를 키 수만큼 부른다 (PR #1384 리뷰 권고 2).
+    const callsBefore = vi.mocked(useQueryState).mock.calls.length;
     for (let i = 1; i <= 120; i += 1) {
       act(() => {
         useSimStore.getState().setTime(J2000 + i / 60);
       });
     }
     expect(setUrlTMock).not.toHaveBeenCalled();
+    expect(vi.mocked(useQueryState).mock.calls.length).toBe(callsBefore);
   });
 
   it('정지 중 이산 조작 (「지금」 · 스크러버) — 바뀐 시각마다 쓴다, 재생으로 돌아가도 지우지 않는다', () => {

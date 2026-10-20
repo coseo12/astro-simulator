@@ -58,7 +58,9 @@ export function UrlSync() {
   );
 
   const mode = useSimStore((s) => s.mode);
-  const julianDate = useSimStore((s) => s.julianDate);
+  // #1381 — 정지 중 시각만 구독한다. 재생 중에는 `null` 로 고정돼 매 프레임 `timeChanged` 가 이 컴포넌트를 다시 그리지 않는다
+  // (`pausedUrlTime(null, …)` 은 `undefined` = 쓰지 않음이라 의미는 같다 — PR #1384 리뷰 권고 2).
+  const pausedJulianDate = useSimStore((s) => (s.timeScale === 0 ? s.julianDate : null));
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
   const timeScale = useSimStore((s) => s.timeScale);
   const physicsEngine = useSimStore((s) => s.physicsEngine);
@@ -164,10 +166,10 @@ export function UrlSync() {
   // #1381 — 일시정지 중에만 store → URL `t` (모듈 머리 주석). 사건 선택은 `setTimeScale(0)` 으로 끝나므로 여기서 실린다.
   useEffect(() => {
     if (!initialized.current) return;
-    const target = pausedUrlTime(julianDate, timeScale);
+    const target = pausedUrlTime(pausedJulianDate, timeScale);
     if (target === undefined || target === urlT) return;
     setUrlT(target);
-  }, [julianDate, timeScale, urlT, setUrlT]);
+  }, [pausedJulianDate, timeScale, urlT, setUrlT]);
 
   useEffect(() => {
     if (!initialized.current) return;

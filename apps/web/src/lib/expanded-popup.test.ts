@@ -3,7 +3,8 @@ import { isFocusInExpandedPopup } from './expanded-popup';
 
 /**
  * #1380 — 캔버스 refocus 보호 판정 (`sim-canvas.tsx` `shouldPreserveFocus`) 의 「펼쳐진 비모달 팝업」 축.
- * 세 팝업 (사건 패널 · 표시 패널 · 천체 메뉴) 이 실제로 이 ARIA 계약을 갖는지는 각 컴포넌트 테스트가 단언한다.
+ * 대상 팝업 넷 중 blur 로 닫히는 셋 (사건 패널 · 표시 패널 · 천체 메뉴) 이 실제로 이 ARIA 계약을 갖는지는 각 컴포넌트 테스트가
+ * 단언한다. 상단 「⋯」 오버플로는 blur 로 닫히지 않아 (#1380 결함 없음) 계약 단언을 두지 않았다.
  */
 describe('isFocusInExpandedPopup (#1380)', () => {
   let root: HTMLDivElement;
