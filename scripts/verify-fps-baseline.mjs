@@ -273,7 +273,7 @@ async function ensurePaused(page, context) {
   const tries = [];
   for (let attempt = 1; attempt <= PAUSE_MAX_ATTEMPTS; attempt += 1) {
     const before = await readSimClock(page);
-    if (before?.scale === 0) return attempt - 1;
+    if (before?.scale === 0) return logPauseResult(context, attempt - 1, tries);
     try {
       // 상태 단언 헬퍼 (#1209) — 「이미 정지 (time-play)」 와 「시간 컨트롤 부재」 를 구분한다.
       await setTimePlayback(page, 'paused', { timeout: PAUSE_CLICK_TIMEOUT_MS });
@@ -282,7 +282,7 @@ async function ensurePaused(page, context) {
         undefined,
         { timeout: PAUSE_SETTLE_TIMEOUT_MS },
       );
-      return attempt;
+      return logPauseResult(context, attempt, tries);
     } catch (error) {
       tries.push(
         `#${attempt} scale=${before?.scale ?? 'n/a'}: ${String(error?.message ?? error).split('\n')[0]}`,
@@ -294,6 +294,15 @@ async function ensurePaused(page, context) {
     `[#1378] 정지 실패 (${context}) — pause ${PAUSE_MAX_ATTEMPTS}회 시도 후 scale=${last?.scale ?? 'n/a'}. ` +
       `정지가 아닌 장면은 재지 않는다. 시도: ${tries.join(' / ')}`,
   );
+}
+
+/** #1378 — 정지 확인 결과 1줄 (클릭 수 · 실패했던 시도). 첫 클릭 실패가 얼마나 잦은지 CI 로그로 판독한다. */
+function logPauseResult(context, clicks, tries) {
+  console.log(
+    `    └ #1378 정지 확인 (${context}): 클릭 ${clicks}회` +
+      (tries.length > 0 ? ` — 실패 시도: ${tries.join(' / ')}` : ''),
+  );
+  return clicks;
 }
 
 /**
