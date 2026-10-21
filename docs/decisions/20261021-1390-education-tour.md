@@ -1,6 +1,6 @@
 # ADR 20261021-1390 — 교육 모드 가이드 투어: 기존 명령만 보내는 투어 컨트롤러 · 단계별 「다음」 · 자유 조작 + 이탈 감지
 
-- **상태**: Provisional — 사용자 결정 Q 표 대기 · §교차검증 반영 사항 통합 전
+- **상태**: Provisional — §교차검증 반영 사항 통합 완료 (cross-validate 2026-10-21) · 사용자 결정 Q 표 대기 (확정 시 Accepted)
 - **날짜**: 2026-10-21
 - **결정자**: architect (이슈 [#1390](https://github.com/coseo12/astro-simulator/issues/1390) · 사용자 선택 2026-10-21 「교육 모드 활성화 — 가이드 투어 · 설명 카드 (트랙 C)」)
 - **관련**:
@@ -200,9 +200,11 @@
     id         안정 id (테스트 · 문안 참조용. URL step 은 1-based 인덱스)
     title      단계 제목
     body       설명 2~4 문장 (375 에서 접지 않고 읽히는 길이 — DoD E11)
-    camera     { focus: <R-Phase 천체 id> | 'overview', view?: 'keep' | 'facing-parent' (+ Q8 채택 시 'from-sun') }
-    time?      { julianDate } | { eventId } | 생략 = 유지
+    camera     { focus: <R-Phase 천체 id> | 'overview', view?: 'facing-parent' (+ Q1 (b) 채택 시 'from-sun') }
+               view 생략 = 시점 각 유지 (시점 요청을 내지 않는다 — 'keep' 값은 두지 않는다)
+    time?      { julianDate } | { eventId, offsetHours? } | 생략 = 유지
     timeScale? 기본 0 (정지)
+    window?    timeScale ≠ 0 단계의 재생 구간 [일] — 시작 시각부터 이만큼 지나면 정지 (아래 이탈 축 · T2-5 · T4-4)
     display?   부분 지정 { <표시 토글 id>: boolean } — 지정하지 않은 토글은 투어 시작 시 스냅샷 값
     ruler?     기준점 id | null — 생략 = 해제
   ```
@@ -210,33 +212,40 @@
 - **단계 적용 순서 = 결정 D6 의 일반화** (`time-events.tsx` `select` 와 같은 순서 · 같은 이유 — core 가 `jumpToJulianDate` 에서 장면을 동기로 옮긴 뒤 포커스가 카메라를 잡는다):
   1. 표시 토글 (store setter + core 명령, URL 미기록 — E6)
   2. `jumpToJulianDate`
-  3. `setFocusViewRequest` (시점이 있으면)
+  3. `setFocusViewRequest` — 시점이 있으면 요청, **없으면 `null`** (앞 단계의 미소비 요청이 뒤늦게 새 포커스에 적용되지 않게 — §교차검증 합의 2)
   4. `focusOn` / `resetCamera`
   5. `setTimeScale`
   6. `setRulerAnchor`
-- **순수 함수 2개로 분리** — `planTourStep(step, snapshot) → 명령 · 액션 목록` 과 `detectTourDrift(step, plannedState, storeState) → 이탈 축 목록`. 둘 다 단위 테스트 대상이고, 컴포넌트는 실행 · 구독만 한다.
+- **순수 함수 2개로 분리** — `planTourStep(step, snapshot) → { 명령 · 액션 목록, plannedState }` 와 `detectTourDrift(plannedState, storeState) → 이탈 축 목록`. 사건 id → JD 해석은 `planTourStep` 한 곳에서만 하고 결과를 `plannedState` 로 넘긴다 (§교차검증 합의 4). 둘 다 단위 테스트 대상이고, 컴포넌트는 실행 · 구독만 한다.
+- **같은 천체 단계의 카메라 재구도 계약** (Claude 고유 발견 1 — 정적 판독) — `sim-canvas` 포커스 동기는 `selectedBodyId` 가 **바뀔 때만** 카메라를 옮긴다 (`sim-canvas.tsx` subscribe — 같은 id 를 다시 set 하면 분기 미발화). 같은 천체가 이어지는 단계에서 카메라를 다시 잡으려면 그 단계가 `view` 를 가져야 한다 (`focusViewRequest` 의 「이미 그 body 에 포커스 중」 분기가 재구도를 일으킨다 — #1360). `view` 없는 같은 천체 단계 · 「이 장면으로 돌아가기」 는 카메라를 사용자가 둔 자리에 그대로 둔다 — 줌 · 회전은 이탈이 아니므로 (결정 E3) 이 동작과 정합한다. T2 1→2 · T4 2→3 처럼 재구도가 필요한 전이에는 `view` 를 둔다.
 
 ### 사용자 조작 (E3)
 
 - **자유 허용 + 이탈 감지.** 캔버스 줌 · 회전은 막지도 감지하지도 않는다 (1-C — 장면을 깨지 않는다).
 - **이탈 축** — 단계가 맞춘 값과 store 를 비교한다:
   - `selectedBodyId` ≠ 단계 포커스 (다른 천체 선택 · `Esc` 자유 비행 · 개요 복귀 포함)
-  - 단계 `timeScale === 0` 일 때 `julianDate` ≠ 단계 시각 또는 `timeScale` ≠ 0 (스크러버 · 재생 · 사건 선택)
-  - 단계 `timeScale ≠ 0` 일 때 `timeScale` 변경만 (시각은 흐르는 게 정상)
+  - 단계 `timeScale === 0` 일 때 `|julianDate − 단계 시각| > 1e-6` 일 또는 `timeScale ≠ 0` (스크러버 · 재생 · 사건 선택). 같은 허용 오차를 DoD E2 와 공유한다 (§교차검증 합의 5)
+  - 단계 `timeScale ≠ 0` 일 때 `timeScale` 변경, 그리고 단계가 시각을 지정했으면 `julianDate` 가 `[시작 시각, 시작 시각 + window]` 밖 (§교차검증 이견 수용 1 — 재생 중 스크러버 점프 과소 판정 차단). 시각을 지정하지 않은 재생 단계 (T1-7) 는 시각을 보지 않는다
+  - `window` 끝에 도달하면 컨트롤러가 `setTimeScale(0)` 로 멈춘다 — 단계 진행은 아니다 (결정 E2 — 자동 진행 타이머 없음 유지). 이 정지는 이탈로 세지 않는다 (`plannedState` 를 정지 상태로 갱신)
   - 단계가 지정한 표시 토글 값 변경
   - `freeFlyMode === true`
 - **이탈 시** — 투어는 같은 단계에 머물고 카드에 한 줄 안내 + 「이 장면으로 돌아가기」 (단계 재적용) 를 띄운다. 「다음」 · 「이전」 은 그대로 동작한다 (다음 단계 적용이 곧 복귀다). 투어를 끝내지 않는다.
+- **적용 중 판정 보류** — 단계 명령 묶음을 보내는 동안은 이탈을 판정하지 않는다 (`applying` 플래그 — 묶음 중간의 store 상태가 이탈로 깜빡이지 않게, §교차검증 합의 6). 묶음이 끝난 뒤 첫 판정부터 유효하다. ⚠️ core 의 `focusOn` → `bodySelected` → store 가 묶음 안에서 동기로 끝나는지는 **미실측** — PR1 단위 · 실브라우저에서 확인하고, 비동기면 「`plannedState` 최초 도달까지 보류」 로 바꾼다.
 - **모드 전환** (관찰 · 연구로) 은 투어 종료다.
 
 ### 시작 · 종료 · 복원 (Q7)
 
-- 투어 시작 시 **표시 토글 의도 12종 스냅샷**. 종료 (종료 버튼 · 마지막 단계 「완료」 · 모드 전환 · 카드 `Esc`) 시 그 스냅샷으로 되돌린다 (store + core 명령. URL 은 투어가 쓰지 않았으므로 원래 값 그대로).
+- 투어 시작 시 **표시 토글 의도 12종 스냅샷**. 종료 (종료 버튼 · 마지막 단계 「완료」 · 모드 전환 · 카드 `Esc`) 시 그 스냅샷으로 되돌린다 — store + core 명령 + **표시 URL 키** (`serializeDisplayToggle` 로 스냅샷 의도를 다시 쓴다). 투어 자신은 표시 URL 을 쓰지 않지만 투어 중 사용자가 표시 패널을 누르면 `useDisplayToggle` 이 URL 을 쓰므로, store 만 되돌리면 URL 과 화면이 어긋난다 (§교차검증 합의 3).
+- 스냅샷 시점 = 투어가 시작되는 순간의 store 의도. 공유 링크 직접 진입 (`?tour=`) 이면 URL 표시 키가 이미 store 에 반영된 뒤다 (sim-canvas 가 mount 시 파싱 — 아래 URL 절의 가용성 대기와 같은 시점).
 - 카메라 · 시각 · 배속은 **되돌리지 않는다** — 투어가 끝난 장면에서 바로 둘러볼 수 있게 한다.
 - 교육 모드 진입만으로는 장면을 바꾸지 않는다 — 카드에 투어 목록만 뜬다.
 
 ### URL (E6)
 
 - `?tour=<id>&step=<n>` (1-based, `history: 'replace'`). 로드 시 유효하면 그 단계를 적용 (단계가 `t` · `focus` · `speed` · `ruler` 의 정본). 무효 id · 범위 밖 step 은 키 제거 + dev 경고 (`?focus=` #418 처분).
+- **초기 적용 진입점은 `UrlSync` 의 1회 초기 effect 하나** (§교차검증 합의 1) — `?tour` 가 유효하면 같은 effect 안에서 `?t` · `?focus` · `?speed` · `?ruler` 적용을 건너뛰고 투어 단계 적용으로 넘긴다. 별도 컴포넌트 effect 두 개가 같은 축에 명령을 두 번 보내는 순서 경합을 만들지 않는다. 적용 후 `UrlSync` 의 store → URL effect 가 `t` · `focus` · `ruler` 를 단계 값으로 다시 쓰는 것은 정상이다 (단계가 정본).
+- **가용성 대기** (Claude 고유 발견 2) — 표시 토글 set 경로는 `displayCapabilities === null` (장면 미준비) 이면 no-op 이다 (`useDisplayToggle` 과 같은 `disabledReason`). `UrlSync` 가 그보다 먼저 돌 수 있으므로 (#419 — `UrlSync` 는 core 준비 후 렌더, 가용성은 sim-canvas 가 핸들러 등록 자리에서 set) 초기 단계 적용은 `displayCapabilities !== null` 을 1회 기다린 뒤 보낸다. 두 시점의 실제 선후는 **미실측** — PR1 에서 확인.
+- **온보딩 모달 (#737)** — 유효한 `?tour=` 로 진입한 첫 방문이면 온보딩 자동 표시를 하지 않는다 (투어 카드 포커스와 모달 포커스 트랩 · `Esc` 의 경합 회피, §교차검증 합의 7). 「조작 가이드」 버튼으로는 언제든 연다.
 - `?tour=` 가 있으면 `?mode=education` 을 함의한다 (모드 키가 없어도 교육 모드로 진입).
 - 투어의 표시 토글 변경은 표시 URL 키를 **쓰지 않는다** (임시 상태 — 종료 시 스냅샷 복원). `useDisplayToggle` 은 그대로 두고, 투어 전용 「지정값 set」 경로를 같은 표 (`display-toggles.ts`) 위에 둔다 (가용성 검사 `disabledReason` 동일 적용 — 소프트웨어 렌더에서 별자리 단계는 「이 환경에서는 별을 그릴 수 없습니다」 안내를 카드에 낸다).
 
@@ -245,6 +254,7 @@
 - **데스크톱 (≥ 640 px)** — 하단 중앙, 타임바 위 (`bottom` 은 타임바 상단과 겹치지 않게), 최대 폭 560 px. 구성: 투어 이름 · 진행 `n / N` (진행바) · 단계 제목 · 본문 · `이전` · `다음` (마지막 단계는 `완료`) · `×` (종료).
 - **375** — 좌우 여백 8 px 전폭 바텀시트, 타임바 위, 최대 높이 40 vh (넘치면 본문 스크롤). 접기 버튼 → 1줄 칩 (`2/6 · 일식 ▴`) 으로 장면 확보. 접힘은 단계가 바뀌어도 유지.
 - 교육 모드에서 숨길 것: 관찰 카드 (이미 observe 전용 — 변경 0) · `SatelliteZoomTooltip` (카드와 같은 하단 중앙 — 375 실측 스크린샷에서 겹침 위치).
+- **목록 ↔ 단계는 같은 카드 컨테이너의 두 보기** (§교차검증 합의 8) — 투어 없음 = 목록 보기 (`role="list"` 의 항목마다 버튼 1개 · Tab 이동 · Enter/Space 시작), 투어 중 = 단계 보기. 같은 `role="region"` 이 유지되므로 보기 전환 때 포커스 위치 계약 (E7) 이 한 컴포넌트 안에서 닫힌다.
 - §3.3 의 레터박스 · 포인터 하이라이트 · 용어 hover 툴팁 · 챕터 네비는 **v1 비-범위** (§비-범위). 「시네마틱 바」 는 위 카드로 대체한다.
 - **375 상단 바** (1-E) — Q5 권고 (a): `max-sm` 에서 모드 전환기를 현재 모드 1개 + 펼침 메뉴 (`aria-expanded` 비모달 팝업 — #1380 `shouldPreserveFocus` 계약에 자동 편입) 로 바꾼다. 좌측 그룹이 293 px 이하로 돌아와야 한다 (DoD E9).
 
@@ -281,7 +291,7 @@
 | 2 | 지구 `facing-parent` (태양 쪽) | 같음 | — | 달 그림자가 지구 표면 (북미) 에 떨어진다 |
 | 3 | 지구 `facing-parent` | 2024-03-10 삭 (JD 상수 + 출처 주석) · 정지 | — | 한 달 전 삭에는 그림자가 지구를 비껴간다 — 달 궤도가 5° 기울어 있어서 |
 | 4 | 달 `facing-parent` (지구 쪽) | 사건 `lunar-eclipse:2025-03-14` · 정지 | — | 반대로 지구 그림자에 달이 들어가면 월식 |
-| 5 | 지구 | 사건 일식 시각 앞뒤 3시간 · 10 분/초 재생 | — | 그림자가 지표를 쓸고 지나간다 |
+| 5 | 지구 `facing-parent` | 사건 일식 `offsetHours −3` · 10 분/초 재생 · `window` 0.25 일 (6시간 뒤 정지) | — | 그림자가 지표를 쓸고 지나간다 |
 
 **T3. 계절은 왜 바뀌나** (5단계 — **시점 종류 1개 추가 필요**, 1-F)
 
@@ -300,13 +310,14 @@
 | 1 | 지구 | 2024-12-21 · 정지 | 별자리 켬 · 궤도선 끔 | 별자리는 아주 먼 별들이 그리는 그림 — 행성처럼 움직이지 않는다 |
 | 2 | 지구 `facing-parent` | 2024-12-21 · 정지 | 같음 | 태양 반대편 = 한밤의 하늘. 겨울엔 오리온자리 (실측 — 1-F) |
 | 3 | 지구 `facing-parent` | 2024-06-20 · 정지 | 같음 | 여름엔 궁수자리 · 전갈자리 쪽 (실측 — 1-F) |
-| 4 | 지구 `facing-parent` | 2024-06-20 → 1 년, 30 일/초 재생 | 같음 | 지구가 돌면 한밤의 하늘이 1 년에 한 바퀴 바뀐다 |
+| 4 | 지구 `facing-parent` | 2024-06-20 · 30 일/초 재생 · `window` 365 일 (약 12 초 뒤 정지) | 같음 | 지구가 돌면 한밤의 하늘이 1 년에 한 바퀴 바뀐다 |
 
 T4 는 소프트웨어 렌더에서 별이 없다 (ADR 738 Amendment 2) — 카드에 가용성 안내 (E6 끝 항목).
 
 ### PR 분할 (Q8)
 
-- **PR1 — 투어 엔진 + 교육 탭 + 투어 1개**: `lib/tours` (형식 · `planTourStep` · `detectTourDrift` · 스냅샷 · 복원) · 투어 상태 (store 슬라이스 또는 전용 훅 — developer 재량, 단 이탈 판정은 순수 함수) · 카드 UI (데스크톱 · 375) · 375 모드 전환기 재배치 · URL `tour`/`step` (Q6 채택 시) · **T2 일식** (단계 필드 — 사건 id · 시점 · 거리 자 · 배속 연출 — 를 가장 많이 덮는다).
+- **PR0 — 375 모드 전환기 재배치** (§교차검증 이견 수용 2): `max-sm` 모드 전환기를 현재 모드 + 펼침 메뉴로. 교육은 아직 `enabled: false` (펼침 메뉴 안 비활성 항목). 관찰 · 연구 레이아웃 · #1380 포커스 보존 계약 회귀만 따로 검증한다.
+- **PR1 — 투어 엔진 + 교육 탭 + 투어 1개**: `lib/tours` (형식 · `planTourStep` · `detectTourDrift` · 스냅샷 · 복원) · 투어 상태 (store 슬라이스 또는 전용 훅 — developer 재량, 단 이탈 판정은 순수 함수) · 카드 UI (데스크톱 · 375) · 교육 탭 `enabled: true` · URL `tour`/`step` (Q6 채택 시) · **T2 일식** (단계 필드 — 사건 id · 시점 · 거리 자 · 배속 연출 — 를 가장 많이 덮는다).
 - **PR2 — 콘텐츠**: T1 · T4 (새 코드 0 — 데이터 파일만. §Concrete Prediction).
 - **PR3 — 계절** (Q1 에 T3 포함 시): 시점 종류 `from-sun` 1개 추가 + T3.
 
@@ -323,13 +334,13 @@ T4 는 소프트웨어 렌더에서 별이 없다 (ADR 738 Amendment 2) — 카�
 | Q5 | 카드 위치 · 375 상단 바 | 카드: (a) 하단 중앙 카드 / 375 바텀시트 (b) §3.3 시네마틱 바 + 레터박스 (c) 좌하 카드. 상단 바 (1-E 15 px 초과): (a) 375 모드 전환기 → 현재 모드 + 펼침 메뉴 (b) 교육을 375 「⋯」 패널로 (c) 375 에서 교육 탭 숨김 (투어는 데스크톱 전용) | **카드 (a) · 상단 바 (a)** — (b) 는 교육 진입이 375 에서 2단계 깊이, (c) 는 모바일 교육 포기 |
 | Q6 | 투어 상태 URL | (a) 미반영 (b) `?tour=&step=` (공유 · 새로고침 재개) | **(b)** — 비용 파서 1개, 「이 장면 봐」 공유가 교육 기능의 핵심 |
 | Q7 | 투어 종료 시 복원 | (a) 표시 토글만 되돌림 (b) 표시 + 시각 · 배속 · 카메라 모두 되돌림 (c) 아무것도 되돌리지 않음 | **(a)** — 투어가 끝난 장면에서 바로 둘러볼 수 있고, 투어가 켠 별자리 · 궤적이 남아 관찰 모드를 어지럽히지 않는다 |
-| Q8 | PR 분할 · PR1 투어 | (a) PR1 엔진 + T2 / PR2 T1 · T4 / PR3 T3 (b) PR1 엔진 + T1 (가장 단순) (c) 한 PR | **(a)** — T2 가 단계 필드를 가장 많이 덮어 엔진 계약을 첫 PR 에서 실증한다 |
+| Q8 | PR 분할 · PR1 투어 | (a) PR0 375 모드 전환기 / PR1 엔진 + T2 / PR2 T1 · T4 / PR3 T3 (b) (a) 에서 PR0 을 PR1 에 합침 (c) PR1 투어를 T1 (가장 단순) 로 | **(a)** — 레이아웃 회귀 (관찰 · 연구 공통) 와 투어 엔진 검증을 섞지 않는다. T2 가 단계 필드를 가장 많이 덮어 엔진 계약을 첫 PR 에서 실증한다 |
 
 ---
 
 ## 완료 기준 (DoD 초안 — 측정 가능)
 
-PR1 기준. 「단계 정착」 = 단계 적용 후 `CameraController` animatable 0 (tween 종료) 또는 1,000 ms 경과 중 먼저.
+PR1 기준. store 상태 단언은 단계 적용 묶음 직후 (판정 보류 해제 후) 바로 한다. 카메라 값 (시점 방향 등) 을 단언할 때만 「단계 정착」 = 카메라 animatable 0 (dev 전역 `window.__solarScene` → `activeCamera` 로 읽힌다 — 본 ADR 1-C 실측이 같은 방법) 또는 1,000 ms 경과 중 먼저를 기다린다.
 
 | # | 기준 | 측정 |
 | --- | --- | --- |
@@ -337,11 +348,11 @@ PR1 기준. 「단계 정착」 = 단계 적용 후 `CameraController` animatabl
 | E2 | 단계 상태 단언 — 정착 후 `selectedBodyId` = 단계 포커스 (개요면 `null` · `freeFlyMode false`), `timeScale` = 단계 값, 정지 단계는 `|julianDate − 단계 시각| ≤ 1e-6` 일, 단계가 지정한 표시 의도 = 지정값 · 나머지 = 스냅샷, `rulerAnchorId` = 단계 값 | 단위 (`planTourStep`) + 실브라우저 (전 단계 순회) |
 | E3 | 이동 — `다음` · `이전` · `완료` · `×` 가 마우스 · 터치 (375) · 키보드 (Tab + Enter/Space, 카드 안 `←` `→` `Esc`) 로 동작. 카드 밖 캔버스 `ArrowRight` 는 단계 불변 · 카메라 `alpha` 변화 (1-C 와 같은 회전) | 실브라우저 |
 | E4 | 이탈 — 다른 천체 선택 · 스크러버 이동 · 재생 · 표시 토글 변경 · 캔버스 `Esc` 각각에서 이탈 안내 표시, 캔버스 휠 10틱 · 드래그에서는 표시 안 됨. 「장면으로 돌아가기」 후 E2 단언 통과 | 단위 (`detectTourDrift` 축별) + 실브라우저 |
-| E5 | 종료 복원 — 종료 · 완료 · 모드 전환 각각 후 표시 의도 12종 (표 행 전부) = 시작 전 스냅샷 (전 키 일치), 표시 URL 키 = 시작 전과 동일 | 단위 + 실브라우저 |
-| E6 | URL (Q6 (b)) — `?tour=<T2>&step=3` 새로고침 → 3단계 적용 (E2 단언). 무효 id · `step=0` · `step=N+1` → 키 제거 · 목록 표시 · 콘솔 경고 (dev) | 단위 (파서) + 실브라우저 |
+| E5 | 종료 복원 — 종료 · 완료 · 모드 전환 각각 후 표시 의도 12종 (표 행 전부) = 시작 전 스냅샷 (전 키 일치), 표시 URL 키 = 시작 전과 동일 — **투어 중 표시 패널을 직접 누른 경우 포함** | 단위 + 실브라우저 |
+| E6 | URL (Q6 (b)) — `?tour=<T2>&step=3` 새로고침 → 3단계 적용 (E2 단언). 무효 id · `step=0` · `step=N+1` → 키 제거 · 목록 표시 · 콘솔 경고 (dev). `?tour=&t=&focus=` 동시 진입 시 단계 값이 이긴다. 온보딩 미dismiss 상태로 `?tour=` 진입 → 온보딩 자동 표시 0 · 카드 포커스 | 단위 (파서) + 실브라우저 |
 | E7 | 회귀 없음 — 기존 단위 테스트 전건 통과 · 자유 비행 · 포커스 CI 가드 7종 통과 · `git diff --stat` 에서 `camera-controller.ts` · `sim-canvas.tsx` 포커스 동기 블록 0 줄 (§Concrete Prediction) | CI · diff |
 | E8 | 접근성 — 교육 모드 카드 열림 상태 axe 위반 0 (1280 · 375), 단계 이동 후 `document.activeElement !== body`, `aria-live` 영역 텍스트 = 새 단계 제목 · 본문 | 실브라우저 |
-| E9 | 375 — 상단 바 좌측 그룹 + 「⋯」 ≤ 351 px (1-E 실측 술어), 카드 하단 ≤ 타임바 상단 (겹침 0 px), 카드 높이 ≤ 40 vh, 가로 스크롤 0 | 실브라우저 |
+| E9 | 375 — 상단 바 좌측 그룹 + 「⋯」 ≤ 351 px (1-E 실측 술어 — PR0 에서 먼저 충족, PR1 에서 재확인), 카드 하단 ≤ 타임바 상단 (겹침 0 px), 카드 높이 ≤ 40 vh, 가로 스크롤 0 | 실브라우저 |
 | E10 | 콘솔 에러 0 · 실브라우저 3단계 · 375 · 사용자 육안 승인 (투어 문안 · 장면) | 실브라우저 · 사용자 |
 | E11 | 콘텐츠 유효성 — 전 투어 전 단계: 포커스 id `isRPhaseFocusable` 참, 사건 id 가 `time-events.json` 에 존재, 본문 ≤ 160 자 (375 바텀시트 접힘 없이 읽힘 — PR1 에서 실측 후 재조정 가능) | 단위 1개 (전 투어 순회) |
 
@@ -360,7 +371,7 @@ PR1 기준. 「단계 정착」 = 단계 적용 후 `CameraController` animatabl
 
 ### Concrete Prediction
 
-- PR1: `git diff --stat develop -- packages/` = **0 줄**. `apps/web/src/components/sim-canvas.tsx` 변경은 0 줄 (투어는 명령 · store 만 쓴다).
+- PR0 · PR1: `git diff --stat develop -- packages/` = **0 줄**. `apps/web/src/components/sim-canvas.tsx` 변경은 0 줄 (투어는 명령 · store 만 쓴다).
 - PR2 (T1 · T4): `apps/web/src/lib/tours/` 의 투어 파일 추가 + 목록 1줄만. 엔진 · 컴포넌트 0 줄. 예측이 깨지면 단계 형식이 부족하다는 신호다 (`data-not-code-extension` 교훈).
 - PR3 (T3): `packages/core` 변경 = 시점 종류 타입 1 멤버, `sim-canvas.tsx` 변경 = `consumeFocusView` 분기 1개.
 
@@ -388,7 +399,7 @@ PR1 기준. 「단계 정착」 = 단계 적용 후 `CameraController` animatabl
 
 ## 구현 인계 (PR1)
 
-- **시작 지점**: `apps/web/src/lib/tours/types.ts` (단계 형식) → `plan-tour-step.ts` · `detect-tour-drift.ts` (순수 함수 + 단위 테스트) → 투어 상태 훅 → `components/layout/tour-card.tsx` → `mode-switcher.tsx` (`education` `enabled: true` + 375 재배치) → `app-shell.tsx` 배치.
+- **시작 지점**: `apps/web/src/lib/tours/types.ts` (단계 형식) → `plan-tour-step.ts` · `detect-tour-drift.ts` (순수 함수 + 단위 테스트) → 투어 상태 훅 → `components/layout/tour-card.tsx` → `mode-switcher.tsx` (`education` `enabled: true` — 375 재배치는 PR0) → `url-sync.tsx` 초기 effect (`?tour` 분기) → `onboarding-modal.tsx` (`?tour=` 진입 시 자동 표시 생략) → `app-shell.tsx` 배치.
 - **재사용 (신규 구현 금지)**: 사건 선택 순서 (`time-events.tsx` `select`) · `display-toggles.ts` 표 (`setterKey` · `command` · `disabledReason`) · `getEventKind` · `eventFocusBodyId` · `isRPhaseFocusable` · `useSwitchMode` · `isFocusInExpandedPopup` (`expanded-popup.ts`).
 - **무접촉**: `packages/core/**` (PR3 전까지) · `camera-controller.ts` · `sim-canvas.tsx` 포커스 동기 · 자유 비행 블록 · `useDisplayToggle` 의 반전 의미 (투어 전용 set 경로를 따로 둔다).
 - ⚠️ 표시 URL 키 맵 (`DISPLAY_URL_KEYS`) 을 투어 경로에서 쓰지 않는다 — 쓰면 종료 복원 후 URL 이 투어 값을 남긴다 (E5).
@@ -398,4 +409,39 @@ PR1 기준. 「단계 정착」 = 단계 적용 후 `CameraController` animatabl
 
 ## 교차검증 반영 사항
 
-(cross-validate 결과 통합 후 작성 — Provisional → Accepted 전이 조건)
+cross-validate 1회 — 외부 검증 모델 Antigravity `agy` (`cross_validate.sh architecture`, 2026-10-21 06:23~06:25 UTC, outcome `applied` · `plan_bypass false`). 입력 = 본 ADR 초판 + 아래 셀프 체크 미통과 4축 명시 질문 + 이탈 감지 질문 1개. 10 분 상한 감시를 걸었고 약 2 분에 끝났다 (#1363 hang 재발 없음).
+
+⚠️ 상태는 **Provisional 유지** — 결과는 본문에 통합했으나 사용자 결정 Q 표가 남았다. Q 확정 후 Accepted 로 전이한다.
+
+### 합의 (본문에 반영)
+
+1. **초기 로드 순서 경합** — `UrlSync` 초기 effect 와 별도 투어 effect 가 같은 축 (`t` · `focus`) 에 명령을 두 번 보낸다. ⇒ 진입점을 `UrlSync` 초기 effect 하나로 묶고 `?tour` 유효 시 개별 키 적용을 건너뛴다 (결정 · URL 절).
+2. **미소비 `focusViewRequest` 잔류** — `view` 없는 단계도 `setFocusViewRequest(null)` 을 보낸다 (단계 적용 순서 3). 비용 0 인 방어라 수용. 다만 `sim-canvas` `consumeFocusView` 는 포커스 동기마다 요청을 「어느 쪽이든 비운다」 (`sim-canvas.tsx` 주석) — 잔류가 실제로 생기는 경로는 포커스 동기가 돌지 않는 경우 (같은 천체 · 메시 부재) 로 좁다.
+3. **투어 중 사용자가 표시 패널을 누르면 URL 오염** — 종료 복원이 표시 URL 키까지 되돌린다 (시작 · 종료 · 복원 절, DoD E5 보강).
+4. **사건 id → JD 해석 중복** — `planTourStep` 이 `plannedState` 를 함께 돌려주고 `detectTourDrift` 는 그것만 본다.
+5. **시각 비교 허용 오차** — 이탈 판정에도 DoD E2 와 같은 `1e-6` 일.
+6. **명령 묶음 중간 상태의 이탈 오판** — `applying` 판정 보류. 단 동기 여부는 미실측이라 PR1 확인 항목으로 남겼다.
+7. **온보딩 모달 경합** — `?tour=` 진입 첫 방문은 자동 표시 생략 (`onboarding-modal.tsx` 의 자동 표시 조건 = `!navigator.webdriver && !dismissed` 확인).
+8. **목록 보기 ↔ 단계 보기 구조 미명시** — 같은 카드 컨테이너의 두 보기로 명시.
+9. **T2-5 「사건 앞뒤 3시간」 을 표현할 필드 부재** — `time: { eventId, offsetHours? }` 추가 (하드코딩 JD 회피).
+
+### 이견 수용
+
+1. **재생 단계의 과소 판정** — 원안: 「`timeScale ≠ 0` 단계는 `timeScale` 변경만 본다」. 외부 모델 반례: T2-5 재생 중 스크러버로 10 년 뒤로 가도 배속이 같으면 이탈이 아니다 — 일식이 없는 장면을 보면서 「돌아가기」 가 안 뜬다. ⇒ 시각을 지정한 재생 단계는 `window` 를 두고 그 밖이면 이탈. 같은 필드가 「자동 정지 없음 (E2) 이면 T4-4 는 언제 끝나나」 라는 지적도 닫는다 — `window` 끝에서 정지 (진행 아님).
+2. **PR1 범위 과대** — 원안: 375 모드 전환기 재배치를 PR1 에 포함. 외부 모델 근거: 모드 전환기는 관찰 · 연구 공통 레이아웃이고 #1380 포커스 보존 계약에 닿아 회귀 성격이 투어 엔진과 다르다. ⇒ PR0 으로 분리 (Q8 권고 변경).
+
+### Claude 재분석으로 기각한 외부 모델 제안
+
+1. **「`CameraController` 가 노출되지 않아 테스트가 animatable 0 을 읽을 수 없다」** — 사실과 다르다. dev 빌드 전역 `window.__solarScene` → `meshes.get('sun').getScene().activeCamera` 로 읽힌다 (본 ADR 1-C 실측 스크립트가 바로 그 방법으로 `getAllAnimatablesByTarget(camera)` 를 표본했다). 권고의 나머지 절반 — store 단언은 즉시, 카메라 단언만 정착 대기 — 는 수용해 DoD 머리말을 고쳤다.
+2. **「재생 단계에서 일시정지 후 원래 배속으로 돌리면 비이탈로 복귀 — 현행 유지 권고」** — 결론 (현행 유지) 은 같으나 근거가 바뀌었다: 이견 수용 1 의 `window` 가 들어간 뒤로는 정지 동안 흐르지 않은 시각이 `window` 안에 있는 한 비이탈이 맞고, 밖이면 이탈이다. 별도 조치 없음.
+
+### 고유 발견 (Claude — 외부 모델 미지적)
+
+1. **같은 천체 단계는 카메라를 다시 잡지 않는다** (정적 판독) — `sim-canvas` 포커스 동기가 `selectedBodyId` 변화에만 반응한다. 재구도가 필요한 전이는 `view` 를 둬야 한다 → 결정 · 엔진 절에 계약으로 박제. 후속 이슈 불요 (투어 데이터 규칙으로 닫힘).
+2. **표시 토글 set 이 장면 준비 전이면 no-op** — `disabledReason(null)` 이 막는다. 초기 단계 적용은 `displayCapabilities !== null` 대기 (URL 절). 선후 실측은 PR1.
+
+후속 이슈 분리 0 건 — 전부 PR0~PR3 범위 안에서 닫힌다.
+
+### 호출 전 Claude 편향 셀프 체크
+
+[cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종 — **낙관적 일정 · 결합 간과 · 폐기 프레이밍 · 순수주의 4축 모두 미통과로 보고 명시 질문으로 삽입**했다. 결과: 낙관적 일정 → 이견 수용 2 (PR0 분리) / 결합 간과 → 합의 1 · 2 · 3 · 6 · 7 + 고유 발견 2 / 폐기 프레이밍 → 외부 모델이 §3.3 축소 판단을 타당하다고 봄 (반론 없음 — 다만 단일 모델의 동의는 검증이 아니므로 재검토 조건 4 를 유지) / 순수주의 → 프로덕션 무접촉은 유지, DoD 의 측정 술어만 완화.
