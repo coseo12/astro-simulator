@@ -43,6 +43,9 @@ import { useSimStore } from '@/store/sim-store';
 let mockUrlFocus: string | null = null;
 let mockUrlRuler: string | null = null;
 const setUrlRulerMock = vi.fn();
+// #1381 — `t` 는 값 · setter 둘 다 추적한다 (일시정지 중 store → URL).
+let mockUrlT: number | null = null;
+const setUrlTMock = vi.fn();
 
 vi.mock('nuqs', () => ({
   useQueryState: vi.fn((key: string) => {
@@ -51,6 +54,9 @@ vi.mock('nuqs', () => ({
     }
     if (key === 'ruler') {
       return [mockUrlRuler, setUrlRulerMock];
+    }
+    if (key === 't') {
+      return [mockUrlT, setUrlTMock];
     }
     return [null, vi.fn()];
   }),
@@ -88,13 +94,16 @@ vi.mock('@astro-simulator/core', async (importOriginal) => {
 });
 
 // 동적 import — vi.mock 등록 후 평가되도록.
-const { UrlSync } = await import('./url-sync');
+const { UrlSync, pausedUrlTime } = await import('./url-sync');
+const { useQueryState } = await import('nuqs');
 
 beforeEach(() => {
   sentCommands = [];
   mockUrlFocus = null;
   mockUrlRuler = null;
   setUrlRulerMock.mockReset();
+  mockUrlT = null;
+  setUrlTMock.mockReset();
   rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — disabled 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
@@ -299,5 +308,88 @@ describe('UrlSync — ?ruler= 거리 자 기준점 (#1341 PR2 결정 R7)', () =>
       useSimStore.getState().setRulerAnchor(null);
     });
     expect(setUrlRulerMock).toHaveBeenLastCalledWith(null);
+  });
+});
+
+/** #1381 — 사건 시각 (1902-05-07 일식 근방). 값 자체는 임의 — J2000 이 아니면 된다. */
+const EVENT_JD = 2_415_876.5432109876;
+const J2000 = 2_451_545.0;
+
+describe('UrlSync — ?t= 일시정지 중 store → URL (#1381)', () => {
+  it('pausedUrlTime — 재생 중 (정 · 역행 · 전 배속) · 시각 미정은 쓰지 않는다, 정지 중 J2000 은 키 삭제', () => {
+    for (const scale of [1, 3_600, 86_400, 3_155_760_000, -1, -86_400]) {
+      expect(pausedUrlTime(EVENT_JD, scale)).toBeUndefined();
+    }
+    expect(pausedUrlTime(null, 0)).toBeUndefined();
+    expect(pausedUrlTime(Number.NaN, 0)).toBeUndefined();
+    expect(pausedUrlTime(EVENT_JD, 0)).toBe(EVENT_JD);
+    expect(pausedUrlTime(J2000, 0)).toBeNull();
+  });
+
+  it('사건 선택 순서 (시각 점프 → 일시정지) — 정지된 뒤 `t` 를 사건 시각 그대로 (반올림 없이) 1회 쓴다', () => {
+    useSimStore.setState({ julianDate: J2000, timeScale: 86_400 });
+    render(<UrlSync />);
+    setUrlTMock.mockClear();
+    act(() => {
+      useSimStore.getState().setTime(EVENT_JD);
+    });
+    expect(setUrlTMock).not.toHaveBeenCalled();
+    act(() => {
+      useSimStore.getState().setTimeScale(0);
+    });
+    expect(setUrlTMock).toHaveBeenCalledTimes(1);
+    expect(setUrlTMock).toHaveBeenLastCalledWith(EVENT_JD);
+  });
+
+  it('재생 중 시각 변화 (프레임마다) — `t` 쓰기 0회 · 리렌더 0회 (리렌더 폭주 방지 규약 유지)', () => {
+    useSimStore.setState({ julianDate: J2000, timeScale: 86_400 });
+    render(<UrlSync />);
+    setUrlTMock.mockClear();
+    // 렌더 횟수 대리 지표 — `UrlSync` 는 렌더마다 `useQueryState` 를 키 수만큼 부른다 (PR #1384 리뷰 권고 2).
+    const callsBefore = vi.mocked(useQueryState).mock.calls.length;
+    for (let i = 1; i <= 120; i += 1) {
+      act(() => {
+        useSimStore.getState().setTime(J2000 + i / 60);
+      });
+    }
+    expect(setUrlTMock).not.toHaveBeenCalled();
+    expect(vi.mocked(useQueryState).mock.calls.length).toBe(callsBefore);
+  });
+
+  it('정지 중 이산 조작 (「지금」 · 스크러버) — 바뀐 시각마다 쓴다, 재생으로 돌아가도 지우지 않는다', () => {
+    useSimStore.setState({ julianDate: EVENT_JD, timeScale: 0 });
+    mockUrlT = EVENT_JD;
+    render(<UrlSync />);
+    setUrlTMock.mockClear();
+    const now = 2_461_000.25;
+    act(() => {
+      useSimStore.getState().setTime(now);
+    });
+    expect(setUrlTMock).toHaveBeenLastCalledWith(now);
+    setUrlTMock.mockClear();
+    act(() => {
+      useSimStore.getState().setTimeScale(86_400);
+    });
+    expect(setUrlTMock).not.toHaveBeenCalled();
+  });
+
+  it('`?t=` 직접 입력 + 정지 부팅 — URL 값과 같은 시각이면 다시 쓰지 않는다 (URL 원문 보존)', () => {
+    mockUrlT = EVENT_JD;
+    useSimStore.setState({ julianDate: EVENT_JD, timeScale: 0 });
+    render(<UrlSync />);
+    expect(sentCommands).toContainEqual({ type: 'jumpToJulianDate', julianDate: EVENT_JD });
+    expect(setUrlTMock).not.toHaveBeenCalled();
+  });
+
+  it('정지 중 J2000 — URL 의 `t` 키를 지운다 (부재 = J2000 기본값), URL 에 없으면 쓰지 않는다', () => {
+    mockUrlT = EVENT_JD;
+    useSimStore.setState({ julianDate: J2000, timeScale: 0 });
+    render(<UrlSync />);
+    expect(setUrlTMock).toHaveBeenLastCalledWith(null);
+    cleanup();
+    setUrlTMock.mockClear();
+    mockUrlT = null;
+    render(<UrlSync />);
+    expect(setUrlTMock).not.toHaveBeenCalled();
   });
 });

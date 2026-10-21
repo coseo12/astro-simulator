@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { DISPLAY_DISABLED_REASONS } from '@/core/display-toggles';
 import { useSimStore } from '@/store/sim-store';
+import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import { DisplayPanel } from './display-panel';
 import { FocusQuickButtons } from './focus-quick-buttons';
 
@@ -70,6 +71,16 @@ beforeEach(() => {
 });
 
 describe('DisplayPanel — 열기/닫기', () => {
+  it('#1380 — 열린 패널의 토글 · 트리거는 캔버스 refocus 보호 대상이다 (ARIA 계약), 닫히면 트리거도 대상이 아니다', () => {
+    renderPanel();
+    openPanel();
+    expect(isFocusInExpandedPopup(toggleEl('orbits'))).toBe(true);
+    expect(isFocusInExpandedPopup(trigger())).toBe(true);
+    openPanel();
+    expect(screen.queryByTestId('display-panel')).toBeNull();
+    expect(isFocusInExpandedPopup(trigger())).toBe(false);
+  });
+
   it('닫힘: aria-expanded=false · 패널 없음', () => {
     renderPanel();
     expect(trigger()).toHaveAttribute('aria-expanded', 'false');
