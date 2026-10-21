@@ -8,7 +8,9 @@ import {
 import { J2000_JD, type SimMode } from '@astro-simulator/shared';
 import { parseAsFloat, parseAsString, parseAsStringEnum, useQueryState } from 'nuqs';
 import { useEffect, useRef } from 'react';
+import { parseTourParam } from '@/lib/tours/parse-tour-param';
 import { useSimStore } from '@/store/sim-store';
+import { useTourStore } from '@/store/tour-store';
 import { useSimCommand } from './sim-context';
 import { parseLodLevel } from './parse-lod-level';
 import { parseRulerAnchor } from './parse-ruler-anchor';
@@ -29,6 +31,11 @@ type PhysicsEngineUrl = (typeof ENGINE_VALUES)[number];
  *    J2000 이면 키를 지운다 (`t` 부재 = J2000 — `speed` 의 기본값 삭제 규약과 같다).
  *
  * 재생 중 임의 시점의 공유는 북마크 버튼 (`bookmark-button.tsx`) 이 스냅샷으로 담는다.
+ *
+ * #1390 — `?tour=<id>&step=<n>` (ADR `20261021-1390` 결정 · URL). 초기 적용 진입점은 **이 컴포넌트의 초기 effect 하나**다 —
+ * 유효하면 교육 모드로 들어가고 (`?tour` 가 `?mode=education` 을 함의) `t` · `focus` · `speed` · `ruler` 적용을 건너뛴 채 투어
+ * 시작을 요청한다 (단계가 그 네 축의 정본 — §교차검증 합의 1). 실제 적용은 투어 컨트롤러가 장면 가용성을 기다려 한다. 이후
+ * store → URL 은 진행 중인 투어 · 단계를 쓴다 (`history: 'replace'`).
  */
 export function UrlSync() {
   const [urlMode, setUrlMode] = useQueryState(
@@ -56,6 +63,15 @@ export function UrlSync() {
     'ruler',
     parseAsString.withOptions({ history: 'replace' }),
   );
+  // #1390 — 투어 · 단계 (1-based). 값 검증은 `parseTourParam` 이 한다 — 여기서는 문자열 그대로 읽고 쓴다.
+  const [urlTour, setUrlTour] = useQueryState(
+    'tour',
+    parseAsString.withOptions({ history: 'replace' }),
+  );
+  const [urlStep, setUrlStep] = useQueryState(
+    'step',
+    parseAsString.withOptions({ history: 'replace' }),
+  );
 
   const mode = useSimStore((s) => s.mode);
   // #1381 — 정지 중 시각만 구독한다. 재생 중에는 `null` 로 고정돼 매 프레임 `timeChanged` 가 이 컴포넌트를 다시 그리지 않는다
@@ -68,6 +84,9 @@ export function UrlSync() {
   const setPhysicsEngine = useSimStore((s) => s.setPhysicsEngine);
   const rulerAnchorId = useSimStore((s) => s.rulerAnchorId);
   const setRulerAnchor = useSimStore((s) => s.setRulerAnchor);
+  const activeTourId = useTourStore((s) => s.activeTourId);
+  const tourStepIndex = useTourStore((s) => s.stepIndex);
+  const tourPending = useTourStore((s) => s.pendingStart !== null);
   // #419 §결정 2 — `setSelectedBody` 직접 호출 제거 (race fallback 폐기, event 단일 진실원 회복).
 
   const sendCommand = useSimCommand();
@@ -78,11 +97,29 @@ export function UrlSync() {
     if (initialized.current) return;
     initialized.current = true;
 
-    if (urlMode) {
-      setMode(urlMode);
-      sendCommand({ type: 'setMode', mode: urlMode });
+    // #1390 — 투어 진입. 키가 있으면 (무효여도) 교육 모드 — 무효는 키를 지우고 목록을 보인다 (`?focus=` #418 처분).
+    const tourParam = parseTourParam(urlTour, urlStep);
+    if (tourParam.kind === 'invalid') {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[url-sync] ${tourParam.reason} — 무시 (투어 목록 표시).`);
+      }
+      setUrlTour(null);
+      setUrlStep(null);
+    } else if (tourParam.kind === 'none' && urlStep !== null && urlStep !== undefined) {
+      // 투어 없는 `?step=` 은 의미가 없다.
+      setUrlStep(null);
     }
-    if (urlT !== null && urlT !== undefined && Number.isFinite(urlT)) {
+    const tourEntry = tourParam.kind === 'valid' ? tourParam : null;
+    const initialMode = tourParam.kind === 'none' ? urlMode : 'education';
+    if (initialMode) {
+      setMode(initialMode);
+      sendCommand({ type: 'setMode', mode: initialMode });
+    }
+    if (tourEntry) {
+      useTourStore.getState().requestStart(tourEntry.tourId, tourEntry.stepIndex);
+    }
+    // 유효한 투어면 시각 · 포커스 · 배속 · 기준점은 단계가 정한다 — 여기서 보내면 같은 축에 명령이 두 번 간다.
+    if (!tourEntry && urlT !== null && urlT !== undefined && Number.isFinite(urlT)) {
       sendCommand({ type: 'jumpToJulianDate', julianDate: urlT });
     }
     // R1 #329 — `?focus=<bodyId>` 허용 body id 검증.
@@ -91,7 +128,7 @@ export function UrlSync() {
     // #415 — R-Phase allowlist 가드 (defense-in-depth store mutation 측면, 3번째 방어선).
     // ADR: docs/decisions/20260504-415-url-sync-guard.md §결정 1 (옵션 B).
     // #402 부모 ADR §결정 2 (UI) + §결정 3 (scene) 와 직교 — url-sync 의 store 직접 mutation 우회 차단.
-    if (urlFocus) {
+    if (!tourEntry && urlFocus) {
       const validIds = new Set(ephemerisApi.getSolarSystem().bodies.map((b) => b.id));
       if (!validIds.has(urlFocus)) {
         if (process.env.NODE_ENV !== 'production') {
@@ -126,12 +163,12 @@ export function UrlSync() {
         sendCommand({ type: 'focusOn', bodyId: urlFocus });
       }
     }
-    if (urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
+    if (!tourEntry && urlSpeed !== null && urlSpeed !== undefined && Number.isFinite(urlSpeed)) {
       sendCommand({ type: 'setTimeScale', scale: urlSpeed });
     }
     // #1341 PR2 — 기준점은 store 만 쓴다. 화면 선은 sim-canvas 가 store (기준점 · 선택) 를 구독해 `setRuler` 명령으로 보낸다.
     // 무효 값은 파서가 warn 후 null — URL 에서도 지운다 (`?focus=` #418 과 같은 처분).
-    if (urlRuler !== null && urlRuler !== undefined) {
+    if (!tourEntry && urlRuler !== null && urlRuler !== undefined) {
       const anchor = parseRulerAnchor(urlRuler);
       if (anchor !== null) setRulerAnchor(anchor);
       else setUrlRuler(null);
@@ -180,6 +217,15 @@ export function UrlSync() {
     if (!initialized.current) return;
     setUrlRuler(rulerAnchorId);
   }, [rulerAnchorId, setUrlRuler]);
+
+  // #1390 — 진행 중인 투어 · 단계. 시작 대기 중에는 쓰지 않는다 (URL 진입 값을 시작 전에 지우지 않게). 대기 여부는 **지금** store 를
+  // 읽는다 — 초기 effect 가 시작을 요청한 같은 커밋에서는 렌더 시점 값 (`tourPending`) 이 아직 false 다.
+  useEffect(() => {
+    if (!initialized.current || tourPending || useTourStore.getState().pendingStart !== null)
+      return;
+    setUrlTour(activeTourId);
+    setUrlStep(activeTourId === null ? null : String(tourStepIndex + 1));
+  }, [activeTourId, tourStepIndex, tourPending, setUrlTour, setUrlStep]);
 
   return null;
 }

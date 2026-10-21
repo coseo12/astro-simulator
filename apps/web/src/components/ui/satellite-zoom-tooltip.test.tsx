@@ -97,6 +97,25 @@ describe('SatelliteZoomTooltip (#534)', () => {
       expect(screen.getByTestId('satellite-zoom-tooltip')).toBeInTheDocument();
     });
 
+    it('#1390 — 교육 모드 (투어 카드 자리) → 표시 · 박제 안 함, 관찰 모드로 돌아오면 그 천체에서 뜬다', () => {
+      useSimStore.setState({ mode: 'education' });
+      try {
+        render(<SatelliteZoomTooltip />);
+        focusBody('earth', 2000);
+        expect(screen.queryByTestId('satellite-zoom-tooltip')).toBeNull();
+        expect(window.localStorage.getItem('r4.satellite-zoom-tooltip-shown.earth')).toBeNull();
+        act(() => {
+          useSimStore.setState({ mode: 'observe' });
+        });
+        act(() => {
+          vi.advanceTimersByTime(1500);
+        });
+        expect(screen.getByTestId('satellite-zoom-tooltip')).toBeInTheDocument();
+      } finally {
+        useSimStore.setState({ mode: 'observe' });
+      }
+    });
+
     it('delay 중 focus 이탈 → tooltip 미표시 + localStorage 박제 안 됨 (architect 위험 2)', () => {
       render(<SatelliteZoomTooltip />);
       focusBody('earth', 500);

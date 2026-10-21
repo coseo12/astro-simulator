@@ -69,6 +69,18 @@ describe('FreeFlyKeyHint (#737)', () => {
       expect(window.localStorage.getItem(FREE_FLY_HINT_STORAGE_KEY)).toBe('1');
     });
 
+    it('#1390 — 교육 모드 (투어 카드 자리) 진입 → 표시 · 박제 안 함', () => {
+      useSimStore.setState({ mode: 'education' });
+      try {
+        render(<FreeFlyKeyHint />);
+        enterFreeFly();
+        expect(screen.queryByTestId('free-fly-key-hint')).toBeNull();
+        expect(window.localStorage.getItem(FREE_FLY_HINT_STORAGE_KEY)).toBeNull();
+      } finally {
+        useSimStore.setState({ mode: 'observe' });
+      }
+    });
+
     it('이미 박제된 경우 → 진입해도 미표시 (글로벌 1회)', () => {
       window.localStorage.setItem(FREE_FLY_HINT_STORAGE_KEY, '1');
       render(<FreeFlyKeyHint />);

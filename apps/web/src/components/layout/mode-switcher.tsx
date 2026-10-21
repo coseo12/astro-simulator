@@ -26,7 +26,8 @@ interface ModeDef {
 const MODES: ModeDef[] = [
   { id: 'observe', label: '관찰', enabled: true },
   { id: 'research', label: '연구', enabled: true },
-  { id: 'education', label: '교육', enabled: false, tooltip: 'P2+ 예정' },
+  // #1390 PR1 — 가이드 투어 (ADR `20261021-1390`). 투어 카드 (`tour-card.tsx`) 가 교육 모드에서만 보인다.
+  { id: 'education', label: '교육', enabled: true },
   { id: 'sandbox', label: '샌드박스', enabled: false, tooltip: 'P2+ 예정' },
 ];
 
@@ -57,7 +58,7 @@ function resolveMenuPosition(trigger: HTMLElement): MenuPosition {
 
 /**
  * ModeSwitcher — 4모드 중 하나 선택.
- * P1 스코프: observe/research 활성화. education/sandbox는 비활성 (tooltip).
+ * observe/research/education (#1390 PR1) 활성화. sandbox는 비활성 (tooltip).
  * 선택 시 html[data-mode] 속성 갱신 → design-tokens CSS Variables 자동 전환.
  *
  * #1390 PR0 — 폭에 따라 두 표현 중 하나만 보인다 (CSS 분기 — 서버 · 클라 첫 렌더가 같아 hydration 분기가 없다).
@@ -128,7 +129,7 @@ export function ModeSwitcher() {
  *   - Esc 는 window capture + `preventDefault()` (자유시점 Esc 오발화 차단) · 메뉴 밖 pointerdown · resize · 포커스 이탈로 닫힘.
  *   - 항목 `menuitemradio` + 로빙 포커스 (↓↑ 순환 · Home/End · Tab 은 닫고 트리거 다음 요소).
  *
- * 비활성 모드 (교육 · 샌드박스) 는 메뉴 안에 `disabled` 항목으로 남기고 사유 「P2+ 예정」 을 **보이는 글자**로 둔다 — 터치에는
+ * 비활성 모드 (샌드박스 — 교육은 #1390 PR1 에서 활성) 는 메뉴 안에 `disabled` 항목으로 남기고 사유 「P2+ 예정」 을 **보이는 글자**로 둔다 — 터치에는
  * `title` 툴팁이 없다. `sm` 이상에서는 `sm:hidden` 이라 트리거가 보이지 않는다 (resize 로 경계를 넘으면 열린 메뉴는 닫힌다).
  */
 function ModeMenuCompact({ mode, onSelect }: { mode: SimMode; onSelect: (next: SimMode) => void }) {

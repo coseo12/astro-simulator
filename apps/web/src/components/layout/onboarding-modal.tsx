@@ -6,6 +6,7 @@ import { Keyboard } from 'lucide-react';
 import { R_PHASE_BODY_ALLOWLIST } from '@astro-simulator/core';
 import { Modal } from '@/components/ui/modal';
 import { getOnboardingDismissed, markOnboardingDismissed } from '@/lib/onboarding-storage';
+import { parseTourParam } from '@/lib/tours/parse-tour-param';
 
 /**
  * #737 — 첫 진입 온보딩 + 조작 가이드 모달.
@@ -119,9 +120,14 @@ export function OnboardingModal() {
   //   가드로 근본 해결. r1-ui-regression-guard.mjs 의 localStorage dismiss(176af2c)와 이중 방어.
   //   수동 호출("조작 가이드" 버튼)은 본 가드와 무관하게 정상 작동한다(가드는 자동표시 useEffect 한정).
   //   SSR 안전: 자동표시 useEffect 는 클라이언트 전용이나 방어적으로 typeof navigator 가드.
+  //
+  // #1390 — 유효한 `?tour=` 진입이면 자동 표시하지 않는다 (ADR `20261021-1390` §교차검증 합의 7 — 투어 카드 포커스와 모달 포커스
+  // 트랩 · Esc 경합 회피). 판정은 URL 파서와 같은 함수 — 무효 투어 키는 목록으로 떨어지므로 평소처럼 연다.
   useEffect(() => {
     const isAutomation = typeof navigator !== 'undefined' && navigator.webdriver;
-    if (!isAutomation && !getOnboardingDismissed()) {
+    const params = new URLSearchParams(window.location.search);
+    const tourEntry = parseTourParam(params.get('tour'), params.get('step')).kind === 'valid';
+    if (!isAutomation && !tourEntry && !getOnboardingDismissed()) {
       // 외부 시스템(localStorage) 동기화 결과를 React 상태로 1회 반영 — 마운트 1회라 cascading
       // 무한루프 없음 (satellite-zoom-tooltip 의 외부 store sync 선례와 동일 정당 false-positive).
       // eslint-disable-next-line react-hooks/set-state-in-effect

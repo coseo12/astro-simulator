@@ -96,6 +96,22 @@ describe('ScaleControl — 렌더 + 초기 sync (DoD-3)', () => {
     expect(valueNow).toBeCloseTo(Math.log10(50), 2);
   });
 
+  it('#1390 — 래퍼의 투명 영역은 탭을 받지 않고 라벨 · 슬라이더만 받는다 (375 투어 바텀시트 「×」 · 「접기」 가림 — PR #1394 qa)', () => {
+    // jsdom 은 hit-test 를 하지 않는다 — 계약을 클래스로 고정한다 (실제 가림 해소는 실브라우저 9점 hit-test 매트릭스 — PR 기록).
+    mockCamera = createMockCamera(50);
+    mockTier = 'solar';
+    render(<ScaleControl />);
+    const wrapperClasses = screen.getByTestId('scale-control').className.split(/\s+/);
+    expect(wrapperClasses).toContain('pointer-events-none');
+    expect(wrapperClasses).not.toContain('pointer-events-auto');
+    expect(screen.getByTestId('scale-slider').className.split(/\s+/)).toContain(
+      'pointer-events-auto',
+    );
+    expect(screen.getByTestId('scale-label').className.split(/\s+/)).toContain(
+      'pointer-events-auto',
+    );
+  });
+
   it('camera 가 null 이면 hardcode 35 그대로 (race fallback)', () => {
     mockCamera = null;
     mockTier = 'solar';

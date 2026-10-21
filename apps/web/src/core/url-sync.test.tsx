@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import type * as AstroCore from '@astro-simulator/core';
 import { useSimStore } from '@/store/sim-store';
+import { useTourStore } from '@/store/tour-store';
 
 /**
  * #415 — url-sync R-Phase Allowlist 가드 단위 테스트 (DoD-3).
@@ -46,6 +47,13 @@ const setUrlRulerMock = vi.fn();
 // #1381 — `t` 는 값 · setter 둘 다 추적한다 (일시정지 중 store → URL).
 let mockUrlT: number | null = null;
 const setUrlTMock = vi.fn();
+// #1390 — 투어 · 단계 (원문 문자열). 나머지 키 (mode · speed) 는 값을 바꿔 가며 「건너뛰기」 를 본다.
+let mockUrlTour: string | null = null;
+let mockUrlStep: string | null = null;
+let mockUrlMode: string | null = null;
+let mockUrlSpeed: number | null = null;
+const setUrlTourMock = vi.fn();
+const setUrlStepMock = vi.fn();
 
 vi.mock('nuqs', () => ({
   useQueryState: vi.fn((key: string) => {
@@ -58,6 +66,10 @@ vi.mock('nuqs', () => ({
     if (key === 't') {
       return [mockUrlT, setUrlTMock];
     }
+    if (key === 'tour') return [mockUrlTour, setUrlTourMock];
+    if (key === 'step') return [mockUrlStep, setUrlStepMock];
+    if (key === 'mode') return [mockUrlMode, vi.fn()];
+    if (key === 'speed') return [mockUrlSpeed, vi.fn()];
     return [null, vi.fn()];
   }),
   // parser 들은 .withOptions() 체이닝만 흉내내고 실 사용 0 (mock 이 무시).
@@ -104,6 +116,13 @@ beforeEach(() => {
   setUrlRulerMock.mockReset();
   mockUrlT = null;
   setUrlTMock.mockReset();
+  mockUrlTour = null;
+  mockUrlStep = null;
+  mockUrlMode = null;
+  mockUrlSpeed = null;
+  setUrlTourMock.mockReset();
+  setUrlStepMock.mockReset();
+  useTourStore.getState().reset();
   rPhaseMock.disabledIds = []; // 기본 passthrough (실모듈) — disabled 계약 테스트만 개별 지정
   useSimStore.setState({
     rendererKind: null,
@@ -391,5 +410,69 @@ describe('UrlSync — ?t= 일시정지 중 store → URL (#1381)', () => {
     mockUrlT = null;
     render(<UrlSync />);
     expect(setUrlTMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('UrlSync — ?tour=&step= 투어 진입 (#1390 결정 · URL / DoD E6)', () => {
+  it('유효 → 교육 모드 + 시작 요청 (1-based → 0-based), t · focus · speed · ruler 적용을 건너뛴다 (단계가 정본)', () => {
+    mockUrlTour = 'eclipse';
+    mockUrlStep = '3';
+    mockUrlMode = 'research';
+    mockUrlT = 2451545;
+    mockUrlFocus = 'mars';
+    mockUrlSpeed = 3600;
+    mockUrlRuler = 'sun';
+    render(<UrlSync />);
+    expect(useSimStore.getState().mode).toBe('education');
+    expect(sentCommands).toContainEqual({ type: 'setMode', mode: 'education' });
+    expect(useTourStore.getState().pendingStart).toEqual({
+      tourId: 'eclipse',
+      stepIndex: 2,
+    });
+    const types = sentCommands.map((c) => c.type);
+    expect(types).not.toContain('jumpToJulianDate');
+    expect(types).not.toContain('focusOn');
+    expect(types).not.toContain('setTimeScale');
+    expect(useSimStore.getState().rulerAnchorId).toBeNull();
+    // 시작 대기 중에는 투어 키를 지우지 않는다.
+    expect(setUrlTourMock).not.toHaveBeenCalledWith(null);
+  });
+
+  it.each([
+    ['모르는 투어', 'nope', '1'],
+    ['step=0', 'eclipse', '0'],
+    ['step=N+1', 'eclipse', '6'],
+  ])(
+    '무효 (%s) → 키 제거 + 경고 + 교육 모드 (목록) · 다른 키는 평소대로 적용',
+    (_n, tour, step) => {
+      mockUrlTour = tour;
+      mockUrlStep = step;
+      mockUrlFocus = 'earth';
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      render(<UrlSync />);
+      expect(setUrlTourMock).toHaveBeenCalledWith(null);
+      expect(setUrlStepMock).toHaveBeenCalledWith(null);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('투어 목록 표시'));
+      expect(useSimStore.getState().mode).toBe('education');
+      expect(useTourStore.getState().pendingStart).toBeNull();
+      expect(sentCommands).toContainEqual({ type: 'focusOn', bodyId: 'earth' });
+    },
+  );
+
+  it('투어 없는 ?step= 은 지운다 · 모드는 URL 대로', () => {
+    mockUrlStep = '2';
+    render(<UrlSync />);
+    expect(setUrlStepMock).toHaveBeenCalledWith(null);
+    expect(useSimStore.getState().mode).toBe('observe');
+  });
+
+  it('store → URL — 진행 중 투어 · 단계 (1-based), 종료 시 둘 다 지운다', () => {
+    render(<UrlSync />);
+    act(() => useTourStore.getState().patch({ activeTourId: 'eclipse', stepIndex: 1 }));
+    expect(setUrlTourMock).toHaveBeenLastCalledWith('eclipse');
+    expect(setUrlStepMock).toHaveBeenLastCalledWith('2');
+    act(() => useTourStore.getState().reset());
+    expect(setUrlTourMock).toHaveBeenLastCalledWith(null);
+    expect(setUrlStepMock).toHaveBeenLastCalledWith(null);
   });
 });

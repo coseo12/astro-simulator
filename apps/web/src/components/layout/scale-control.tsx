@@ -131,12 +131,15 @@ export function ScaleControl() {
   return (
     <div
       data-testid="scale-control"
-      className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-col items-center gap-2 z-[var(--z-hud)] pointer-events-auto"
+      // #1390 PR1 — 래퍼는 탭을 받지 않는다 (`pointer-events-none`). 폭은 라벨 (「221 mAU (focus: 지구)」) 이 만들어 145×223 의
+      // 투명 상자가 되는데, 그 빈 곳이 아래 요소 (375 투어 바텀시트의 「×」 · 「접기」, 캔버스) 의 탭을 가로챘다 (PR #1394 qa).
+      // 조작 대상인 라벨 · 슬라이더만 `pointer-events-auto` 다.
+      className="absolute top-1/2 -translate-y-1/2 right-3 flex flex-col items-center gap-2 z-[var(--z-hud)] pointer-events-none"
     >
       <span
         data-testid="scale-label"
         data-hud-chip
-        className="hud-chip num text-caption text-fg-secondary px-1.5 py-0.5 rounded-xs"
+        className="hud-chip num text-caption text-fg-secondary px-1.5 py-0.5 rounded-xs pointer-events-auto"
       >
         {labelText}
         {focusSuffix}
@@ -149,7 +152,8 @@ export function ScaleControl() {
         step={0.01}
         onValueChange={handleChange}
         onValueCommit={handleCommit}
-        className="relative flex items-center justify-center select-none touch-none w-5 h-48"
+        data-testid="scale-slider"
+        className="relative flex items-center justify-center select-none touch-none w-5 h-48 pointer-events-auto"
       >
         <Slider.Track className="relative grow w-1 rounded-full bg-bg-elevated">
           <Slider.Range className="absolute w-full bg-primary/50 rounded-full" />

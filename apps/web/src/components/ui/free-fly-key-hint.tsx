@@ -49,6 +49,9 @@ function isTouchDevice(): boolean {
 
 export function FreeFlyKeyHint() {
   const freeFlyMode = useSimStore((s) => s.freeFlyMode);
+  // #1390 — 교육 모드에서는 투어 카드가 같은 하단 중앙을 쓴다 (`satellite-zoom-tooltip` 과 같은 처리). 표시도 박제도 하지 않아
+  // 관찰 · 연구 모드의 첫 자유시점 진입에서 그대로 보인다.
+  const education = useSimStore((s) => s.mode === 'education');
   const [visible, setVisible] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
   // 터치 기기 판정 — 마운트 후 1회 (SSR 은 항상 false → Hydration 안전).
@@ -65,14 +68,14 @@ export function FreeFlyKeyHint() {
     const entered = freeFlyMode && !prevFreeFlyRef.current;
     prevFreeFlyRef.current = freeFlyMode;
     if (!entered) return;
-    // 터치 기기 / 이미 표시한 경우 skip (글로벌 1회 박제).
-    if (touch) return;
+    // 터치 기기 / 교육 모드 / 이미 표시한 경우 skip (글로벌 1회 박제).
+    if (touch || education) return;
     if (getFreeFlyHintShown()) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(true);
     setFadingOut(false);
     markFreeFlyHintShown(); // 표시 시점에 글로벌 박제.
-  }, [freeFlyMode, touch]);
+  }, [freeFlyMode, touch, education]);
 
   // 자동 fade-out — visible=true 시점부터 5초 후 fade 시작.
   useEffect(() => {
@@ -96,7 +99,7 @@ export function FreeFlyKeyHint() {
     }, FADE_DURATION_MS);
   };
 
-  if (touch || !visible) return null;
+  if (touch || !visible || education) return null;
 
   return (
     <div

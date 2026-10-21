@@ -164,7 +164,6 @@ describe('TopBar — 오버플로 메뉴 (#1313)', () => {
   it.each([
     ['표시 패널', () => useSimStore.setState({ displayPanelOpen: true })],
     ['천체 메뉴', () => useSimStore.setState({ bodyMenuOpen: true })],
-    ['모드 메뉴 (#1390)', () => useSimStore.setState({ modeMenuOpen: true })],
     [
       '모달',
       () => {
@@ -184,6 +183,26 @@ describe('TopBar — 오버플로 메뉴 (#1313)', () => {
     expect(ev.defaultPrevented).toBe(false);
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
     document.querySelectorAll('[data-modal-open]').forEach((el) => el.remove());
+  });
+
+  it('#1390 PR1 — 모드 메뉴가 열리면 「⋯」 패널을 닫는다 (PR0 qa — 375 에서 두 패널이 겹쳤다) · 포커스는 옮기지 않는다', () => {
+    renderBar();
+    fireEvent.click(toggle());
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    const other = document.createElement('button');
+    document.body.appendChild(other);
+    other.focus();
+    act(() => useSimStore.setState({ modeMenuOpen: true }));
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(group()).not.toHaveAttribute('data-overflow-open');
+    expect(document.activeElement).toBe(other);
+    // 닫힌 뒤의 Esc 는 「⋯」 리스너가 받지 않는다 — 모드 메뉴 Esc 만 남는다.
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      window.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+    other.remove();
   });
 
   it('캔버스 pointerdown → 닫힘 / 패널 밖의 다른 요소 pointerdown → 유지', () => {
