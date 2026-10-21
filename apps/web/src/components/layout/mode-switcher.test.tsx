@@ -1,6 +1,6 @@
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { useSimStore } from '@/store/sim-store';
 import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
@@ -83,6 +83,18 @@ describe('ModeSwitcher', () => {
     expect(document.documentElement.getAttribute('data-mode')).toBe('research');
   });
 });
+
+/**
+ * `focus-quick-buttons` 의 자유시점 Esc 는 window **bubble** 리스너이고 메뉴보다 먼저 등록된다. 메뉴 리스너가 bubble 이면
+ * 등록 순서상 자유시점이 먼저 돌아 `defaultPrevented` 를 보지 못한다. 그 순서를 재현하려고 파일 안 어떤 메뉴 리스너보다도
+ * 먼저 (`beforeAll`) window bubble 리스너를 걸어 둔다 — capture ↔ bubble 을 판별하는 것은 이 등록 순서다.
+ */
+const escSeenByEarlierBubble: boolean[] = [];
+const recordEsc = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') escSeenByEarlierBubble.push(e.defaultPrevented);
+};
+beforeAll(() => window.addEventListener('keydown', recordEsc));
+afterAll(() => window.removeEventListener('keydown', recordEsc));
 
 const trigger = () => screen.getByTestId('mode-menu-trigger');
 const item = (id: string) => screen.getByTestId(`mode-menu-${id}`);
@@ -235,16 +247,25 @@ describe('ModeSwitcher — 모바일 모드 메뉴 (#1390 PR0)', () => {
     expect(document.activeElement).toBe(item('research'));
   });
 
-  it('Esc 는 capture 에서 preventDefault 하고 닫은 뒤 트리거로 포커스를 돌린다', () => {
+  it('Esc 는 window capture 에서 preventDefault — 먼저 등록된 window bubble 리스너 (자유시점 Esc) 가 defaultPrevented 를 본다', () => {
     renderWithNeighbors();
     fireEvent.click(trigger());
-    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    escSeenByEarlierBubble.length = 0;
     act(() => {
-      window.dispatchEvent(ev);
+      fireEvent.keyDown(item('observe'), { key: 'Escape' });
     });
-    expect(ev.defaultPrevented).toBe(true);
+    expect(escSeenByEarlierBubble).toEqual([true]);
     expect(screen.queryByTestId('mode-menu')).toBeNull();
     expect(document.activeElement).toBe(trigger());
+  });
+
+  it('현재 모드가 첫 항목이 아니어도 Enter 로 열면 현재 모드 항목에 포커스 (연구)', async () => {
+    useSimStore.setState({ mode: 'research' });
+    const user = userEvent.setup();
+    renderWithNeighbors();
+    trigger().focus();
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(item('research'));
   });
 
   it('Tab → 닫고 트리거 다음 요소 / Shift+Tab → 닫고 트리거', async () => {

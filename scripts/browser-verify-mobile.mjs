@@ -47,7 +47,11 @@ await withBrowser({}, async (browser) => {
   // 기본 요소 렌더
   check('모바일 canvas 렌더', (await page.$('canvas')) !== null);
   check('TopBar 렌더 (로고)', (await page.$('header[data-testid="topbar"]')) !== null);
-  check('모드 스위처 렌더', (await page.$('[data-testid="mode-switcher"]')) !== null);
+  // #1390 PR0 — 640px 미만에서 버튼 그룹 (`mode-switcher`) 은 DOM 에 있지만 숨는다 — 존재가 아니라 보이는 트리거를 본다.
+  check(
+    '모드 메뉴 트리거 보임',
+    await page.locator('[data-testid="mode-menu-trigger"]').isVisible(),
+  );
 
   // 가로 스크롤 발생 여부 (반응형 깨짐 검출)
   const hScroll = await page.evaluate(() => {
