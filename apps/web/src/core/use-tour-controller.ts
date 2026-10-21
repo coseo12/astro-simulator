@@ -33,11 +33,13 @@ import {
   plannedAfterWindowStop,
   type TourDriftAxis,
   type TourObservedState,
+  type TourTimeSample,
 } from '@/lib/tours/detect-tour-drift';
 import {
   planDisplayRestore,
   planTourStep,
   readDisplayIntents,
+  type PlannedTourState,
   type TourAction,
 } from '@/lib/tours/plan-tour-step';
 import type { TourDef } from '@/lib/tours/types';
@@ -78,6 +80,11 @@ function observe(): TourObservedState {
   };
 }
 
+function sampleNow(): TourTimeSample {
+  const s = useSimStore.getState();
+  return { julianDate: s.julianDate, timeScale: s.timeScale, atMs: performance.now() };
+}
+
 function sameAxes(a: readonly TourDriftAxis[], b: readonly TourDriftAxis[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i]);
 }
@@ -96,6 +103,8 @@ export function useTourController(): TourController {
   const [, setDisplayUrl] = useQueryStates(DISPLAY_URL_KEYS, { history: 'replace' });
   const applyingRef = useRef(false);
   const stopScheduledRef = useRef(false);
+  /** 직전 시각 · 배속 표본 — 재생 구간 끝 판정이 프레임 진행과 사용자 도약을 가르는 기준 (`isTourWindowComplete`). */
+  const sampleRef = useRef<TourTimeSample | null>(null);
 
   const mode = useSimStore((s) => s.mode);
   const capabilities = useSimStore((s) => s.displayCapabilities);
@@ -163,6 +172,8 @@ export function useTourController(): TourController {
       }
       execute(plan.actions);
       stopScheduledRef.current = false;
+      // 단계 적용 직후의 시각 · 배속이 다음 판정의 기준 표본이다 (적용 묶음 동안 구독은 판정을 건너뛴다).
+      sampleRef.current = sampleNow();
       useTourStore.getState().patch({
         stepIndex,
         planned: plan.planned,
@@ -213,36 +224,42 @@ export function useTourController(): TourController {
   // 구독 — 재생 구간 끝 정지 + 이탈 판정.
   useEffect(() => {
     if (activeTourId === null) return;
-    const stopAtWindowEnd = () => {
+    const stopAtWindowEnd = (target: PlannedTourState) => {
       stopScheduledRef.current = false;
-      const planned = useTourStore.getState().planned;
-      if (
-        planned === null ||
-        planned.window === null ||
-        !isTourWindowComplete(planned, observe())
-      ) {
+      // 마이크로태스크 사이에 단계가 바뀌었거나 배속이 바뀌었으면 (사건 선택은 마지막에 정지를 보낸다) 멈추지 않는다.
+      if (useTourStore.getState().planned !== target || target.window === null) return;
+      if (useSimStore.getState().timeScale !== target.timeScale) {
+        evaluate();
         return;
       }
       // 정지 → 구간 끝 시각으로 맞춤 (프레임 경계 초과분을 지워 정지 시각이 결정적이다). 이탈로 세지 않는다.
       execute([
         { type: 'command', command: { type: 'setTimeScale', scale: 0 } },
-        {
-          type: 'command',
-          command: { type: 'jumpToJulianDate', julianDate: planned.window.endJd },
-        },
+        { type: 'command', command: { type: 'jumpToJulianDate', julianDate: target.window.endJd } },
       ]);
-      useTourStore.getState().patch({ planned: plannedAfterWindowStop(planned) });
+      sampleRef.current = sampleNow();
+      useTourStore.getState().patch({ planned: plannedAfterWindowStop(target) });
       evaluate();
     };
-    return useSimStore.subscribe((s) => {
+    return useSimStore.subscribe((s, prevState) => {
+      // 표본은 판정 보류 중에도 갱신한다 — 다음 판정의 「직전」 이 늘 최신이어야 도약 · 진행을 가를 수 있다.
+      const before = sampleRef.current;
+      const timeMoved =
+        s.julianDate !== prevState.julianDate || s.timeScale !== prevState.timeScale;
+      const cur: TourTimeSample = {
+        julianDate: s.julianDate,
+        timeScale: s.timeScale,
+        atMs: performance.now(),
+      };
+      if (timeMoved) sampleRef.current = cur;
       const planned = useTourStore.getState().planned;
       if (planned === null || applyingRef.current) return;
-      if (isTourWindowComplete(planned, s)) {
+      if (timeMoved && isTourWindowComplete(planned, before, cur)) {
         // 구독 콜백 안에서 store 를 다시 쓰지 않는다 — 같은 알림 루프의 다른 구독자 (sim-canvas 등) 가 낡은 (state, prev) 쌍을
         // 받는다. 마이크로태스크로 미룬다.
         if (!stopScheduledRef.current) {
           stopScheduledRef.current = true;
-          queueMicrotask(stopAtWindowEnd);
+          queueMicrotask(() => stopAtWindowEnd(planned));
         }
         return;
       }
@@ -271,7 +288,7 @@ export function useTourController(): TourController {
     if (!tour) return;
     // 실패 뒤 재시도 포함 — `requestTimeEvents` 는 불러오는 중 · 완료면 no-op, 실패 뒤면 다시 받는다.
     if (tourUsesEvents(tour)) requestTimeEvents();
-    useTourStore.getState().requestStart(tourId, 0, true);
+    useTourStore.getState().requestStart(tourId, 0);
   }, []);
 
   const goTo = useCallback(

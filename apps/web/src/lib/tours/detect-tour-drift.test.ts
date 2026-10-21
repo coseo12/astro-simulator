@@ -136,15 +136,73 @@ describe('detectTourDrift — 재생 단계 (§교차검증 이견 수용 1)', (
 });
 
 describe('isTourWindowComplete · plannedAfterWindowStop (결정 E2 — 구간 끝 정지)', () => {
-  it('구간 끝 도달 시 참 · 전에는 거짓', () => {
-    expect(isTourWindowComplete(PLAYING, { julianDate: JD + 0.2, timeScale: 600 })).toBe(false);
-    expect(isTourWindowComplete(PLAYING, { julianDate: JD + 0.25, timeScale: 600 })).toBe(true);
-    expect(isTourWindowComplete(PLAYING, { julianDate: JD + 0.3, timeScale: 600 })).toBe(true);
+  /** 600 배 재생에서 16 ms 프레임 1개의 진행량 [일]. */
+  const FRAME_MS = 16;
+  const FRAME_DAYS = ((FRAME_MS / 1000) * 600) / 86_400;
+  const sample = (julianDate: number, atMs: number, timeScale = 600) => ({
+    julianDate,
+    timeScale,
+    atMs,
+  });
+  const END = JD + 0.25;
+
+  it('프레임 진행으로 끝을 넘으면 참 · 끝 전이면 거짓', () => {
+    const prev = sample(END - FRAME_DAYS / 2, 1000);
+    expect(isTourWindowComplete(PLAYING, prev, sample(END + FRAME_DAYS / 2, 1000 + FRAME_MS))).toBe(
+      true,
+    );
+    expect(
+      isTourWindowComplete(PLAYING, sample(JD + 0.1, 1000), sample(JD + 0.1 + FRAME_DAYS, 1016)),
+    ).toBe(false);
   });
 
-  it('사용자가 배속을 바꿨으면 구간 종료가 아니다 (이탈이다)', () => {
-    expect(isTourWindowComplete(PLAYING, { julianDate: JD + 0.3, timeScale: 86_400 })).toBe(false);
-    expect(isTourWindowComplete(PAUSED, { julianDate: JD + 0.3, timeScale: 0 })).toBe(false);
+  it('탭 복귀 뒤 긴 프레임 (벽시계 5 s) 도 그만큼의 진행이면 재생으로 본다', () => {
+    const longFrameDays = (5 * 600) / 86_400;
+    expect(
+      isTourWindowComplete(
+        PLAYING,
+        sample(END - 0.001, 0),
+        sample(END - 0.001 + longFrameDays, 5000),
+      ),
+    ).toBe(true);
+  });
+
+  it('B1 — 같은 배속 그대로 미래로 도약 (스크러버 앞으로 · 「지금」) 은 완료가 아니고 time 이탈이다', () => {
+    // 리뷰 프로브와 같은 입력 — 두 술어가 같은 입력에 서로 반대로 답하지 않아야 한다.
+    const jumps = [END + 3650, END + 0.05, JD + 680];
+    for (const jd of jumps) {
+      expect(
+        isTourWindowComplete(PLAYING, sample(JD + 0.1, 1000), sample(jd, 1016)),
+        String(jd),
+      ).toBe(false);
+      expect(detectTourDrift(PLAYING, { ...settled(PLAYING), julianDate: jd }), String(jd)).toEqual(
+        ['time'],
+      );
+    }
+  });
+
+  it('직전 표본 없음 · 직전이 구간 밖 · 배속이 바뀐 표본은 완료가 아니다', () => {
+    const cur = sample(END + FRAME_DAYS, 1016);
+    expect(isTourWindowComplete(PLAYING, null, cur)).toBe(false);
+    // 이미 구간 밖 (끝 너머) 에서 재생이 이어지는 중 — 프레임 진행이어도 「끝에 닿음」 이 아니다 (그 상태는 time 이탈).
+    expect(
+      isTourWindowComplete(
+        PLAYING,
+        sample(END + 0.01, 1000),
+        sample(END + 0.01 + FRAME_DAYS, 1016),
+      ),
+    ).toBe(false);
+    expect(isTourWindowComplete(PLAYING, sample(END, 1000, 0), cur)).toBe(false);
+    expect(
+      isTourWindowComplete(
+        PLAYING,
+        sample(END - FRAME_DAYS, 1000),
+        sample(END + FRAME_DAYS, 1016, 86_400),
+      ),
+    ).toBe(false);
+    expect(
+      isTourWindowComplete(PAUSED, sample(END - FRAME_DAYS, 1000, 0), sample(END, 1016, 0)),
+    ).toBe(false);
   });
 
   it('정지 후 기준 장면 = 정지 · 구간 끝 시각 → 그 상태는 이탈 0', () => {

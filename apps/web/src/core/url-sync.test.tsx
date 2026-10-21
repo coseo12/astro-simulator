@@ -428,7 +428,6 @@ describe('UrlSync — ?tour=&step= 투어 진입 (#1390 결정 · URL / DoD E6)'
     expect(useTourStore.getState().pendingStart).toEqual({
       tourId: 'eclipse',
       stepIndex: 2,
-      focusCard: true,
     });
     const types = sentCommands.map((c) => c.type);
     expect(types).not.toContain('jumpToJulianDate');

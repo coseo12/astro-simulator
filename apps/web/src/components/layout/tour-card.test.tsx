@@ -267,24 +267,78 @@ describe('TourCard — 이탈 (E4)', () => {
     expect(screen.queryByTestId('tour-drift')).toBeNull();
   });
 
-  it('재생 단계는 구간 끝에서 멈추고 (이탈 아님) 구간 끝 시각에 선다', async () => {
+  /** 5단계로 이동 (600 배 재생 · 구간 0.25 일). 벽시계는 `performance.now` 를 고정값으로 돌린다. */
+  async function enterShadowSweep(nowRef: { ms: number }) {
+    vi.spyOn(performance, 'now').mockImplementation(() => nowRef.ms);
     await startEclipse();
     for (let i = 0; i < 4; i++) act(() => fireEvent.click(screen.getByTestId('tour-next')));
     const planned = useTourStore.getState().planned!;
-    const end = planned.window!.endJd;
-    // 재생 중 프레임 — 구간 안.
-    act(() => useSimStore.getState().setTime(planned.window!.startJd + 0.1));
+    expect(planned.timeScale).toBe(600);
+    return planned.window!;
+  }
+  /** 600 배 · 16 ms 프레임 1개의 진행량 [일]. */
+  const FRAME_DAYS = (0.016 * 600) / 86_400;
+
+  it('재생 단계는 프레임 진행으로 구간 끝에 닿으면 멈추고 (이탈 아님) 구간 끝 시각에 선다', async () => {
+    const now = { ms: 1000 };
+    const { startJd, endJd } = await enterShadowSweep(now);
+    // 재생 중 프레임 — 구간 안 (벽시계도 그만큼 흐른다).
+    now.ms += 16;
+    act(() => useSimStore.getState().setTime(startJd + FRAME_DAYS));
     expect(useTourStore.getState().drift).toEqual([]);
-    // 프레임이 끝을 넘김 → 마이크로태스크에서 정지.
+    // 끝 직전까지 흐른 상태 → 다음 프레임이 끝을 넘김 → 마이크로태스크에서 정지.
+    now.ms += 16;
+    act(() => useSimStore.getState().setTime(endJd - FRAME_DAYS / 2));
+    now.ms += 16;
     await act(async () => {
-      useSimStore.getState().setTime(end + 0.003);
+      useSimStore.getState().setTime(endJd + FRAME_DAYS / 2);
       await Promise.resolve();
     });
     const s = useSimStore.getState();
     expect(s.timeScale).toBe(0);
-    expect(s.julianDate).toBe(end);
+    expect(s.julianDate).toBe(endJd);
     expect(useTourStore.getState().drift).toEqual([]);
     expect(useTourStore.getState().stepIndex).toBe(4);
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['미래 10년 도약 (리뷰 프로브)', (end: number) => end + 3650],
+    ['스크러버 앞으로 — 끝을 조금 넘김', (end: number) => end + 0.05],
+    ['「지금」 — 먼 미래', (end: number) => end + 900],
+  ])(
+    'B1 — 재생 중 %s → 시각 유지 · 배속 유지 · time 이탈 안내 (끝으로 되돌리지 않는다)',
+    async (_name, target) => {
+      const now = { ms: 1000 };
+      const { startJd, endJd } = await enterShadowSweep(now);
+      now.ms += 16;
+      act(() => useSimStore.getState().setTime(startJd + FRAME_DAYS));
+      const jd = target(endJd);
+      now.ms += 16;
+      await act(async () => {
+        fakeCore({ type: 'jumpToJulianDate', julianDate: jd });
+        await Promise.resolve();
+      });
+      const s = useSimStore.getState();
+      expect(s.julianDate).toBe(jd);
+      expect(s.timeScale).toBe(600);
+      expect(useTourStore.getState().drift).toEqual(['time']);
+      expect(screen.getByTestId('tour-drift')).toHaveAttribute('data-drift-axes', 'time');
+      vi.restoreAllMocks();
+    },
+  );
+
+  it('B1 대조 — 과거로 도약도 time 이탈 (종전과 같음)', async () => {
+    const now = { ms: 1000 };
+    const { startJd } = await enterShadowSweep(now);
+    now.ms += 16;
+    await act(async () => {
+      fakeCore({ type: 'jumpToJulianDate', julianDate: startJd - 3650 });
+      await Promise.resolve();
+    });
+    expect(useSimStore.getState().julianDate).toBe(startJd - 3650);
+    expect(useTourStore.getState().drift).toEqual(['time']);
+    vi.restoreAllMocks();
   });
 });
 
@@ -339,7 +393,7 @@ describe('TourCard — 종료 복원 (E5)', () => {
 describe('TourCard — URL 진입 시작 요청 (E6 · 고유 발견 2 — 가용성 대기)', () => {
   it('장면 미준비 (capabilities null) 동안은 적용하지 않고, 준비되면 그 단계를 적용 · 카드 포커스', async () => {
     useSimStore.setState({ displayCapabilities: null });
-    useTourStore.getState().requestStart('eclipse', 2, true);
+    useTourStore.getState().requestStart('eclipse', 2);
     render(<TourCard />);
     await act(async () => {
       await Promise.resolve();

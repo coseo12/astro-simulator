@@ -116,7 +116,7 @@ export function UrlSync() {
       sendCommand({ type: 'setMode', mode: initialMode });
     }
     if (tourEntry) {
-      useTourStore.getState().requestStart(tourEntry.tourId, tourEntry.stepIndex, true);
+      useTourStore.getState().requestStart(tourEntry.tourId, tourEntry.stepIndex);
     }
     // 유효한 투어면 시각 · 포커스 · 배속 · 기준점은 단계가 정한다 — 여기서 보내면 같은 축에 명령이 두 번 간다.
     if (!tourEntry && urlT !== null && urlT !== undefined && Number.isFinite(urlT)) {

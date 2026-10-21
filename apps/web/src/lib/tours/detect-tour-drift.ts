@@ -53,20 +53,57 @@ export function detectTourDrift(
   return axes;
 }
 
+/** 초당 일수 — 배속 [초/초] × 벽시계 [초] → 장면 시각 진행 [일]. */
+const SECONDS_PER_DAY = 86_400;
 /**
- * 재생 구간 끝에 닿았는가 — 컨트롤러가 이 판정으로 정지한다 (결정 E2 — 단계 진행은 아니다). 단계 배속 그대로 재생 중일 때만
- * 참이다 (사용자가 배속을 바꿨으면 그건 이탈이지 구간 종료가 아니다).
+ * 프레임 진행으로 인정하는 시각 진행의 배수 여유 — 「직전 표본 이후 벽시계 경과 × 배속」 의 이 배까지는 재생이 흘린 시각이다.
+ * core 는 프레임 dt 를 자르지 않으므로 (`simulation-core.ts` 렌더 루프 — 탭 복귀 뒤 첫 프레임은 길다) 고정 dt 상한 대신 **벽시계
+ * 경과로 기대 진행량을 잰다**. 2 배 = core 의 프레임 시각과 구독 알림 시각의 어긋남 흡수.
+ */
+export const TOUR_FRAME_ADVANCE_SLACK = 2;
+/** 벽시계 경과의 하한 [ms] — 같은 태스크 안 연속 알림 (경과 ≈ 0) 에서도 한 프레임 분량은 진행으로 인정한다. */
+export const TOUR_MIN_FRAME_MS = 50;
+
+/** 시각 · 배속 표본 — 컨트롤러가 store 의 시각 · 배속이 바뀔 때마다 벽시계 시각과 함께 남긴다. */
+export interface TourTimeSample {
+  julianDate: number | null;
+  timeScale: number;
+  /** `performance.now()` [ms]. */
+  atMs: number;
+}
+
+/**
+ * 재생 구간 끝에 **재생으로** 닿았는가 — 컨트롤러가 이 판정으로 정지한다 (결정 E2 — 단계 진행은 아니다).
+ *
+ * 참 조건 (전부): 직전 표본 · 지금 모두 단계 배속으로 재생 중 · 직전 표본은 구간 안 · 지금은 끝을 넘음 · 그 사이 진행이 재생 방향이고
+ * 「벽시계 경과 × 배속 × 여유」 이내. 마지막 조건이 **프레임 진행과 사용자 도약을 가른다** — 재생 중 스크러버를 앞으로 끌거나
+ * 「지금」 을 누르면 (배속은 그대로 `jumpToJulianDate` 만 간다) 같은 배속 · 끝 너머라도 거짓이고, 그 도약은 `detectTourDrift`
+ * 의 `'time'` 이탈이 된다 (PR #1394 리뷰 B1 — 종전 판정은 「배속 같음 ∧ 끝 너머」 뿐이라 도약을 끝으로 되돌리고 안내도 없었다).
  */
 export function isTourWindowComplete(
   planned: PlannedTourState,
-  observed: Pick<TourObservedState, 'julianDate' | 'timeScale'>,
+  prev: TourTimeSample | null,
+  cur: TourTimeSample,
 ): boolean {
-  if (planned.window === null || planned.timeScale === 0) return false;
-  if (observed.timeScale !== planned.timeScale || observed.julianDate === null) return false;
-  const end = planned.window.endJd;
-  return planned.timeScale > 0
-    ? observed.julianDate >= end - TOUR_TIME_TOLERANCE_DAYS
-    : observed.julianDate <= end + TOUR_TIME_TOLERANCE_DAYS;
+  const window = planned.window;
+  const scale = planned.timeScale;
+  if (window === null || scale === 0 || prev === null) return false;
+  if (prev.timeScale !== scale || cur.timeScale !== scale) return false;
+  if (prev.julianDate === null || cur.julianDate === null) return false;
+  if (!insideWindow(prev.julianDate, window)) return false;
+  const direction = Math.sign(scale);
+  const crossed =
+    direction > 0
+      ? cur.julianDate >= window.endJd - TOUR_TIME_TOLERANCE_DAYS
+      : cur.julianDate <= window.endJd + TOUR_TIME_TOLERANCE_DAYS;
+  if (!crossed) return false;
+  const advanceDays = (cur.julianDate - prev.julianDate) * direction;
+  const elapsedMs = Math.max(cur.atMs - prev.atMs, TOUR_MIN_FRAME_MS);
+  const expectedDays = ((elapsedMs / 1000) * Math.abs(scale)) / SECONDS_PER_DAY;
+  return (
+    advanceDays >= -TOUR_TIME_TOLERANCE_DAYS &&
+    advanceDays <= expectedDays * TOUR_FRAME_ADVANCE_SLACK + TOUR_TIME_TOLERANCE_DAYS
+  );
 }
 
 /** 구간 끝에서 멈춘 뒤의 기준 장면 — 정지 · 시각 = 구간 끝. 이 정지는 이탈로 세지 않는다 (결정 E3). */

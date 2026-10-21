@@ -65,6 +65,9 @@ export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode })
       if (
         st.displayPanelOpen ||
         st.bodyMenuOpen ||
+        // #1390 PR1 이후 이 항은 현행 UI 경로로는 도달하지 않는다 — 모드 메뉴가 열리면 위 effect 가 「⋯」 를 닫아 이 리스너가
+        // 해제되고, 모드 메뉴가 열린 채 「⋯」 를 누르면 모드 메뉴의 바깥 pointerdown 이 먼저 닫는다. 그래도 남긴다: 「위에 뜬
+        // 팝업에 양보」 목록에서 하나만 빠지면, 닫기 effect 가 없어지는 날 Esc 1회가 두 패널을 함께 닫는 순서 결함이 조용히 돌아온다.
         st.modeMenuOpen ||
         document.querySelector('[data-modal-open="true"]')
       ) {

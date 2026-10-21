@@ -22,7 +22,7 @@ export interface TourStoreState {
    * 시작 요청 — 장면 가용성 (`displayCapabilities !== null`) 과 사건 목록 준비를 기다려 컨트롤러가 소비한다. URL 진입
    * (`UrlSync` 초기 effect) 과 목록 버튼이 같은 경로를 쓴다 (ADR 결정 · URL — 초기 적용 진입점 단일).
    */
-  pendingStart: { tourId: string; stepIndex: number; focusCard: boolean } | null;
+  pendingStart: { tourId: string; stepIndex: number } | null;
   /** 투어 시작 순간의 표시 의도 12종 — 종료 시 복원 (결정 Q7). */
   displaySnapshot: DisplayIntents | null;
   /** 투어 시작 순간의 표시 URL 키 원문 — 종료 시 그대로 되돌린다 (`null` = 키 없음). */
@@ -36,7 +36,7 @@ export interface TourStoreState {
   /** 단계 적용 실패 사유 (사건 목록 불러오기 실패 등). */
   error: string | null;
 
-  requestStart: (tourId: string, stepIndex: number, focusCard: boolean) => void;
+  requestStart: (tourId: string, stepIndex: number) => void;
   /** 진행 상태 일괄 갱신 (컨트롤러 전용). */
   patch: (partial: Partial<Omit<TourStoreState, 'requestStart' | 'patch' | 'reset'>>) => void;
   reset: () => void;
@@ -56,8 +56,7 @@ const INITIAL: Omit<TourStoreState, 'requestStart' | 'patch' | 'reset'> = {
 
 export const useTourStore = create<TourStoreState>((set) => ({
   ...INITIAL,
-  requestStart: (tourId, stepIndex, focusCard) =>
-    set({ pendingStart: { tourId, stepIndex, focusCard }, error: null }),
+  requestStart: (tourId, stepIndex) => set({ pendingStart: { tourId, stepIndex }, error: null }),
   patch: (partial) => set(partial),
   reset: () => set(INITIAL),
 }));
