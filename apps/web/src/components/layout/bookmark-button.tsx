@@ -52,7 +52,29 @@ export function BookmarkButton() {
     >
       {/* #1281 — 1440 미만은 아이콘만, 라벨은 `sr-only` 로 접근 가능한 이름 보존 (계약 D5 · D9(d)). 모바일 세로 눌림뿐 아니라
             Linux 폰트(CI ubuntu)의 1280 에서 우측 그룹이 넘쳐 `?` 가 화면 밖으로 밀렸다 (PR #1283 CI 실측 우단 1286.6). */}
-      <span aria-hidden="true">{copied ? '✓' : '🔖'}</span>
+      {/* #1385 — 두 글리프를 한 칸에 겹쳐 두고 보이는 쪽만 바꾼다. 종전처럼 글자를 갈아 끼우면 `✓` 와 `🔖` 의 폭
+            차이만큼 버튼 폭이 변해, 오른쪽 정렬된 상단 바의 다른 트리거(표시 패널 등)가 복사 직후와 1.5 s 뒤에 흔들렸다
+            (macOS 실측 — 실 Chrome 4.875 px · headless SwiftShader 7.98 px). 열린 표시 패널은 「트리거가 움직였으면
+            닫는다」(#1268) 라 그 사이 스크롤하면 닫혔다. 칸 폭은 항상 둘 중 넓은 쪽이다. `invisible`(visibility: hidden)
+            이라 숨은 쪽은 자리만 차지한다. */}
+      <span
+        aria-hidden="true"
+        data-testid="bookmark-icon"
+        className="inline-grid place-items-center"
+      >
+        <span
+          data-testid="bookmark-icon-idle"
+          className={`col-start-1 row-start-1 ${copied ? 'invisible' : ''}`}
+        >
+          🔖
+        </span>
+        <span
+          data-testid="bookmark-icon-copied"
+          className={`col-start-1 row-start-1 ${copied ? '' : 'invisible'}`}
+        >
+          ✓
+        </span>
+      </span>
       <span className="max-[1439px]:sr-only">{copied ? ' 복사됨' : ' 북마크'}</span>
     </button>
   );
