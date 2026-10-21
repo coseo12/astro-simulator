@@ -75,7 +75,9 @@ await withBrowser({}, async (browser) => {
   }
 
   // 연구 모드 탭 → 패널 슬라이드 (모바일에서 풀스크린 차지할 수 있음)
-  const researchBtn = await page.$('[data-testid="mode-research"]');
+  // #1390 PR0 — 640px 미만 모드 전환은 「현재 모드 ▾」 메뉴다 (버튼 그룹 `mode-<id>` 는 숨는다).
+  await page.tap('[data-testid="mode-menu-trigger"]').catch(() => {});
+  const researchBtn = await page.$('[data-testid="mode-menu-research"]');
   if (researchBtn) {
     await researchBtn.tap();
     await page.waitForTimeout(600);

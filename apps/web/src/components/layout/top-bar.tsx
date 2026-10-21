@@ -21,17 +21,24 @@ const OVERFLOW_MENU_DISABLED_QUERY = '(min-width: 640px)';
  * #1281 — 천체 메뉴가 열려 있는 동안도 같은 이유로 숨기지 않는다 (계약 D7). 터치(`pointerdown`)도 활동으로 센다
  *   (`use-mouse-inactivity.ts`).
  * #1313 — 모바일(`max-sm`) 에서는 우측 그룹을 「⋯」 버튼 뒤 패널로 접는다. 열린 동안도 숨기지 않는다.
+ * #1390 PR0 — 모바일 모드 메뉴 (`mode-switcher.tsx`) 가 열린 동안도 숨기지 않는다 (천체 메뉴 D7 과 같은 이유).
  */
 export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode }) {
   const mode = useSimStore((s) => s.mode);
   const displayPanelOpen = useSimStore((s) => s.displayPanelOpen);
   const bodyMenuOpen = useSimStore((s) => s.bodyMenuOpen);
+  const modeMenuOpen = useSimStore((s) => s.modeMenuOpen);
   const inactive = useMouseInactivity(AUTO_HIDE_INACTIVITY_MS);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowToggleRef = useRef<HTMLButtonElement | null>(null);
   const rightGroupId = useId();
   const hidden =
-    mode === 'observe' && inactive && !displayPanelOpen && !bodyMenuOpen && !overflowOpen;
+    mode === 'observe' &&
+    inactive &&
+    !displayPanelOpen &&
+    !bodyMenuOpen &&
+    !modeMenuOpen &&
+    !overflowOpen;
 
   const closeOverflow = useCallback((restoreFocus: boolean) => {
     setOverflowOpen(false);
@@ -43,12 +50,13 @@ export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode })
     if (!overflowOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      // 위에 떠 있는 것이 먼저 닫힌다 — 모달 · 표시 패널 · 천체 메뉴가 열려 있으면 그쪽 Esc 에 양보한다. 이 리스너는
+      // 위에 떠 있는 것이 먼저 닫힌다 — 모달 · 표시 패널 · 천체 메뉴 · 모드 메뉴 (#1390) 가 열려 있으면 그쪽 Esc 에 양보한다. 이 리스너는
       // 그것들보다 먼저 열려 먼저 등록되므로 (같은 window capture) 순서가 아니라 상태로 물러난다.
       const st = useSimStore.getState();
       if (
         st.displayPanelOpen ||
         st.bodyMenuOpen ||
+        st.modeMenuOpen ||
         document.querySelector('[data-modal-open="true"]')
       ) {
         return;
