@@ -91,6 +91,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // `performance.now` 등 spy 는 단언 실패와 무관하게 여기서 되돌린다 (본문 안 복원은 실패 시 건너뛰어 다음 테스트로 샌다).
+  vi.restoreAllMocks();
   resetTimeEventsForTest();
 });
 
@@ -299,7 +301,6 @@ describe('TourCard — 이탈 (E4)', () => {
     expect(s.julianDate).toBe(endJd);
     expect(useTourStore.getState().drift).toEqual([]);
     expect(useTourStore.getState().stepIndex).toBe(4);
-    vi.restoreAllMocks();
   });
 
   it.each([
@@ -324,7 +325,6 @@ describe('TourCard — 이탈 (E4)', () => {
       expect(s.timeScale).toBe(600);
       expect(useTourStore.getState().drift).toEqual(['time']);
       expect(screen.getByTestId('tour-drift')).toHaveAttribute('data-drift-axes', 'time');
-      vi.restoreAllMocks();
     },
   );
 
@@ -338,7 +338,6 @@ describe('TourCard — 이탈 (E4)', () => {
     });
     expect(useSimStore.getState().julianDate).toBe(startJd - 3650);
     expect(useTourStore.getState().drift).toEqual(['time']);
-    vi.restoreAllMocks();
   });
 });
 

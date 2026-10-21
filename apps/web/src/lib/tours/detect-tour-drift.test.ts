@@ -156,6 +156,16 @@ describe('isTourWindowComplete · plannedAfterWindowStop (결정 E2 — 구간 �
     ).toBe(false);
   });
 
+  it('같은 태스크 안 연속 알림 (벽시계 경과 0) 이어도 한 프레임 (16 ms) 분량 진행은 재생으로 본다 — TOUR_MIN_FRAME_MS 하한', () => {
+    expect(
+      isTourWindowComplete(
+        PLAYING,
+        sample(END - FRAME_DAYS / 2, 1000),
+        sample(END + FRAME_DAYS / 2, 1000),
+      ),
+    ).toBe(true);
+  });
+
   it('탭 복귀 뒤 긴 프레임 (벽시계 5 s) 도 그만큼의 진행이면 재생으로 본다', () => {
     const longFrameDays = (5 * 600) / 86_400;
     expect(
