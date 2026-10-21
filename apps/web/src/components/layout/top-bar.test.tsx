@@ -12,7 +12,12 @@ const INACTIVITY_WAIT_MS = 4000;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  useSimStore.setState({ mode: 'observe', displayPanelOpen: false, bodyMenuOpen: false });
+  useSimStore.setState({
+    mode: 'observe',
+    displayPanelOpen: false,
+    bodyMenuOpen: false,
+    modeMenuOpen: false,
+  });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -56,6 +61,17 @@ describe('TopBar — 자동 숨김', () => {
     });
     expect(opacity()).toBe('1');
     act(() => useSimStore.setState({ bodyMenuOpen: false }));
+    expect(opacity()).toBe('0');
+  });
+
+  it('#1390 PR0 — 모바일 모드 메뉴 열림 · 4초 무입력 → opacity 1, 닫으면 다시 숨김', () => {
+    useSimStore.setState({ modeMenuOpen: true });
+    render(<TopBar />);
+    act(() => {
+      vi.advanceTimersByTime(INACTIVITY_WAIT_MS);
+    });
+    expect(opacity()).toBe('1');
+    act(() => useSimStore.setState({ modeMenuOpen: false }));
     expect(opacity()).toBe('0');
   });
 
@@ -148,6 +164,7 @@ describe('TopBar — 오버플로 메뉴 (#1313)', () => {
   it.each([
     ['표시 패널', () => useSimStore.setState({ displayPanelOpen: true })],
     ['천체 메뉴', () => useSimStore.setState({ bodyMenuOpen: true })],
+    ['모드 메뉴 (#1390)', () => useSimStore.setState({ modeMenuOpen: true })],
     [
       '모달',
       () => {
