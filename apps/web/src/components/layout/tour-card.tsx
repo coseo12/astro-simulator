@@ -31,9 +31,17 @@ import { useTourStore } from '@/store/tour-store';
  * 교육 모드가 아니면 아무것도 그리지 않지만 **마운트는 유지**한다 — 모드 전환 (= 투어 종료) 의 복원이 컨트롤러에서 돌아야 한다.
  */
 
-/** 카드 위치 — 타임바 (64px) 위 8px. 375 는 좌우 8px 전폭, `sm` 이상은 가운데 560px. */
+/**
+ * 카드 위치 — 타임바 (64px) 위 8px. 375 는 좌우 8px 전폭, `sm` 이상은 가운데 560px.
+ *
+ * 쌓임은 HUD 층 **한 칸 위** (`--z-hud` + 1) 다. 같은 HUD 층의 줌 슬라이더 (`scale-control` — 화면 오른쪽 세로 중앙, DOM 상 카드 뒤)
+ * 가 375 바텀시트 머리줄과 겹쳐, 같은 층이면 뒤 형제인 슬라이더가 위에 그려지고 탭을 가져갔다 (PR #1394 qa 차단 — 375×667 에서
+ * 「×」 · 「접기」 9/9 가림). 슬라이더 래퍼의 투명 영역은 `pointer-events-none` 으로 비웠지만 (`scale-control.tsx`) 슬라이더 막대
+ * 자체 (20×192) 가 「접기」 와 겹치므로 그것만으로는 모자라다 — 겹치는 곳에서는 교육 모드의 1차 조작인 카드가 이긴다. 슬라이더는
+ * 카드 위로 드러난 부분 (트랙 탭 · 썸) 으로 조작된다. 펼친 팝업 (`--z-dropdown`) 보다는 아래다.
+ */
 const CARD_POSITION =
-  'absolute z-[var(--z-hud)] bottom-[72px] inset-x-2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[560px] sm:max-w-[calc(100vw-1rem)]';
+  'absolute z-[calc(var(--z-hud)_+_1)] bottom-[72px] inset-x-2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[560px] sm:max-w-[calc(100vw-1rem)]';
 
 /** 카드 1차 조작 버튼 — 터치 타깃 32px 이상 (결정 E7). */
 const ACTION_BUTTON =
@@ -228,29 +236,31 @@ function TourCardView({ controller }: { controller: TourController }) {
             {error}
           </p>
         ) : null}
-        <div role="status" className="empty:hidden">
-          {drift.length > 0 ? (
-            <div
-              data-testid="tour-drift"
-              data-drift-axes={drift.join(' ')}
-              className="mt-2 flex flex-wrap items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-2 py-1.5"
+      </div>
+      {/* 이탈 안내는 본문 스크롤 영역 밖 (shrink-0) 에 둔다 — 360×640 에서 안에 두면 「돌아가기」 하단이 스크롤 영역 밖으로
+          잘렸다 (PR #1394 qa 비차단 기록). 본문이 줄고 안내 · 버튼은 늘 다 보인다. */}
+      <div role="status" className="shrink-0 px-3 empty:hidden">
+        {drift.length > 0 ? (
+          <div
+            data-testid="tour-drift"
+            data-drift-axes={drift.join(' ')}
+            className="mb-2 flex flex-wrap items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-2 py-1.5"
+          >
+            <span className="text-caption text-fg-primary">{DRIFT_NOTICE}</span>
+            <button
+              type="button"
+              data-testid="tour-return"
+              onClick={() => {
+                controller.returnToScene();
+                // 이 버튼은 장면이 돌아오면 사라진다 — 포커스를 「다음」 으로 넘겨 body 로 빠지지 않게.
+                nextRef.current?.focus();
+              }}
+              className={`${ACTION_BUTTON} border-primary/40 bg-primary/20 text-fg-primary hover:bg-primary/30`}
             >
-              <span className="text-caption text-fg-primary">{DRIFT_NOTICE}</span>
-              <button
-                type="button"
-                data-testid="tour-return"
-                onClick={() => {
-                  controller.returnToScene();
-                  // 이 버튼은 장면이 돌아오면 사라진다 — 포커스를 「다음」 으로 넘겨 body 로 빠지지 않게.
-                  nextRef.current?.focus();
-                }}
-                className={`${ACTION_BUTTON} border-primary/40 bg-primary/20 text-fg-primary hover:bg-primary/30`}
-              >
-                이 장면으로 돌아가기
-              </button>
-            </div>
-          ) : null}
-        </div>
+              이 장면으로 돌아가기
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border-subtle px-3 py-2">
         <button

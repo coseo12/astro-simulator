@@ -119,6 +119,13 @@ describe('TourCard — 목록 보기 (E1)', () => {
     expect(screen.getByTestId('tour-item-eclipse')).toHaveTextContent(ECLIPSE_TOUR.title);
   });
 
+  it('#1390 — 카드는 HUD 층 한 칸 위 (같은 층 뒤 형제인 줌 슬라이더가 375 머리줄 「×」 · 「접기」 를 덮지 않게 — PR #1394 qa)', () => {
+    render(<TourCard />);
+    expect(screen.getByTestId('tour-card').className.split(/\s+/)).toContain(
+      'z-[calc(var(--z-hud)_+_1)]',
+    );
+  });
+
   it('교육 모드가 아니면 아무것도 그리지 않는다', () => {
     useSimStore.setState({ mode: 'observe' });
     render(<TourCard />);
