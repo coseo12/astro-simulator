@@ -45,6 +45,15 @@ export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode })
     if (restoreFocus) overflowToggleRef.current?.focus();
   }, []);
 
+  // #1390 PR1 — 모드 메뉴가 열리면 「⋯」 패널을 닫는다 (PR0 qa 관찰 — 375 에서 두 패널이 화면상 겹쳤다). 반대 방향 (모드 메뉴가 열린
+  // 채 「⋯」) 은 모드 메뉴의 바깥 pointerdown 이 이미 닫는다. 포커스는 옮기지 않는다 — 모드 메뉴가 자기 항목으로 가져간다. Esc 순서는
+  // 그대로다: 겹칠 일이 없으니 모드 메뉴 Esc 가 먼저이고 「⋯」 Esc 는 열려 있지 않다.
+  useEffect(() => {
+    // 외부 store (모드 메뉴 열림) 에 맞춰 로컬 패널을 닫는 동기화 — 결과가 트리거를 다시 바꾸지 않아 연쇄 없음.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (modeMenuOpen) setOverflowOpen(false);
+  }, [modeMenuOpen]);
+
   // 열린 동안만 전역 리스너 — Esc (capture) · 캔버스 pointerdown · sm 이상으로 넓어짐.
   useEffect(() => {
     if (!overflowOpen) return;

@@ -53,6 +53,25 @@ describe('OnboardingModal (#737)', () => {
       render(<OnboardingModal />);
       expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
     });
+
+    // #1390 — 유효한 `?tour=` 진입은 투어 카드가 포커스를 갖는다 (모달 포커스 트랩 · Esc 경합 회피 — §교차검증 합의 7).
+    it.each([
+      ['/?tour=eclipse', false],
+      ['/?tour=eclipse&step=5', false],
+      ['/?tour=nope', true],
+      ['/?tour=eclipse&step=0', true],
+    ])('%s → 자동 표시 %s', (url, shown) => {
+      window.history.replaceState(null, '', url);
+      try {
+        render(<OnboardingModal />);
+        expect(screen.queryByTestId('onboarding-modal') !== null).toBe(shown);
+        // 수동 호출은 항상 된다.
+        fireEvent.click(screen.getByTestId('onboarding-button'));
+        expect(screen.getByTestId('onboarding-modal')).toBeInTheDocument();
+      } finally {
+        window.history.replaceState(null, '', '/');
+      }
+    });
   });
 
   // #739 — 자동화 환경(Playwright/WebDriver)에서 자동표시 모달 backdrop 이 클릭/픽셀 verify 를

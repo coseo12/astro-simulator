@@ -19,6 +19,7 @@ import { SensitivitySettingsModal } from './sensitivity-settings-modal';
 import { OnboardingModal } from './onboarding-modal';
 import { BookmarkButton } from './bookmark-button';
 import { DisplayPanel } from './display-panel';
+import { TourCard } from './tour-card';
 import { UrlSync } from '../../core/url-sync';
 import { SimCanvasDynamic } from '../sim-canvas.dynamic';
 import { SatelliteZoomTooltip } from '../ui/satellite-zoom-tooltip';
@@ -66,6 +67,8 @@ export function AppShell() {
         <HudCorners />
         {/* #1281 — 관찰 모드 선택 천체 정보 카드 (좌하 고정, 종전 `focus · <id>` 칩 대체). */}
         <BodyInfoCard />
+        {/* #1390 — 교육 모드 가이드 투어 카드 (하단 중앙 · 375 바텀시트). 관찰 카드 (observe 전용) 와 모드가 겹치지 않는다. */}
+        <TourCard />
         <LodDevOverlay />
         <SidePanels />
         <ScaleControl />

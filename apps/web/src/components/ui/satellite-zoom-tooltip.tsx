@@ -119,6 +119,9 @@ function getTooltipText(bodyId: string): string {
  */
 export function SatelliteZoomTooltip() {
   const selectedBodyId = useSimStore((s) => s.selectedBodyId);
+  // #1390 — 교육 모드에서는 투어 카드가 같은 하단 중앙을 쓴다 (ADR `20261021-1390` 결정 · 카드 UI — 375 실측에서 겹침 위치).
+  // 표시도 박제도 하지 않는다 — 관찰 · 연구 모드에서 그 천체를 처음 볼 때 그대로 뜬다.
+  const education = useSimStore((s) => s.mode === 'education');
   const [visible, setVisible] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
   const currentBodyIdRef = useRef<string | null>(null);
@@ -131,7 +134,7 @@ export function SatelliteZoomTooltip() {
 
   useEffect(() => {
     // focus 해제 또는 satellite-parent 아닌 body → 즉시 숨김 (전이 시점 cleanup)
-    if (selectedBodyId === null || !isSatelliteParent) {
+    if (selectedBodyId === null || !isSatelliteParent || education) {
       // selectedBodyId(외부 store) 변화에 반응하는 cleanup — visible 은 결과이고 trigger 가 아니라
       // cascading 무한루프 없음 (정당한 외부 상태 sync). set-state-in-effect 규칙 보수적 false-positive.
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -159,7 +162,7 @@ export function SatelliteZoomTooltip() {
     return () => {
       window.clearTimeout(showTimer);
     };
-  }, [selectedBodyId, isSatelliteParent]);
+  }, [selectedBodyId, isSatelliteParent, education]);
 
   // 자동 fade-out timer — visible=true 가 된 시점부터 5초 후 fade-out 시작
   useEffect(() => {
@@ -185,7 +188,7 @@ export function SatelliteZoomTooltip() {
     }, FADE_DURATION_MS);
   };
 
-  if (!visible || selectedBodyId === null) return null;
+  if (!visible || selectedBodyId === null || education) return null;
 
   const text = getTooltipText(selectedBodyId);
 

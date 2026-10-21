@@ -61,12 +61,18 @@ describe('ModeSwitcher', () => {
     expect(sentCommands).toContainEqual({ type: 'setMode', mode: 'research' });
   });
 
-  it('education 모드는 disabled 상태', () => {
+  it('#1390 PR1 — education 모드 활성: 클릭 시 store + setMode 명령, sandbox 는 여전히 disabled', () => {
     render(<ModeSwitcher />);
     const btn = screen.getByTestId('mode-education') as HTMLButtonElement;
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
+    expect(btn).not.toHaveAttribute('title');
+    fireEvent.click(btn);
+    expect(useSimStore.getState().mode).toBe('education');
+    expect(sentCommands).toContainEqual({ type: 'setMode', mode: 'education' });
+    const sandbox = screen.getByTestId('mode-sandbox') as HTMLButtonElement;
+    expect(sandbox).toBeDisabled();
     // P2+ 툴팁 존재
-    expect(btn).toHaveAttribute('title');
+    expect(sandbox).toHaveAttribute('title');
   });
 
   it('disabled 모드 클릭은 setMode 명령 발행 안 함', () => {
@@ -147,17 +153,26 @@ describe('ModeSwitcher — 모바일 모드 메뉴 (#1390 PR0)', () => {
     expect(useSimStore.getState().modeMenuOpen).toBe(true);
   });
 
-  it('교육 · 샌드박스는 메뉴 안 비활성 항목 — disabled + 보이는 사유 「P2+ 예정」, 클릭해도 전환 없음', () => {
+  it('샌드박스는 메뉴 안 비활성 항목 — disabled + 보이는 사유 「P2+ 예정」, 클릭해도 전환 없음 (교육은 #1390 PR1 활성)', () => {
     renderWithNeighbors();
     fireEvent.click(trigger());
-    for (const id of ['education', 'sandbox']) {
-      expect(item(id)).toBeDisabled();
-      expect(item(id)).toHaveTextContent('P2+ 예정');
-    }
+    expect(item('sandbox')).toBeDisabled();
+    expect(item('sandbox')).toHaveTextContent('P2+ 예정');
+    expect(item('education')).not.toBeDisabled();
+    expect(item('education')).not.toHaveTextContent('P2+ 예정');
     expect(item('research')).not.toBeDisabled();
-    fireEvent.click(item('education'));
+    fireEvent.click(item('sandbox'));
     expect(useSimStore.getState().mode).toBe('observe');
     expect(sentCommands).toEqual([]);
+  });
+
+  it('#1390 PR1 — 메뉴에서 교육 선택 → 모드 전환 · 트리거 글자 「교육」', () => {
+    renderWithNeighbors();
+    fireEvent.click(trigger());
+    fireEvent.click(item('education'));
+    expect(useSimStore.getState().mode).toBe('education');
+    expect(sentCommands).toContainEqual({ type: 'setMode', mode: 'education' });
+    expect(trigger()).toHaveTextContent('교육');
   });
 
   it('#1380 — 열린 메뉴의 항목 · 트리거는 캔버스 refocus 보호 대상, 닫히면 아니다', () => {
@@ -221,9 +236,13 @@ describe('ModeSwitcher — 모바일 모드 메뉴 (#1390 PR0)', () => {
     expect(document.activeElement).toBe(item('observe'));
     await user.keyboard('{ArrowDown}');
     expect(document.activeElement).toBe(item('research'));
-    // 교육 · 샌드박스 (disabled) 를 건너뛰고 처음으로 순환한다.
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(item('education'));
+    // 샌드박스 (disabled) 를 건너뛰고 처음으로 순환한다.
     await user.keyboard('{ArrowDown}');
     expect(document.activeElement).toBe(item('observe'));
+    await user.keyboard('{ArrowUp}');
+    expect(document.activeElement).toBe(item('education'));
     await user.keyboard('{ArrowUp}');
     expect(document.activeElement).toBe(item('research'));
     await user.keyboard('{Enter}');
@@ -238,13 +257,13 @@ describe('ModeSwitcher — 모바일 모드 메뉴 (#1390 PR0)', () => {
     await user.keyboard(' ');
     expect(document.activeElement).toBe(item('observe'));
     await user.keyboard('{End}');
-    expect(document.activeElement).toBe(item('research'));
+    expect(document.activeElement).toBe(item('education'));
     await user.keyboard('{Home}');
     expect(document.activeElement).toBe(item('observe'));
     await user.keyboard('{Escape}');
     expect(screen.queryByTestId('mode-menu')).toBeNull();
     await user.keyboard('{ArrowUp}');
-    expect(document.activeElement).toBe(item('research'));
+    expect(document.activeElement).toBe(item('education'));
   });
 
   it('Esc 는 window capture 에서 preventDefault — 먼저 등록된 window bubble 리스너 (자유시점 Esc) 가 defaultPrevented 를 본다', () => {
