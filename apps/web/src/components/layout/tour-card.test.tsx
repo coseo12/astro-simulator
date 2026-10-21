@@ -198,6 +198,21 @@ describe('TourCard — 키보드 (E3)', () => {
     expect(useTourStore.getState().stepIndex).toBe(4);
   });
 
+  it.each(['ArrowRight', 'ArrowLeft'])(
+    '이탈 안내의 「돌아가기」 에 포커스가 있을 때 %s 로 단계 이동 → 안내가 사라져도 포커스는 「다음」 (body 로 빠지지 않음 — qa 재검증 B2)',
+    async (key) => {
+      await startEclipse();
+      act(() => fireEvent.click(screen.getByTestId('tour-next')));
+      act(() => fakeCore({ type: 'focusOn', bodyId: 'mars' }));
+      const ret = screen.getByTestId('tour-return');
+      ret.focus();
+      expect(document.activeElement).toBe(ret);
+      act(() => fireEvent.keyDown(ret, { key }));
+      expect(screen.queryByTestId('tour-return')).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId('tour-next'));
+    },
+  );
+
   it('카드 밖 화살표는 단계를 바꾸지 않는다', async () => {
     await startEclipse();
     act(() => fireEvent.keyDown(document.body, { key: 'ArrowRight' }));

@@ -91,6 +91,20 @@ function TourCardView({ controller }: { controller: TourController }) {
     }
   }, [activeTourId]);
 
+  /**
+   * 카드 안 `←` `→` 로 단계를 옮긴 직후에만 포커스를 확인한다. 이탈 안내의 「돌아가기」 에 포커스가 있으면 단계 이동이 안내를 지워
+   * 포커스가 `body` 로 빠졌다 (PR #1394 qa 재검증 B2 — 12/12). 그때는 클릭 경로 (`tour-return` 의 `nextRef.focus()`) 와 같이 「다음」 으로.
+   */
+  const keyNavRef = useRef(false);
+  useEffect(() => {
+    if (!keyNavRef.current) return;
+    keyNavRef.current = false;
+    const active = document.activeElement;
+    if (!active || active === document.body || !regionRef.current?.contains(active)) {
+      nextRef.current?.focus();
+    }
+  }, [stepIndex]);
+
   useEffect(() => {
     if (!focusAfterToggle.current) return;
     focusAfterToggle.current = false;
@@ -168,8 +182,14 @@ function TourCardView({ controller }: { controller: TourController }) {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     e.preventDefault();
-    if (e.key === 'ArrowRight' && !isLast) controller.next();
-    if (e.key === 'ArrowLeft' && !isFirst) controller.prev();
+    if (e.key === 'ArrowRight' && !isLast) {
+      keyNavRef.current = true;
+      controller.next();
+    }
+    if (e.key === 'ArrowLeft' && !isFirst) {
+      keyNavRef.current = true;
+      controller.prev();
+    }
   };
 
   const unavailableReasons = [...new Set(unavailable.map((u) => u.reason))];
@@ -236,31 +256,33 @@ function TourCardView({ controller }: { controller: TourController }) {
             {error}
           </p>
         ) : null}
-      </div>
-      {/* 이탈 안내는 본문 스크롤 영역 밖 (shrink-0) 에 둔다 — 360×640 에서 안에 두면 「돌아가기」 하단이 스크롤 영역 밖으로
-          잘렸다 (PR #1394 qa 비차단 기록). 본문이 줄고 안내 · 버튼은 늘 다 보인다. */}
-      <div role="status" className="shrink-0 px-3 empty:hidden">
-        {drift.length > 0 ? (
-          <div
-            data-testid="tour-drift"
-            data-drift-axes={drift.join(' ')}
-            className="mb-2 flex flex-wrap items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-2 py-1.5"
-          >
-            <span className="text-caption text-fg-primary">{DRIFT_NOTICE}</span>
-            <button
-              type="button"
-              data-testid="tour-return"
-              onClick={() => {
-                controller.returnToScene();
-                // 이 버튼은 장면이 돌아오면 사라진다 — 포커스를 「다음」 으로 넘겨 body 로 빠지지 않게.
-                nextRef.current?.focus();
-              }}
-              className={`${ACTION_BUTTON} border-primary/40 bg-primary/20 text-fg-primary hover:bg-primary/30`}
+        {/* 이탈 안내는 본문 스크롤 영역 **안**의 맨 아래에 붙인다 (`sticky bottom-0`). 낮은 화면 (360×640) 에서 본문이 길어도 안내 ·
+            「돌아가기」 는 늘 스크롤 영역 아래 끝에 다 보이고 (종전 qa 비차단 기록 — 잘림), 스크롤 영역은 포커스 가능한 자손을
+            가져 axe `scrollable-region-focusable` 를 지킨다. 영역 밖 (`shrink-0`) 으로 뺐던 판본은 그 규칙을 어겼다 (PR #1394 qa
+            재검증 B1). DOM 위치 · Tab 순서는 c1cb5948 과 같다. */}
+        <div role="status" className="sticky bottom-0 -mb-2 bg-bg-surface pb-2 empty:hidden">
+          {drift.length > 0 ? (
+            <div
+              data-testid="tour-drift"
+              data-drift-axes={drift.join(' ')}
+              className="mt-2 flex flex-wrap items-center gap-2 rounded-sm border border-primary/40 bg-primary/10 px-2 py-1.5"
             >
-              이 장면으로 돌아가기
-            </button>
-          </div>
-        ) : null}
+              <span className="text-caption text-fg-primary">{DRIFT_NOTICE}</span>
+              <button
+                type="button"
+                data-testid="tour-return"
+                onClick={() => {
+                  controller.returnToScene();
+                  // 이 버튼은 장면이 돌아오면 사라진다 — 포커스를 「다음」 으로 넘겨 body 로 빠지지 않게.
+                  nextRef.current?.focus();
+                }}
+                className={`${ACTION_BUTTON} border-primary/40 bg-primary/20 text-fg-primary hover:bg-primary/30`}
+              >
+                이 장면으로 돌아가기
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border-subtle px-3 py-2">
         <button
