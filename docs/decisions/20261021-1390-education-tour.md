@@ -496,7 +496,7 @@ T1 의 개요 단계 (1 · 7) 는 `resetCamera` 로 태양 중심에 돌아온�
 
 ### A1-4. Concrete Prediction 갱신
 
-- **PR2 (실측)**: 데이터 파일 2개 (`solar-system-tour.ts` · `constellation-tour.ts`) 와 목록 등록 외에 위 A1-3 표의 엔진 확장이 들어간다. `packages/core` 3파일 (+ 테스트 1), `sim-canvas.tsx` 시점 소비 2곳, store 타입 1개, 엔진 (`plan-tour-step.ts` · `types.ts`) 이다. 정확한 `git diff --stat` 은 PR #1390-PR2 본문에 있다.
+- **PR2 (실측)**: 데이터 파일 2개 (`solar-system-tour.ts` · `constellation-tour.ts`) 와 목록 등록 외에 위 A1-3 표의 엔진 확장이 들어간다. `packages/core` 3파일 (+ 테스트 1), `sim-canvas.tsx` 시점 소비 2곳, store 타입 1개, 엔진 (`plan-tour-step.ts` · `types.ts`) 이다. 정확한 `git diff --stat` 은 PR [#1396](https://github.com/coseo12/astro-simulator/pull/1396) 본문에 있다.
 - **PR3**: 바뀌지 않는다 (위 확장점).
 - **이후 투어**: 절대 · 상대 시점 종류로 표현되는 장면이면 다시 「데이터 파일만」 이다. 재검토 조건 1 (연속 카메라 연출) 은 그대로다.
 
