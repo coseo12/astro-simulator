@@ -1122,7 +1122,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const request = useSimStore.getState().focusViewRequest;
           if (request === null) return undefined;
           useSimStore.getState().setFocusViewRequest(null);
-          if (bodyId === null || request.bodyId !== bodyId) return undefined;
+          if (request.bodyId !== bodyId) return undefined;
+          // #1390 Amendment 1 — 절대 방향 시점은 대상과 무관하다 (개요 포함). 앱 첫 화면 각 그대로.
+          if (request.view === 'ecliptic-oblique') {
+            return sceneApi.arcAnglesToViewDirection({
+              alpha: sceneApi.DEFAULT_CAMERA_ALPHA,
+              beta: sceneApi.DEFAULT_CAMERA_BETA,
+            });
+          }
+          if (bodyId === null) return undefined;
           const mesh = solar.meshes.get(bodyId);
           const parentId = solar.getBodyParentId(bodyId);
           const parentMesh = parentId ? solar.meshes.get(parentId) : undefined;
@@ -1230,7 +1238,15 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
             solar.clearFocus();
-            controller.reset(35);
+            // #1390 Amendment 1 — 개요 시점 요청 (`bodyId: null`) 이 있을 때만 소비한다. 대상이 있는 요청은 그 포커스 진입이
+            // 소비하도록 남긴다 (관찰 · 연구 모드 reset 은 요청이 없어 현행 그대로 — alpha · beta 를 맞추지 않는다).
+            controller.reset(
+              35,
+              undefined,
+              useSimStore.getState().focusViewRequest?.bodyId === null
+                ? consumeFocusView(null)
+                : undefined,
+            );
             // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
             freeFlyActive = false;
             freeFlyEntryRadius = null;

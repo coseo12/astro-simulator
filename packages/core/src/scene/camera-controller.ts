@@ -159,7 +159,7 @@ export interface FocusTarget {
    * #1360 PR2 결정 C3 (ADR 1354 Q-S Amendment) — 시점 방향: 대상 → 카메라 world 방향 (정규화 불요). 주면 카메라 `alpha` ·
    * `beta` 도 같은 전환 시간으로 그 방향에 맞춘다 (`alpha` 는 짧은 쪽으로 돈다). 생략하면 현행대로 시점 각을 유지한다.
    */
-  viewDirection?: Vector3;
+  viewDirection?: ViewDirectionLike;
 }
 
 /** 시점 방향 → ArcRotate 각. `beta` 는 카메라 한계로 자른다 (극 방향이면 `alpha` 는 정의상 임의 — 현재 값을 유지). */
@@ -167,6 +167,9 @@ export interface ArcAngles {
   alpha: number;
   beta: number;
 }
+
+/** 시점 방향 — Babylon `Vector3` 또는 같은 모양의 평범한 객체. */
+export type ViewDirectionLike = { readonly x: number; readonly y: number; readonly z: number };
 
 const TWO_PI = Math.PI * 2;
 /** 극 방향 판정 — 수평 성분이 이보다 작으면 `alpha` 를 바꾸지 않는다 (atan2(0, 0) 회피). */
@@ -178,7 +181,7 @@ const POLAR_HORIZONTAL_EPSILON = 1e-9;
  * `alpha` 는 `currentAlpha` 에서 짧은 쪽으로 도는 값 (`|Δ| ≤ π`) 을 돌려준다 — 전환 애니메이션이 한 바퀴 돌지 않게.
  */
 export function viewDirectionToArcAngles(
-  dir: { readonly x: number; readonly y: number; readonly z: number },
+  dir: ViewDirectionLike,
   currentAlpha: number,
   lowerBetaLimit: number | null,
   upperBetaLimit: number | null,
@@ -197,6 +200,19 @@ export function viewDirectionToArcAngles(
   if (delta > Math.PI) delta -= TWO_PI;
   if (delta <= -Math.PI) delta += TWO_PI;
   return { alpha: currentAlpha + delta, beta };
+}
+
+/**
+ * #1390 Amendment 1 — ArcRotate 각 → 시점 방향 (대상 → 카메라, 단위 벡터). {@link viewDirectionToArcAngles} 의 역이다 (같은 위치식).
+ * 고정 시점 각 (예: 앱 첫 화면 각) 을 `viewDirection` 계약으로 넘길 때 쓴다.
+ */
+export function arcAnglesToViewDirection(angles: ArcAngles): ViewDirectionLike {
+  const sinBeta = Math.sin(angles.beta);
+  return {
+    x: Math.cos(angles.alpha) * sinBeta,
+    y: Math.cos(angles.beta),
+    z: Math.sin(angles.alpha) * sinBeta,
+  };
 }
 
 /**
@@ -387,36 +403,47 @@ export class CameraController {
     );
 
     // #1360 PR2 결정 C3 — 선택적 시점 방향. 같은 전환 시간 · easing 으로 alpha · beta 를 맞춘다.
-    if (target.viewDirection) {
-      const angles = viewDirectionToArcAngles(
-        target.viewDirection,
-        this.camera.alpha,
-        this.camera.lowerBetaLimit,
-        this.camera.upperBetaLimit,
+    if (target.viewDirection) this.#animateViewDirection(target.viewDirection);
+  }
+
+  /** 시점 방향 (대상 → 카메라) 으로 alpha · beta 를 전환 시간 · easing 에 맞춰 옮긴다. 방향이 영벡터면 아무것도 하지 않는다. */
+  #animateViewDirection(viewDirection: ViewDirectionLike): void {
+    const angles = viewDirectionToArcAngles(
+      viewDirection,
+      this.camera.alpha,
+      this.camera.lowerBetaLimit,
+      this.camera.upperBetaLimit,
+    );
+    if (!Number.isFinite(angles.beta)) return;
+    for (const [name, from, to] of [
+      ['alpha', this.camera.alpha, angles.alpha],
+      ['beta', this.camera.beta, angles.beta],
+    ] as const) {
+      Animation.CreateAndStartAnimation(
+        `cam-${name}`,
+        this.camera,
+        name,
+        FRAMES_PER_SECOND,
+        (TRANSITION_MS / 1000) * FRAMES_PER_SECOND,
+        from,
+        to,
+        Animation.ANIMATIONLOOPMODE_CONSTANT,
+        this.#easing,
       );
-      if (Number.isFinite(angles.beta)) {
-        for (const [name, from, to] of [
-          ['alpha', this.camera.alpha, angles.alpha],
-          ['beta', this.camera.beta, angles.beta],
-        ] as const) {
-          Animation.CreateAndStartAnimation(
-            `cam-${name}`,
-            this.camera,
-            name,
-            FRAMES_PER_SECOND,
-            (TRANSITION_MS / 1000) * FRAMES_PER_SECOND,
-            from,
-            to,
-            Animation.ANIMATIONLOOPMODE_CONSTANT,
-            this.#easing,
-          );
-        }
-      }
     }
   }
 
-  /** 카메라 reset — 기본 위치로 복귀 */
-  reset(targetRadius = 35, target: Vector3 = Vector3.Zero()): void {
+  /**
+   * 카메라 reset — 기본 위치로 복귀.
+   *
+   * #1390 Amendment 1 — `viewDirection` 을 주면 alpha · beta 도 같은 전환으로 그 방향에 맞춘다 (`focusOn` 의 `viewDirection` 과
+   * 같은 계약). 생략하면 현행대로 alpha · beta 를 애니메이션하지 않는다 — 관찰 · 연구 모드의 reset 은 인자를 주지 않는다.
+   */
+  reset(
+    targetRadius = 35,
+    target: Vector3 = Vector3.Zero(),
+    viewDirection?: ViewDirectionLike,
+  ): void {
     // R-Phase #507 — focus 해제 시 follow observer detach. observer 잔존 시 Animation 의
     // target=(0,0,0) 을 매 프레임 mesh 위치로 덮어써 reset 자체가 무효화됨.
     this.#detachFollow();
@@ -443,6 +470,7 @@ export class CameraController {
       Animation.ANIMATIONLOOPMODE_CONSTANT,
       this.#easing,
     );
+    if (viewDirection) this.#animateViewDirection(viewDirection);
   }
 
   dispose(): void {

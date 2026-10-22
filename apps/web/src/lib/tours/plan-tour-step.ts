@@ -15,13 +15,13 @@
  */
 
 import type { CoreCommand } from '@astro-simulator/shared';
-import type { EventFocusView } from '@astro-simulator/core';
+import { isAbsoluteFocusView } from '@astro-simulator/core';
 import {
   DISPLAY_TOGGLES,
   type DisplayCapabilities,
   type DisplayToggleId,
 } from '@/core/display-toggles';
-import type { SimStoreState } from '@/store/sim-store';
+import type { FocusViewRequest, SimStoreState } from '@/store/sim-store';
 import { TOUR_OVERVIEW, type TourStep } from './types';
 
 /** 표시 토글 의도 12종 (표 행 전부). 투어 시작 스냅샷 · 현재 store 의도를 같은 형식으로 다룬다. */
@@ -32,7 +32,7 @@ const HOURS_PER_DAY = 24;
 export type TourAction =
   | { type: 'display'; id: DisplayToggleId; visible: boolean }
   | { type: 'command'; command: CoreCommand }
-  | { type: 'focusViewRequest'; request: { bodyId: string; view: EventFocusView } | null }
+  | { type: 'focusViewRequest'; request: FocusViewRequest | null }
   | { type: 'rulerAnchor'; anchorId: string | null };
 
 /** 단계가 맞춘 장면 — 이탈 판정의 기준. */
@@ -130,9 +130,11 @@ export function planTourStep(step: TourStep, input: TourPlanInput): TourPlan {
   const focus = step.camera.focus;
   const focusBodyId = focus === TOUR_OVERVIEW ? null : focus;
   const view = step.camera.view;
+  // 개요 (`null`) 는 절대 방향 시점만 — 상대 시점은 대상이 없어 요청하지 않는다 (콘텐츠 유효성 테스트가 선언에서 막는다).
+  const viewApplies = view !== undefined && (focusBodyId !== null || isAbsoluteFocusView(view));
   actions.push({
     type: 'focusViewRequest',
-    request: focusBodyId !== null && view !== undefined ? { bodyId: focusBodyId, view } : null,
+    request: viewApplies ? { bodyId: focusBodyId, view } : null,
   });
   actions.push({
     type: 'command',

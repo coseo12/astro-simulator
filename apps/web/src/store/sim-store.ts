@@ -10,6 +10,15 @@ import {
   type FreeFlySensitivityAxis,
 } from './free-fly-sensitivity';
 
+/**
+ * 포커스 시점 요청 (#1360 PR2 결정 C3). `bodyId: null` = 개요 (태양 중심 — `resetCamera`) — #1390 Amendment 1. 개요에는 대상이
+ * 없으므로 절대 방향 시점 (`isAbsoluteFocusView`) 만 의미가 있다 (상대 시점은 소비 쪽이 버린다).
+ */
+export interface FocusViewRequest {
+  bodyId: string | null;
+  view: EventFocusView;
+}
+
 type IntegratorKind = physics.IntegratorKind;
 
 // #841 — UnitSystem / unitSystem / setUnitSystem 제거. 소비자가 UnitToggle 자신뿐인
@@ -162,7 +171,7 @@ export interface SimStoreState {
    * 소비하고 비운다 (대상 body 가 다르면 버린다). 이미 그 body 에 포커스 중이면 요청 시점에 바로 소비한다 — 선택이 바뀌지
    * 않아 포커스 동기가 다시 돌지 않기 때문이다. 요청 객체는 매번 새로 만든다 (같은 요청 반복도 구독이 감지).
    */
-  focusViewRequest: { bodyId: string; view: EventFocusView } | null;
+  focusViewRequest: FocusViewRequest | null;
   /**
    * #1265 — 신규 3 토글의 환경 가용성. `null` = 장면 미준비 (핸들러 미등록 → command 가 no-op 으로
    * 사라지므로 토글 불가). sim-canvas 가 핸들러 등록과 같은 자리에서 set 하고 언마운트 시 null.
@@ -242,7 +251,7 @@ export interface SimStoreState {
   /** #1341 PR2 — 거리 자 기준점 설정 · 해제 (`null`). */
   setRulerAnchor: (id: string | null) => void;
   /** #1360 PR2 — 포커스 시점 요청 · 비움 (`null`). */
-  setFocusViewRequest: (request: { bodyId: string; view: EventFocusView } | null) => void;
+  setFocusViewRequest: (request: FocusViewRequest | null) => void;
   setDisplayCapabilities: (caps: DisplayCapabilities | null) => void;
   setDisplayPanelOpen: (open: boolean) => void;
   setBodyMenuOpen: (open: boolean) => void;
