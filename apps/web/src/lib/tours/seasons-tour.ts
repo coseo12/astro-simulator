@@ -2,8 +2,8 @@ import {
   APHELION_2024_JD,
   DECEMBER_SOLSTICE_2024_JD,
   JUNE_SOLSTICE_2024_JD,
-  MARCH_EQUINOX_2024_JD,
   PERIHELION_2025_JD,
+  SEPTEMBER_EQUINOX_2024_JD,
 } from './season-dates';
 import type { TourDef } from './types';
 
@@ -29,7 +29,11 @@ const DISTANCE_VIEW = 'ecliptic-oblique';
  * 선과 같은 거리 자). 3 ~ 5 는 `from-sun` (태양 → 지구 직선, 기울기 없음) 이라 원반 중심이 태양 직하점이다.
  *
  * 문안 수치 — 근일점 0.983 · 원일점 1.017 AU 는 앱 지구 궤도 요소 (`packages/shared/data/solar-system.json` — a 1.00000261 AU,
- * e 0.01671123) 의 a(1 ∓ e) 와 같다 (0.98329 · 1.01671). 자전축 기울기 23.4° 는 같은 데이터의 `axialTiltDeg` (23.44) 다.
+ * e 0.01671123) 의 a(1 ∓ e) 와 같다 (0.98329 · 1.01671). 거리 차 3% 는 2e = 3.34 % (평균 거리 a 대비), 햇빛 세기 차 7% 는 거리
+ * 제곱 반비례로 ((1 + e) / (1 − e))² − 1 = 6.91 % 다. 자전축 기울기 23.4° 는 같은 데이터의 `axialTiltDeg` (23.44) 다.
+ * `tours-content.test.ts` 가 이 수치들을 데이터에서 셈해 문안과 대조한다.
+ *
+ * 3 → 4 → 5 는 하지 → 동지 → 그 「사이」 의 추분이다 (5단계 시각이 3 · 4 사이 — 문안 「하지와 동지 사이」 가 문자 그대로 참).
  *
  * ⚠️ 전 단계가 같은 천체 (지구) 다 — 단계마다 `view` 로 카메라를 다시 잡는다 (`types.ts` `TourCamera.view`).
  */
@@ -50,7 +54,7 @@ export const SEASONS_TOUR = {
     {
       id: 'perihelion',
       title: '1월, 가장 가까운 때',
-      body: '반년 뒤 2025년 1월 4일, 가장 가까운 근일점에서는 약 0.983 AU입니다. 그런데 북반구는 겨울입니다. 거리 차이는 3%쯤이라, 거리는 계절의 원인이 아닙니다.',
+      body: '반년 뒤 2025년 1월 4일, 가장 가까운 근일점에서는 약 0.983 AU입니다. 태양에 가장 가까운 이때 북반구는 겨울이니, 거리는 계절의 원인이 아닙니다. 거리 차 3%쯤은 햇빛 세기로 7%쯤 차이일 뿐입니다.',
       camera: { focus: 'earth', view: DISTANCE_VIEW },
       time: { julianDate: PERIHELION_2025_JD },
       ruler: 'sun',
@@ -72,11 +76,11 @@ export const SEASONS_TOUR = {
       display: SUN_VIEW_DISPLAY,
     },
     {
-      id: 'march-equinox',
-      title: '3월 춘분 — 두 반구가 똑같이',
-      body: '그 사이 3월(춘분)과 9월(추분)에는 해가 적도 머리 위에 옵니다. 두 반구가 햇빛을 똑같이 받고, 낮과 밤의 길이가 거의 같습니다.',
+      id: 'september-equinox',
+      title: '9월 추분 — 두 반구가 똑같이',
+      body: '하지와 동지 사이, 9월 추분에는 해가 적도 머리 위에 옵니다(3월 춘분도 같습니다). 두 반구가 햇빛을 똑같이 받고, 낮과 밤의 길이가 거의 같습니다.',
       camera: { focus: 'earth', view: 'from-sun' },
-      time: { julianDate: MARCH_EQUINOX_2024_JD },
+      time: { julianDate: SEPTEMBER_EQUINOX_2024_JD },
       display: SUN_VIEW_DISPLAY,
     },
   ],

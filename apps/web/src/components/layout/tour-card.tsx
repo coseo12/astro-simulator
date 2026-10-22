@@ -257,7 +257,9 @@ function TourCardView({ controller }: { controller: TourController }) {
             {step.body}
           </p>
         </div>
-        {step.ruler ? <TourRulerReadout anchorId={step.ruler} /> : null}
+        {step.ruler ? (
+          <TourRulerReadout anchorId={step.ruler} focusBodyId={step.camera.focus} />
+        ) : null}
         {unavailableReasons.length > 0 ? (
           <p data-testid="tour-unavailable" className="mt-2 text-caption text-fg-secondary">
             {unavailableReasons.join(' · ')}
@@ -333,14 +335,20 @@ function TourCardView({ controller }: { controller: TourController }) {
 }
 
 /**
- * 단계가 지정한 거리 자 (기준점 A = `anchorId` · B = 현재 선택) 의 물리 거리 — 관찰 카드 거리 자 행 (`RulerRow`) 과 같은 출처
- * (`useRulerDistance`). 사용자가 기준점이나 선택을 바꿔 단계 장면에서 벗어나면 (이탈) 보이지 않는다 — 이탈 안내가 그 자리를 설명한다.
+ * 단계가 지정한 거리 자 (기준점 A = `anchorId` · B = 단계 포커스 `focusBodyId`) 의 물리 거리 — 관찰 카드 거리 자 행 (`RulerRow`) 과
+ * 같은 출처 (`useRulerDistance`). store 의 기준점이 A 이고 **현재 선택이 B 일 때만** 보인다. 줄에는 B 의 이름이 없으므로 (「태양까지
+ * 거리」), 사용자가 다른 천체를 선택하면 (이탈) 그 천체의 거리를 단계 천체의 거리처럼 보이게 된다 — 그때는 숨기고 이탈 안내가 그
+ * 자리를 설명한다 (PR #1397 리뷰 차단 1). 기준점을 바꿔도 같다.
  */
-function TourRulerReadout({ anchorId }: { anchorId: string }) {
+function TourRulerReadout({ anchorId, focusBodyId }: { anchorId: string; focusBodyId: string }) {
   const storeAnchorId = useSimStore((s) => s.rulerAnchorId);
   const selectedId = useSimStore((s) => s.selectedBodyId);
   const bodiesById = useMemo(() => indexBodies(ephemerisApi.getSolarSystem().bodies), []);
-  const distanceM = useRulerDistance(storeAnchorId === anchorId ? anchorId : null, selectedId);
+  const onStepScene = storeAnchorId === anchorId && selectedId === focusBodyId;
+  const distanceM = useRulerDistance(
+    onStepScene ? anchorId : null,
+    onStepScene ? selectedId : null,
+  );
   const anchor = bodiesById.get(anchorId);
   if (distanceM === null || anchor === undefined) return null;
   return (

@@ -279,7 +279,13 @@ describe('TourCard — 계절 투어 거리 자 (#1390 PR3)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('tour-ruler-distance')).toHaveTextContent(/^0\.983 AU · /),
     );
-    // 사용자가 기준점을 바꾸면 (이탈) 단계 거리를 보이지 않는다.
+    // 사용자가 다른 천체를 선택하면 (이탈) 숨긴다 — 줄에 B 이름이 없어 화성 거리가 지구 거리처럼 보이면 안 된다 (리뷰 차단 1).
+    act(() => useSimStore.getState().setSelectedBody('mars'));
+    expect(screen.queryByTestId('tour-ruler')).toBeNull();
+    // 단계 장면으로 돌아오면 다시 보인다.
+    act(() => fireEvent.click(screen.getByTestId('tour-return')));
+    expect(screen.getByTestId('tour-ruler')).toBeInTheDocument();
+    // 기준점을 바꿔도 (이탈) 숨긴다.
     act(() => useSimStore.getState().setRulerAnchor('moon'));
     expect(screen.queryByTestId('tour-ruler')).toBeNull();
   });
