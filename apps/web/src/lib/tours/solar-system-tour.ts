@@ -6,9 +6,9 @@ import { TOUR_OVERVIEW, type TourDef } from './types';
 export const SOLAR_SYSTEM_TOUR_JD = startOfYearJulianDate(2026);
 
 /**
- * 전 단계 시점 — 앱 첫 화면과 같은 「황도 위 비스듬히 내려다보기」 (#1390 Amendment 1). 개요 복귀 (`resetCamera`) 와 포커스는
- * target · 거리만 옮기고 시점 각은 직전 경로가 남긴 값이라, 지정하지 않으면 「다음」 으로 순회할 때 7단계가 황도면을 옆에서 보게
- * 된다 (실측 beta 102.6° — 궤도가 세로선으로 겹친다). 천체 단계도 같은 시점으로 둬 진입 경로와 무관하게 같은 화면이 나오게 한다.
+ * 전 단계 시점 — 앱 첫 화면과 같은 「황도 위 비스듬히 내려다보기」 (#1390 Amendment 1). 지정하지 않으면 시점 각이 진입 경로마다
+ * 달라져, 「다음」 으로 순회할 때 7단계가 황도면을 옆에서 보게 된다 (실측 beta 102.6° — 궤도가 세로선으로 겹친다). 천체 단계도 같은
+ * 시점으로 둬 진입 경로와 무관하게 같은 화면이 나오게 한다 (사용자 승인 2026-10-23).
  */
 const TOUR_VIEW = 'ecliptic-oblique';
 
@@ -16,8 +16,8 @@ const TOUR_VIEW = 'ecliptic-oblique';
 const ORBIT_PLAY_WINDOW_DAYS = 365;
 
 /**
- * #1390 T1 — 태양계 한 바퀴 (ADR `20261021-1390` §첫 릴리스 투어 T1). 포커스 · 개요 · 표시 토글 · 배속만 쓴다 (새 코드 0 —
- * §Concrete Prediction PR2).
+ * #1390 T1 — 태양계 한 바퀴 (ADR `20261021-1390` §첫 릴리스 투어 T1 · Amendment 1). 포커스 · 개요 · 시점 · 표시 토글 · 배속만
+ * 쓴다.
  *
  * 문안의 수치는 앱의 천체 데이터 (`packages/shared/data/solar-system.json` — NASA Planetary Fact Sheet) 에서 셈했다:
  * 태양 질량 비율 99.87 % (전 천체 질량 합 대비), 화성 지름 0.53 지구, 목성 질량 317.8 지구 = 나머지 일곱 행성 합 (128.8) 의 2.47 배.

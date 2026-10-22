@@ -438,6 +438,8 @@ export class CameraController {
    *
    * #1390 Amendment 1 — `viewDirection` 을 주면 alpha · beta 도 같은 전환으로 그 방향에 맞춘다 (`focusOn` 의 `viewDirection` 과
    * 같은 계약). 생략하면 현행대로 alpha · beta 를 애니메이션하지 않는다 — 관찰 · 연구 모드의 reset 은 인자를 주지 않는다.
+   * 생략이 시점 각 보존을 뜻하지는 않는다 — target tween 이 Babylon `setTarget` (`rebuildAnglesAndRadius`) 을 거쳐 카메라 위치를
+   * 고정한 채 각을 다시 셈하므로, 화면의 각은 직전 카메라 위치가 정한다 (PR #1396 리뷰 실측).
    */
   reset(
     targetRadius = 35,

@@ -16,8 +16,8 @@ export interface TourCamera {
   focus: string | typeof TOUR_OVERVIEW;
   /**
    * 시점 방향. 생략 = 시점 각 유지 (시점 요청을 내지 않는다 — 'keep' 값은 두지 않는다).
-   * 개요에는 절대 방향 시점 (`isAbsoluteFocusView` — `ecliptic-oblique`) 만 쓴다 (#1390 Amendment 1 — 개요 복귀는 target · 거리만
-   * 바꾸고 시점 각은 직전 포커스 경로가 남긴 값이라, 지정하지 않으면 진입 경로마다 화면이 달라진다. 콘텐츠 유효성 테스트가 고정).
+   * 개요에는 절대 방향 시점 (`isAbsoluteFocusView` — `ecliptic-oblique`) 만 쓴다 (#1390 Amendment 1 — 지정하지 않으면 개요 단계의
+   * 시점 각이 진입 경로마다 달라진다 (실측 102.6° / 72° / 48.5°). 콘텐츠 유효성 테스트가 고정).
    * ⚠️ 같은 천체가 이어지는 단계에서 카메라를 다시 잡으려면 `view` 가 있어야 한다 — 포커스 동기는 선택이 **바뀔 때만** 카메라를
    * 옮긴다 (ADR 결정 · 엔진 「같은 천체 단계의 카메라 재구도 계약」).
    */
