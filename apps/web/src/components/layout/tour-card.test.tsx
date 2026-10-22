@@ -2,10 +2,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isAbsoluteFocusView } from '@astro-simulator/core';
 import type { CoreCommand } from '@astro-simulator/shared';
 import { DISPLAY_TOGGLES } from '@/core/display-toggles';
 import { resetTimeEventsForTest } from '@/lib/time-events';
-import { ECLIPSE_TOUR, NEW_MOON_2024_03_10_JD } from '@/lib/tours/eclipse-tour';
+import { decodeTimeEvents } from '@/lib/time-events-data';
+import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
+import { TOURS, TOUR_OVERVIEW, type TourDef } from '@/lib/tours';
+import { NEW_MOON_2024_03_10_JD } from '@/lib/tours/eclipse-tour';
 import { useSimStore } from '@/store/sim-store';
 import { useTourStore } from '@/store/tour-store';
 import { TourCard } from './tour-card';
@@ -115,8 +119,10 @@ describe('TourCard — 목록 보기 (E1)', () => {
     const region = screen.getByRole('region', { name: '가이드 투어' });
     expect(region).toBeInTheDocument();
     const list = screen.getByRole('list');
-    expect(list.querySelectorAll('li')).toHaveLength(1);
-    expect(screen.getByTestId('tour-item-eclipse')).toHaveTextContent(ECLIPSE_TOUR.title);
+    expect(list.querySelectorAll('li')).toHaveLength(TOURS.length);
+    for (const tour of TOURS) {
+      expect(screen.getByTestId(`tour-item-${tour.id}`)).toHaveTextContent(tour.title);
+    }
   });
 
   it('#1390 — 카드는 HUD 층 한 칸 위 (같은 층 뒤 형제인 줌 슬라이더가 375 머리줄 「×」 · 「접기」 를 덮지 않게 — PR #1394 qa)', () => {
@@ -183,6 +189,75 @@ describe('TourCard — 시작 · 단계 적용 (E2)', () => {
     expect(useTourStore.getState().drift).toEqual([]);
   });
 });
+
+/** 사건 id → 율리우스일 (실제 사전 계산 파일 — 컨트롤러와 독립으로 기대값을 셈한다). */
+const EVENT_JD = new Map(
+  decodeTimeEvents(EVENTS_RAW, { startJd: SCRUBBER_MIN_JD, endJd: SCRUBBER_MAX_JD }).map((e) => [
+    e.id,
+    e.julianDate,
+  ]),
+);
+const HOURS_PER_DAY = 24;
+
+/**
+ * #1390 PR2 — 전 투어 전 단계 store 상태 단언 (DoD E2). 투어를 더하면 그대로 새 투어를 순회한다. 기대값은 단계 선언에서 직접
+ * 셈한다 (엔진의 `planned` 를 기대값으로 쓰지 않는다 — 같은 출처끼리 비교하면 엔진 결함이 숨는다).
+ *
+ * 시작 전 별 배경은 꺼져 있다 (`beforeEach` — `stars=off`). 단계가 별 배경을 지정하지 않으면 꺼진 채, 지정하면 그 값이어야 한다.
+ */
+describe.each(TOURS.map((t) => [t.id, t] as const))(
+  'TourCard — 전 단계 상태 (E2) · %s',
+  (_id, tour: TourDef) => {
+    it('단계마다 포커스 · 시각 · 배속 · 시점 요청 · 표시 의도 12종 · 거리 자 = 단계 선언, 이탈 0', async () => {
+      const snapshot = { ...INITIAL_INTENTS, starsVisible: false } as Record<string, boolean>;
+      render(<TourCard />);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`tour-item-${tour.id}`));
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(useTourStore.getState().activeTourId).toBe(tour.id);
+
+      let expectedJd: number | null = useSimStore.getState().julianDate;
+      for (const [i, step] of tour.steps.entries()) {
+        if (i > 0) act(() => fireEvent.click(screen.getByTestId('tour-next')));
+        const s = useSimStore.getState();
+        const label = `${tour.id} ${i + 1} (${step.id})`;
+        const focus = step.camera.focus === TOUR_OVERVIEW ? null : step.camera.focus;
+        expect(s.selectedBodyId, label).toBe(focus);
+        expect(s.freeFlyMode, label).toBe(false);
+        expect(s.timeScale, label).toBe(step.timeScale ?? 0);
+        if (step.time) {
+          expectedJd =
+            'julianDate' in step.time
+              ? step.time.julianDate
+              : EVENT_JD.get(step.time.eventId)! + (step.time.offsetHours ?? 0) / HOURS_PER_DAY;
+        }
+        // 시각 생략 단계는 앞 단계 시각이 유지된다 (테스트 더블은 프레임 진행이 없어 재생 단계도 시작 시각에 머문다).
+        expect(Math.abs(s.julianDate! - expectedJd!), label).toBeLessThanOrEqual(1e-6);
+        // 시점 요청 — 천체는 그 시점, 개요는 절대 시점만 (`bodyId: null` — #1390 Amendment 1). 테스트 더블에는 소비자가 없어 남는다.
+        const view = step.camera.view;
+        expect(s.focusViewRequest, label).toEqual(
+          view !== undefined && (focus !== null || isAbsoluteFocusView(view))
+            ? { bodyId: focus, view }
+            : null,
+        );
+        for (const def of DISPLAY_TOGGLES) {
+          const specified = (step.display as Record<string, boolean> | undefined)?.[def.id];
+          expect(s[def.intentKey], `${label} display ${def.id}`).toBe(
+            specified ?? snapshot[def.intentKey],
+          );
+        }
+        expect(s.rulerAnchorId, label).toBe(step.ruler ?? null);
+        expect(useTourStore.getState().drift, label).toEqual([]);
+        expect(useTourStore.getState().unavailable, label).toEqual([]);
+        expect(screen.getByTestId('tour-step-title'), label).toHaveTextContent(step.title);
+      }
+      expect(screen.getByTestId('tour-next')).toHaveTextContent('완료');
+    });
+  },
+);
 
 describe('TourCard — 키보드 (E3)', () => {
   it('카드 안 → ← 로 단계 이동, 첫 단계 ← · 마지막 단계 → 는 제자리', async () => {
