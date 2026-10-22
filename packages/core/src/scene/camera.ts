@@ -251,6 +251,13 @@ export function attachWasdControl(
   };
 }
 
+/**
+ * 기본 시점 각 — 앱 첫 화면 (`setupArcRotateCamera` 기본값) [rad]. 장면은 황도면이 X–Y 평면 · 황도 북극이 −Z 다 (#1366 `S_z`)
+ * 라 이 각은 황도 북쪽 위에서 약 72° 높이로 내려다보는 시점이다. #1390 Amendment 1 의 `ecliptic-oblique` 시점이 같은 값을 쓴다.
+ */
+export const DEFAULT_CAMERA_ALPHA = -Math.PI / 2;
+export const DEFAULT_CAMERA_BETA = Math.PI / 2.5;
+
 export interface ArcCameraOptions {
   /** 수평 회전각 (rad) */
   alpha?: number;
@@ -275,8 +282,8 @@ export function setupArcRotateCamera(
   options: ArcCameraOptions = {},
 ): ArcRotateCamera {
   const {
-    alpha = -Math.PI / 2,
-    beta = Math.PI / 2.5,
+    alpha = DEFAULT_CAMERA_ALPHA,
+    beta = DEFAULT_CAMERA_BETA,
     radius = 30,
     target = Vector3.Zero(),
     lowerRadiusLimit = 0.5,

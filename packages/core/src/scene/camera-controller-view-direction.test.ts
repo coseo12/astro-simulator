@@ -7,7 +7,12 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, MeshBuilder, NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { CameraController, viewDirectionToArcAngles } from './camera-controller.js';
+import {
+  arcAnglesToViewDirection,
+  CameraController,
+  viewDirectionToArcAngles,
+} from './camera-controller.js';
+import { DEFAULT_CAMERA_ALPHA, DEFAULT_CAMERA_BETA } from './camera.js';
 
 const disposers: Array<() => void> = [];
 afterEach(() => {
@@ -113,5 +118,62 @@ describe('#1360 PR2 — CameraController.focusOn viewDirection', () => {
     expect(props.has('alpha')).toBe(false);
     expect(props.has('beta')).toBe(false);
     expect(props.has('radius')).toBe(true);
+  });
+});
+
+describe('#1390 Amendment 1 — arcAnglesToViewDirection · CameraController.reset viewDirection', () => {
+  function animatedProperties(scene: Scene, camera: ArcRotateCamera): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const animatable of scene.getAllAnimatablesByTarget(camera)) {
+      for (const runtime of animatable.getAnimations()) {
+        const keys = runtime.animation.getKeys();
+        out.set(runtime.animation.targetProperty, keys[keys.length - 1]!.value as number);
+      }
+    }
+    return out;
+  }
+
+  it('각 → 방향 → 각 왕복 (앱 첫 화면 각) — Babylon 위치 방향과 같다', () => {
+    const { camera } = makeCamera();
+    const angles = { alpha: DEFAULT_CAMERA_ALPHA, beta: DEFAULT_CAMERA_BETA };
+    const dir = arcAnglesToViewDirection(angles);
+    expect(Math.hypot(dir.x, dir.y, dir.z)).toBeCloseTo(1, 12);
+    const got = cameraDirection(camera, angles.alpha, angles.beta);
+    expect(got.x * dir.x + got.y * dir.y + got.z * dir.z).toBeCloseTo(1, 9);
+    const back = viewDirectionToArcAngles(dir, DEFAULT_CAMERA_ALPHA, null, null);
+    expect(back.alpha).toBeCloseTo(DEFAULT_CAMERA_ALPHA, 12);
+    expect(back.beta).toBeCloseTo(DEFAULT_CAMERA_BETA, 12);
+  });
+
+  it('reset 에 viewDirection 을 주면 시작 각과 무관하게 같은 alpha · beta 로 애니메이션한다', () => {
+    const angles = { alpha: DEFAULT_CAMERA_ALPHA, beta: DEFAULT_CAMERA_BETA };
+    for (const [alpha0, beta0] of [
+      [0.3, 1.1],
+      [-0.26, 1.79], // 실측 — 1→7 순회 시 개요 진입 각 (beta 102.6°)
+      [0, 0.85], // 실측 — 일식 투어 직후 (beta 48.5°)
+    ] as const) {
+      const { scene, camera } = makeCamera();
+      camera.alpha = alpha0;
+      camera.beta = beta0;
+      const controller = new CameraController(camera, scene);
+      controller.reset(35, undefined, arcAnglesToViewDirection(angles));
+      const props = animatedProperties(scene, camera);
+      expect(props.get('beta')).toBeCloseTo(DEFAULT_CAMERA_BETA, 12);
+      // alpha 는 짧은 쪽 — 2π 배수 차이까지 같은 방향.
+      const k = (props.get('alpha')! - DEFAULT_CAMERA_ALPHA) / (2 * Math.PI);
+      expect(k).toBeCloseTo(Math.round(k), 9);
+      expect(props.get('radius')).toBe(35);
+    }
+  });
+
+  it('reset 인자 생략 — alpha · beta 애니메이션 없음 (관찰 · 연구 모드 reset 현행 유지)', () => {
+    const { scene, camera } = makeCamera();
+    const controller = new CameraController(camera, scene);
+    controller.reset(35);
+    const props = animatedProperties(scene, camera);
+    expect(props.has('alpha')).toBe(false);
+    expect(props.has('beta')).toBe(false);
+    expect(props.get('radius')).toBe(35);
+    expect(props.has('target')).toBe(true);
   });
 });

@@ -5,8 +5,11 @@ import {
   scene as sceneApi,
   gpu as gpuApi,
   coords as coordsApi,
+  isAbsoluteFocusView,
   isRPhaseFocusable,
+  type EventFocusView,
 } from '@astro-simulator/core';
+import type { ViewDirectionLike } from '@astro-simulator/core/scene';
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
 import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
@@ -187,6 +190,41 @@ export function shouldPreserveFocus(active: HTMLElement): boolean {
     // (프로젝트 요구 사양이 WebGPU 이므로 실제 도달 불가 경로.)
     return true;
   }
+}
+
+/** 개요 reset 의 카메라 거리 (씬 단위) — 앱 첫 화면 (`setupArcRotateCamera` `radius: 35`) 과 같은 개요 거리. */
+const OVERVIEW_RESET_RADIUS = 35;
+
+/**
+ * #1390 Amendment 1 — 절대 방향 시점 (`isAbsoluteFocusView`) → 시점 방향 (대상 → 카메라). 대상과 무관하므로 개요에도 쓴다.
+ * 상대 시점 (`facing-parent`) 은 대상 메시가 있어야 해서 여기서는 셈하지 않는다 (`undefined` — 호출부가 따로 셈한다).
+ * 절대 시점은 현재 1종 (`ecliptic-oblique` = 앱 첫 화면 각) 이다. 2번째가 생기면 여기에 `view → 각` 분기를 더한다.
+ */
+export function absoluteViewDirection(view: EventFocusView): ViewDirectionLike | undefined {
+  if (!isAbsoluteFocusView(view)) return undefined;
+  return sceneApi.arcAnglesToViewDirection({
+    alpha: sceneApi.DEFAULT_CAMERA_ALPHA,
+    beta: sceneApi.DEFAULT_CAMERA_BETA,
+  });
+}
+
+/**
+ * 개요 복귀 reset (#1390 Amendment 1). 개요 시점 요청 (`bodyId: null`) 이 있을 때만 그 요청을 소비해 alpha · beta 까지 맞춘다.
+ * 대상이 있는 요청은 그 포커스 진입이 소비하도록 남긴다. 관찰 · 연구 모드 reset 은 요청이 없어 종전과 같다 (각을 지정하지 않음).
+ */
+export function resetCameraToOverview(
+  controller: {
+    reset: (radius?: number, target?: undefined, viewDirection?: ViewDirectionLike) => void;
+  },
+  store: Pick<typeof useSimStore, 'getState'> = useSimStore,
+): void {
+  const request = store.getState().focusViewRequest;
+  let viewDirection: ViewDirectionLike | undefined;
+  if (request !== null && request.bodyId === null) {
+    store.getState().setFocusViewRequest(null);
+    viewDirection = absoluteViewDirection(request.view);
+  }
+  controller.reset(OVERVIEW_RESET_RADIUS, undefined, viewDirection);
 }
 
 /**
@@ -1122,7 +1160,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           const request = useSimStore.getState().focusViewRequest;
           if (request === null) return undefined;
           useSimStore.getState().setFocusViewRequest(null);
-          if (bodyId === null || request.bodyId !== bodyId) return undefined;
+          if (request.bodyId !== bodyId) return undefined;
+          // #1390 Amendment 1 — 절대 방향 시점은 대상과 무관하다 (`absoluteViewDirection`).
+          const absolute = absoluteViewDirection(request.view);
+          if (absolute !== undefined) return absolute;
+          if (bodyId === null) return undefined;
           const mesh = solar.meshes.get(bodyId);
           const parentId = solar.getBodyParentId(bodyId);
           const parentMesh = parentId ? solar.meshes.get(parentId) : undefined;
@@ -1230,7 +1272,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
             solar.clearFocus();
-            controller.reset(35);
+            // #1390 Amendment 1 — 개요 시점 요청 (`bodyId: null`) 소비 + reset (`resetCameraToOverview` — 단위 테스트 대상).
+            resetCameraToOverview(controller);
             // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
             freeFlyActive = false;
             freeFlyEntryRadius = null;

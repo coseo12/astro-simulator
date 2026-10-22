@@ -89,6 +89,44 @@ describe('planTourStep — 순서 계약 (결정 D6 일반화)', () => {
     });
   });
 
+  it('#1390 Amendment 1 — 개요 + 절대 시점은 대상 없는 요청 (bodyId null) 을 resetCamera 앞에 낸다', () => {
+    const plan = planTourStep(
+      { ...BASE_STEP, camera: { focus: 'overview', view: 'ecliptic-oblique' } },
+      input(),
+    );
+    if (!plan.ok) throw new Error(plan.reason);
+    const types = kinds(plan.actions);
+    expect(plan.actions[types.indexOf('focusViewRequest')]).toEqual({
+      type: 'focusViewRequest',
+      request: { bodyId: null, view: 'ecliptic-oblique' },
+    });
+    expect(types.indexOf('focusViewRequest')).toBeLessThan(types.indexOf('resetCamera'));
+  });
+
+  it('#1390 Amendment 1 — 개요 + 상대 시점 (facing-parent) 은 요청하지 않는다 (대상 없음)', () => {
+    const plan = planTourStep(
+      { ...BASE_STEP, camera: { focus: 'overview', view: 'facing-parent' } },
+      input(),
+    );
+    if (!plan.ok) throw new Error(plan.reason);
+    expect(plan.actions.find((a) => a.type === 'focusViewRequest')).toEqual({
+      type: 'focusViewRequest',
+      request: null,
+    });
+  });
+
+  it('#1390 Amendment 1 — 천체 + 절대 시점은 그 천체 요청', () => {
+    const plan = planTourStep(
+      { ...BASE_STEP, camera: { focus: 'saturn', view: 'ecliptic-oblique' } },
+      input(),
+    );
+    if (!plan.ok) throw new Error(plan.reason);
+    expect(plan.actions.find((a) => a.type === 'focusViewRequest')).toEqual({
+      type: 'focusViewRequest',
+      request: { bodyId: 'saturn', view: 'ecliptic-oblique' },
+    });
+  });
+
   it('개요는 resetCamera · 기대 선택 null', () => {
     const plan = planTourStep({ ...BASE_STEP, camera: { focus: 'overview' } }, input());
     if (!plan.ok) throw new Error(plan.reason);

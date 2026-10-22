@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { isRPhaseFocusable } from '@astro-simulator/core';
+import { isAbsoluteFocusView, isRPhaseFocusable } from '@astro-simulator/core';
 import { describe, expect, it } from 'vitest';
 import { decodeTimeEvents } from '@/lib/time-events-data';
 import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
@@ -30,9 +30,9 @@ describe.each(TOURS.map((t) => [t.id, t] as const))('투어 %s', (_id, tour) => 
   });
 
   it.each(tour.steps.map((s, i) => [i + 1, s] as const))('단계 %i', (_n, step) => {
-    // 포커스 — R-Phase allowlist 또는 개요. 시점은 천체 포커스에서만.
+    // 포커스 — R-Phase allowlist 또는 개요. 개요의 시점은 절대 방향만 (상대 시점은 대상이 없다 — #1390 Amendment 1).
     if (step.camera.focus === TOUR_OVERVIEW) {
-      expect(step.camera.view).toBeUndefined();
+      if (step.camera.view !== undefined) expect(isAbsoluteFocusView(step.camera.view)).toBe(true);
     } else {
       expect(isRPhaseFocusable(step.camera.focus)).toBe(true);
     }
