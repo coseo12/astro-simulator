@@ -1,6 +1,7 @@
 # ADR 20261021-1390 — 교육 모드 가이드 투어: 기존 명령만 보내는 투어 컨트롤러 · 단계별 「다음」 · 자유 조작 + 이탈 감지
 
 - **상태**: Accepted (cross-validate 2026-10-21) — 사용자 결정 (2026-10-21): Q1~Q8 전부 권고안
+  - **Amendment 1** (2026-10-22 — 개요 시점 각 · T4-4 장면): **Provisional** — 사용자 결정 (2026-10-22) 권고안 반영, cross-validate 결과 통합 전 ([§Amendment 1](#amendment-1-2026-10-22--pr2-concrete-prediction-pr2-반증--개요-시점-각))
 - **날짜**: 2026-10-21
 - **결정자**: 사용자 (2026-10-21 — Q 표 전부 권고안, 메인 오케스트레이터 경유) · 설계 architect (이슈 [#1390](https://github.com/coseo12/astro-simulator/issues/1390) · 사용자 선택 2026-10-21 「교육 모드 활성화 — 가이드 투어 · 설명 카드 (트랙 C)」)
 - **관련**:
@@ -445,3 +446,63 @@ cross-validate 1회 — 외부 검증 모델 Antigravity `agy` (`cross_validate.
 ### 호출 전 Claude 편향 셀프 체크
 
 [cross-validate-protocol.md](../guides/cross-validate-protocol.md) §5 4종 — **낙관적 일정 · 결합 간과 · 폐기 프레이밍 · 순수주의 4축 모두 미통과로 보고 명시 질문으로 삽입**했다. 결과: 낙관적 일정 → 이견 수용 2 (PR0 분리) / 결합 간과 → 합의 1 · 2 · 3 · 6 · 7 + 고유 발견 2 / 폐기 프레이밍 → 외부 모델이 §3.3 축소 판단을 타당하다고 봄 (반론 없음 — 다만 단일 모델의 동의는 검증이 아니므로 재검토 조건 4 를 유지) / 순수주의 → 프로덕션 무접촉은 유지, DoD 의 측정 술어만 완화.
+
+---
+
+## Amendment 1 (2026-10-22 — PR2: Concrete Prediction PR2 반증 · 개요 시점 각)
+
+- **상태**: Provisional — 사용자 결정 (2026-10-22, 이슈 [#1390](https://github.com/coseo12/astro-simulator/issues/1390) 코멘트) 을 반영했다. cross-validate 는 아직 하지 않았다. 구현 PR 의 developer 단계는 cross-validate 를 직접 부르지 않는 규약 (#479) 이라, 메인 오케스트레이터 · 리뷰 단계에서 1회 돌린 뒤 결과를 통합하고 Accepted 로 전이한다.
+- **바뀌는 것**: §Concrete Prediction 의 PR2 행 (「새 코드 0」 → 반증) · 단계 형식 (`view` 를 개요에서도 허용) · T4 4단계 장면. 결정 E1~E7 · Q1~Q8 은 그대로다.
+
+### A1-1. 반증 — 개요 단계의 시점 각이 진입 경로에 따라 갈린다
+
+T1 의 개요 단계 (1 · 7) 는 `resetCamera` 로 태양 중심에 돌아온다. 그런데 개요 복귀 (`sim-canvas` `syncFocusToScene(null)` → `CameraController.reset(35)`) 는 target 과 거리만 애니메이션하고 **alpha · beta 를 지정하지 않는다** — 화면의 각은 직전 경로가 정한다. 원래 단계 형식은 개요의 시점 각을 지정할 수 없었다 (`view` 는 천체 포커스 전용 · `facing-parent` 1종). 그래서 같은 단계가 진입 경로마다 다른 화면이 된다.
+
+실측은 실 GPU 1280 × 800, PR2 초안 (develop `830325d0` + T1 · T4 데이터) 에서 했다. beta 는 장면 +Y 에서 잰 각이다. 장면의 황도면은 X–Y 평면이다 (지구 공전 위치 3점의 법선 = ±Z 실측). 황도 북극은 −Z 다 (#1366 `S_z` — 데이터 +Z → 장면 −Z). 그래서 beta 90° 근처에서는 황도면이 옆에서 보인다.
+
+| 진입 경로 | 개요 단계 beta (변경 전) | 변경 후 |
+| --- | --- | --- |
+| 처음부터 「다음」 1→7 (2회) | 1단계 72.0° · **7단계 102.6° / 102.4°** — 화성 29.8° · 목성 160° · 토성 94.9~97.9° 포커스를 거치며 바뀐다 | 1~7단계 전부 72.0° (2회) |
+| URL `?tour=solar-system&step=7` 직접 진입 | 72.0° | 72.0° |
+| 일식 투어 완료 직후 T1 1단계 | **48.5°** | 72.0° |
+
+102.6° 에서는 궤도가 화면 세로선으로 겹쳐, 7단계가 보이려던 「안쪽 행성일수록 빨리 돈다」 장면이 서지 않는다 (PR2 의 사용자 육안 검토 자료에 스크린샷이 있다). ⇒ **§Concrete Prediction PR2 「새 코드 0 — 데이터 파일만」 은 반증됐다.** 단계 형식이 부족하다는 신호이며, 이 예측이 드러내려던 바로 그 경우다 (`data-not-code-extension` 교훈).
+
+### A1-2. 사용자 결정 (2026-10-22 — 둘 다 권고안)
+
+1. **엔진 확장** — 개요 단계에서도 시점 각을 지정한다. 진입 경로와 무관하게 같은 화면이 나와야 하고, 판정 술어는 위 세 경로의 beta 가 ±0.5° 안에서 같은 것이다. 관찰 · 연구 모드의 reset · 포커스 동작은 회귀 0 이어야 한다. PR3 `from-sun` 과 같은 축이므로 확장성을 고려한다 (`from-sun` 자체는 PR3 에서 만든다).
+   - 기각한 대안 (a) — 케플러 재생을 2단계로 옮겨 1단계 각을 잇는다. 1단계 각 자체가 진입 상태에 따라 갈린다 (48.5°).
+   - 기각한 대안 (b) — T1-7 을 뺀다.
+2. **T4 4단계** — 「한밤의 하늘이 1년에 한 바퀴 돈다」 는 장면이 서지 않는다. 시점 요청은 단계 시작 때 1회 적용되고, 재생 중에는 alpha · beta 가 변하지 않는다 (실측). 그래서 별자리는 제자리에 있고 태양이 화면 세로선을 따라 올라온다. ⇒ 하지부터 **190 일** 재생 (12월 27일 정지) 하고, 문안을 「별자리는 그대로, 태양이 그쪽으로 온다 → 12월엔 궁수자리가 낮 하늘」 로 바꾼다. 2단계 문안에서는 1280 에서 카드 뒤에 가려지는 「황소자리」 를 뺀다.
+
+### A1-3. 확장 형식 — 절대 방향 시점 1종
+
+시점을 **상대 시점** (대상 천체가 있어야 방향이 정해진다 — `facing-parent` · PR3 `from-sun`) 과 **절대 시점** (대상과 무관한 고정 방향) 으로 나눈다. 절대 시점은 대상이 없는 개요에도 쓸 수 있다.
+
+| 위치 | 변경 |
+| --- | --- |
+| `packages/core` `events/event-kinds.ts` | `EventFocusView` 에 `'ecliptic-oblique'` 1 멤버를 더한다. `ABSOLUTE_FOCUS_VIEWS` · `isAbsoluteFocusView` 를 추가한다 |
+| `packages/core` `scene/camera.ts` | 앱 첫 화면 각을 `DEFAULT_CAMERA_ALPHA` (−π/2) · `DEFAULT_CAMERA_BETA` (π/2.5 = 72°) 상수로 뽑는다. `setupArcRotateCamera` 기본값과 `ecliptic-oblique` 가 같은 SSoT 를 쓴다. 이 각은 황도 북쪽 위 약 72° 높이에서 내려다보는 시점이다 |
+| `packages/core` `scene/camera-controller.ts` | `reset(radius, target, viewDirection?)` — `focusOn` 의 `viewDirection` 과 같은 계약이다. **인자를 생략하면 현행대로 alpha · beta 를 애니메이션하지 않는다** (관찰 · 연구 모드의 reset 경로는 인자를 주지 않는다). 각 → 방향 변환 `arcAnglesToViewDirection` 은 `viewDirectionToArcAngles` 의 역이다 |
+| `apps/web` `store/sim-store.ts` | `FocusViewRequest.bodyId: string \| null` — `null` 이 개요다 |
+| `apps/web` `sim-canvas.tsx` | `consumeFocusView` 에 절대 시점 분기를 1개 더한다. 개요 reset 분기는 `bodyId: null` 요청이 있을 때만 그 요청을 소비한다 (대상이 있는 요청은 기존대로 그 포커스 진입이 소비한다) |
+| `apps/web` `lib/tours` | `planTourStep` 이 「개요 + 절대 시점」 을 `{ bodyId: null, view }` 로 요청한다 (개요 + 상대 시점은 요청하지 않음). 콘텐츠 유효성 테스트가 개요에는 절대 시점만 허용한다 |
+
+이미 개요인 상태에서 개요 단계로 가면 선택이 바뀌지 않는다. 이 경우에는 기존 「같은 body 요청 즉시 소비」 분기가 `null === null` 로 그대로 발화한다 (조건식 무변경).
+
+**적용 범위 (판단 항목 — PR2 검토 자료에 적었다)**: T1 은 개요 2단계뿐 아니라 천체 단계 (2~6) 에도 `ecliptic-oblique` 를 쓴다. 천체 포커스도 시점 각이 경로에 따라 갈렸기 때문이다 (토성 94.9~97.9° — 고리가 거의 옆으로 보였다). 여기에 써서 7단계 모두 진입 경로와 무관한 화면이 된다. T4 1단계도 같은 이유로 쓴다. 이 시점에서는 지구 너머 배경이 황도 남극 쪽 하늘이 되므로, 1단계 문안은 특정 별자리를 가리키지 않는다.
+
+**PR3 확장점**: `from-sun` 은 상대 시점이다. `EventFocusView` 1 멤버와 `consumeFocusView` 분기 1개를 더하면 된다 — §Concrete Prediction PR3 행 그대로다.
+
+### A1-4. Concrete Prediction 갱신
+
+- **PR2 (실측)**: 데이터 파일 2개 (`solar-system-tour.ts` · `constellation-tour.ts`) 와 목록 등록 외에 위 A1-3 표의 엔진 확장이 들어간다. `packages/core` 3파일 (+ 테스트 1), `sim-canvas.tsx` 시점 소비 2곳, store 타입 1개, 엔진 (`plan-tour-step.ts` · `types.ts`) 이다. 정확한 `git diff --stat` 은 PR #1390-PR2 본문에 있다.
+- **PR3**: 바뀌지 않는다 (위 확장점).
+- **이후 투어**: 절대 · 상대 시점 종류로 표현되는 장면이면 다시 「데이터 파일만」 이다. 재검토 조건 1 (연속 카메라 연출) 은 그대로다.
+
+### A1-5. 회귀 범위
+
+- 관찰 · 연구 모드의 reset (`resetCamera`) 은 `focusViewRequest` 가 `null` 이므로 `reset(35)` 를 인자 없이 부른다. 그래서 동작이 종전과 같다 (core 단위 테스트 「reset 인자 생략 — alpha · beta 애니메이션 없음」). 실브라우저 대조로도 확인했다. 관찰 모드에서 드래그 → 화성 포커스 → reset 버튼을 누르면 develop `830325d0` 과 PR2 모두 alpha · beta 가 바뀐다 (develop: alpha −145.4° → −66.0°, beta 99.7° → 103.5° / PR2: −142.7° → −73.4°, 98.4° → 101.5° — 드래그 양이 달라 값은 다르다). 둘 다 72° 로 맞춰지지 않으므로 같은 종전 동작이다. reset 이 시점 각을 지정하지 않아 화면의 각이 경로에 따라 정해지는 것은 A1-1 반증의 기전과 같다.
+- 사건 선택 (`time-events.tsx`) 은 지금도 `bodyId` 에 천체 id 를 넣으므로 경로가 바뀌지 않는다.
+- 자유 비행 · 포커스 CI 가드는 PR CI 에서 확인한다.
+
