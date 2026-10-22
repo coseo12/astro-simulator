@@ -31,6 +31,14 @@ describe('formatRulerDistance — 경계 0.01 AU (결정 R5)', () => {
     // 지구–달 대표값
     expect(formatRulerDistance(384_400_000)).toBe('38.4만 km');
   });
+
+  it('#1390 PR3 — AU 소수 자리 지정 (근원일점 1.017 · 0.983 이 2자리에서는 1.02 · 0.98 로 뭉개진다)', () => {
+    expect(formatRulerDistance(1.01671 * AU, 3)).toBe('1.017 AU · 1.52억 km');
+    expect(formatRulerDistance(0.98329 * AU, 3)).toBe('0.983 AU · 1.47억 km');
+    // 기본은 종전 2자리 · km 경계는 자리 수와 무관.
+    expect(formatRulerDistance(1.01671 * AU)).toBe('1.02 AU · 1.52억 km');
+    expect(formatRulerDistance(384_400_000, 3)).toBe('38.4만 km');
+  });
 });
 
 describe('formatLightTime — 광시간 (결정 R5 · 연구 모드)', () => {

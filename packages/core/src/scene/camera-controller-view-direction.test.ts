@@ -10,6 +10,7 @@ import { ArcRotateCamera, MeshBuilder, NullEngine, Scene, Vector3 } from '@babyl
 import {
   arcAnglesToViewDirection,
   CameraController,
+  toCameraUpFrame,
   viewDirectionToArcAngles,
 } from './camera-controller.js';
 import { DEFAULT_CAMERA_ALPHA, DEFAULT_CAMERA_BETA } from './camera.js';
@@ -175,5 +176,89 @@ describe('#1390 Amendment 1 — arcAnglesToViewDirection · CameraController.res
     expect(props.has('beta')).toBe(false);
     expect(props.get('radius')).toBe(35);
     expect(props.has('target')).toBe(true);
+  });
+});
+
+describe('#1390 PR3 (Amendment 2) — FocusTarget.viewUp (from-sun 의 황도 북극 위)', () => {
+  /** 황도 북극 (장면 — #1366 `S_z`). */
+  const ECLIPTIC_NORTH = new Vector3(0, 0, -1);
+
+  function finalAngles(scene: Scene, camera: ArcRotateCamera): { alpha: number; beta: number } {
+    const out = { alpha: camera.alpha, beta: camera.beta };
+    for (const animatable of scene.getAllAnimatablesByTarget(camera)) {
+      for (const runtime of animatable.getAnimations()) {
+        const keys = runtime.animation.getKeys();
+        const v = keys[keys.length - 1]!.value as number;
+        if (runtime.animation.targetProperty === 'alpha') out.alpha = v;
+        if (runtime.animation.targetProperty === 'beta') out.beta = v;
+      }
+    }
+    return out;
+  }
+
+  /** 애니메이션 끝 각을 카메라에 넣고 (대상 → 카메라 방향, 카메라 공간의 위 방향) 을 읽는다. */
+  function settledView(scene: Scene, camera: ArcRotateCamera) {
+    const { alpha, beta } = finalAngles(scene, camera);
+    scene.stopAllAnimations();
+    camera.alpha = alpha;
+    camera.beta = beta;
+    camera.getViewMatrix(true);
+    const dir = camera.position.subtract(camera.target).normalize();
+    return { dir, view: camera.getViewMatrix() };
+  }
+
+  it('지점 (至點) 처럼 시점 방향이 장면 +Y 와 평행해도 정확히 그 방향이고, 황도 북극이 화면 위다', () => {
+    // 기본 위 (+Y) 로는 beta 가 한계 0.01 rad 에 잘려 0.57° 벗어나고 alpha 가 이전 값에 묶인다 (실측 — 사이각 0.189°).
+    for (const d of [new Vector3(0.006, 1, 0), new Vector3(-0.006, -1, 0), new Vector3(1, 0, 0)]) {
+      const { scene, camera } = makeCamera();
+      const mesh = MeshBuilder.CreateSphere('m', { diameter: 2 }, scene);
+      const controller = new CameraController(camera, scene);
+      controller.focusOn({ mesh, radius: 8, viewDirection: d, viewUp: ECLIPTIC_NORTH });
+      expect(camera.upVector.equalsWithEpsilon(ECLIPTIC_NORTH, 1e-12)).toBe(true);
+      const { dir, view } = settledView(scene, camera);
+      expect(Vector3.Dot(dir, d.normalizeToNew())).toBeCloseTo(1, 9);
+      // 카메라 공간 (Babylon 왼손 — +y 화면 위) 에서 황도 북극의 방향.
+      const up = Vector3.TransformNormal(ECLIPTIC_NORTH, view);
+      expect(up.y).toBeGreaterThan(0.999);
+    }
+  });
+
+  it('viewUp 생략 (다른 포커스 · reset) 은 기본 +Y 로 되돌리고, 그 순간 카메라 위치는 움직이지 않는다', () => {
+    const { scene, camera } = makeCamera();
+    const mesh = MeshBuilder.CreateSphere('m', { diameter: 2 }, scene);
+    const controller = new CameraController(camera, scene);
+    // 회전축 (X) 위가 아닌 방향이어야 두 프레임의 같은 각이 다른 위치가 된다 — 하지 방향 (거의 +Y).
+    const solstice = new Vector3(0.006, 1, 0.2);
+    controller.focusOn({ mesh, radius: 8, viewDirection: solstice, viewUp: ECLIPTIC_NORTH });
+    settledView(scene, camera);
+    const before = camera.position.clone();
+    controller.focusOn({ mesh, radius: 8 });
+    expect(camera.upVector.equals(Vector3.Up())).toBe(true);
+    camera.getViewMatrix(true);
+    expect(camera.position.subtract(before).length()).toBeLessThan(1e-9);
+    // reset 도 같다.
+    controller.focusOn({
+      mesh,
+      radius: 8,
+      viewDirection: new Vector3(1, 0, 0),
+      viewUp: ECLIPTIC_NORTH,
+    });
+    controller.reset(35);
+    expect(camera.upVector.equals(Vector3.Up())).toBe(true);
+  });
+
+  it('기본 위 방향 경로는 upVector 를 쓰지 않는다 — toCameraUpFrame 항등 · 종전 각과 비트 동일', () => {
+    const d = { x: -0.6, y: -0.72, z: 0.35 };
+    expect(toCameraUpFrame(d, { x: 0, y: 1, z: 0 })).toBe(d);
+    const { scene, camera } = makeCamera();
+    const mesh = MeshBuilder.CreateSphere('m', { diameter: 2 }, scene);
+    const controller = new CameraController(camera, scene);
+    const upBefore = camera.upVector;
+    controller.focusOn({ mesh, radius: 8, viewDirection: new Vector3(d.x, d.y, d.z) });
+    expect(camera.upVector).toBe(upBefore);
+    const expected = viewDirectionToArcAngles(d, 0.3, camera.lowerBetaLimit, camera.upperBetaLimit);
+    const got = finalAngles(scene, camera);
+    expect(got.alpha).toBe(expected.alpha);
+    expect(got.beta).toBe(expected.beta);
   });
 });

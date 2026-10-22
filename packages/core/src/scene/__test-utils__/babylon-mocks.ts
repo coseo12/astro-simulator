@@ -39,7 +39,7 @@ export interface MockCameraOptions {
  * focusOn / runTierTransition / panning 산식이 만지는 속성만 갖는 최소 카메라 모킹.
  *
  * 소비처별 사용 속성 (superset — 미사용 속성은 duck-typing 상 무해):
- *  - focus-lower-radius-floor: radius(고정 30) / minZ / lowerRadiusLimit / target
+ *  - focus-lower-radius-floor: radius(고정 30) / minZ / lowerRadiusLimit / target / upVector
  *  - camera-panning, camera-sensitivity-injection: radius / lowerRadiusLimit / panningSensibility
  */
 export function mockArcRotateCamera(opts: MockCameraOptions = {}): ArcRotateCamera {
@@ -49,6 +49,8 @@ export function mockArcRotateCamera(opts: MockCameraOptions = {}): ArcRotateCame
     lowerRadiusLimit: opts.lowerRadiusLimit ?? 0.5,
     panningSensibility: 0,
     target: new Vector3(0, 0, 0),
+    // #1390 PR3 — `focusOn` 이 위 방향을 먼저 맞춘다 (`#applyViewUp`). 기본 (+Y) 이면 쓰지 않는다.
+    upVector: Vector3.Up(),
   } as unknown as ArcRotateCamera;
 }
 

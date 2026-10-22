@@ -4,13 +4,18 @@ import { ChevronLeft, ChevronRight, ChevronUp, X } from 'lucide-react';
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
 } from 'react';
+import { ephemeris as ephemerisApi } from '@astro-simulator/core';
 import { useTourController, type TourController } from '@/core/use-tour-controller';
+import { useRulerDistance } from '@/hooks/use-ruler-distance';
+import { indexBodies } from '@/lib/body-distance';
+import { formatRulerDistance } from '@/lib/ruler';
 import { TOURS, getTour, type TourDef } from '@/lib/tours';
 import { useSimStore } from '@/store/sim-store';
 import { useTourStore } from '@/store/tour-store';
@@ -48,6 +53,12 @@ const ACTION_BUTTON =
   'inline-flex items-center justify-center gap-1 min-h-8 min-w-8 px-2.5 rounded-sm border text-body-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60';
 
 const DRIFT_NOTICE = '장면을 직접 바꿨습니다. 투어는 이 단계에 머뭅니다.';
+
+/**
+ * 투어 단계 거리 자의 AU 소수 자리 (#1390 PR3). 교육 모드는 관찰 카드 · 연구 패널 (거리 자 행이 있는 곳) 이 숨어 있어 카드가 거리를
+ * 직접 보인다. 근원일점 (1.017 · 0.983 AU) 이 2자리 (`1.02` · `0.98`) 로는 문안 수치와 어긋나 3자리다.
+ */
+const TOUR_RULER_AU_DIGITS = 3;
 
 export function TourCard() {
   const mode = useSimStore((s) => s.mode);
@@ -246,6 +257,7 @@ function TourCardView({ controller }: { controller: TourController }) {
             {step.body}
           </p>
         </div>
+        {step.ruler ? <TourRulerReadout anchorId={step.ruler} /> : null}
         {unavailableReasons.length > 0 ? (
           <p data-testid="tour-unavailable" className="mt-2 text-caption text-fg-secondary">
             {unavailableReasons.join(' · ')}
@@ -317,6 +329,31 @@ function TourCardView({ controller }: { controller: TourController }) {
         </button>
       </div>
     </TourRegion>
+  );
+}
+
+/**
+ * 단계가 지정한 거리 자 (기준점 A = `anchorId` · B = 현재 선택) 의 물리 거리 — 관찰 카드 거리 자 행 (`RulerRow`) 과 같은 출처
+ * (`useRulerDistance`). 사용자가 기준점이나 선택을 바꿔 단계 장면에서 벗어나면 (이탈) 보이지 않는다 — 이탈 안내가 그 자리를 설명한다.
+ */
+function TourRulerReadout({ anchorId }: { anchorId: string }) {
+  const storeAnchorId = useSimStore((s) => s.rulerAnchorId);
+  const selectedId = useSimStore((s) => s.selectedBodyId);
+  const bodiesById = useMemo(() => indexBodies(ephemerisApi.getSolarSystem().bodies), []);
+  const distanceM = useRulerDistance(storeAnchorId === anchorId ? anchorId : null, selectedId);
+  const anchor = bodiesById.get(anchorId);
+  if (distanceM === null || anchor === undefined) return null;
+  return (
+    <p
+      data-testid="tour-ruler"
+      data-distance-m={distanceM}
+      className="mt-2 flex items-baseline justify-between gap-2 text-caption"
+    >
+      <span className="text-fg-secondary">{anchor.nameKo}까지 거리</span>
+      <span data-testid="tour-ruler-distance" className="num text-fg-primary">
+        {formatRulerDistance(distanceM, TOUR_RULER_AU_DIGITS)}
+      </span>
+    </p>
   );
 }
 

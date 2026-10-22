@@ -9,7 +9,7 @@ import {
   isRPhaseFocusable,
   type EventFocusView,
 } from '@astro-simulator/core';
-import type { ViewDirectionLike } from '@astro-simulator/core/scene';
+import type { FocusTarget, ViewDirectionLike } from '@astro-simulator/core/scene';
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
 import { PointerEventTypes } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
@@ -1156,17 +1156,29 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         const FOCUS_VIEW_TILT_RAD = (15 * Math.PI) / 180;
         /** 모체 방향이 카메라 위 방향과 거의 평행하면 기울이지 않는다 (기울일 축의 길이 하한). */
         const FOCUS_VIEW_TILT_MIN_AXIS = 1e-6;
-        const consumeFocusView = (bodyId: string | null) => {
+        /** #1390 PR3 — `from-sun` 시점의 기준 천체 (태양 메시 id). */
+        const SUN_BODY_ID = 'sun';
+        /**
+         * #1390 PR3 (Amendment 2) — `from-sun` 시점의 화면 위 = 황도 북극 (데이터 +Z → 장면 `S_z`, #1366). 장면 기본 위 (+Y) 는 황도면
+         * **안**이라 태양 → 지구 선 (황도면 안) 을 따라 보면 황도 북극이 화면 옆으로 눕고, 지점 (至點) 에는 그 선이 +Y 와 거의 평행해
+         * 카메라 `beta` 한계 (0.01 rad) 에 걸린다 (실측 — 사이각 0.189°, 북극 화면각 ±89.75°).
+         */
+        const FROM_SUN_VIEW_UP = { x: 0, y: 0, z: coordsApi.SCENE_Z_SIGN };
+        const consumeFocusView = (
+          bodyId: string | null,
+        ): Pick<FocusTarget, 'viewDirection' | 'viewUp'> | undefined => {
           const request = useSimStore.getState().focusViewRequest;
           if (request === null) return undefined;
           useSimStore.getState().setFocusViewRequest(null);
           if (request.bodyId !== bodyId) return undefined;
           // #1390 Amendment 1 — 절대 방향 시점은 대상과 무관하다 (`absoluteViewDirection`).
           const absolute = absoluteViewDirection(request.view);
-          if (absolute !== undefined) return absolute;
+          if (absolute !== undefined) return { viewDirection: absolute };
           if (bodyId === null) return undefined;
           const mesh = solar.meshes.get(bodyId);
-          const parentId = solar.getBodyParentId(bodyId);
+          // #1390 PR3 — `from-sun` 은 모체 대신 태양 쪽이고 기울이지 않는다 (원반 중심 = 태양 직하점 — ADR 1-F).
+          const fromSun = request.view === 'from-sun';
+          const parentId = fromSun ? SUN_BODY_ID : solar.getBodyParentId(bodyId);
           const parentMesh = parentId ? solar.meshes.get(parentId) : undefined;
           if (!mesh || !parentMesh) return undefined;
           mesh.computeWorldMatrix(true);
@@ -1175,16 +1187,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             .getAbsolutePosition()
             .subtract(mesh.getAbsolutePosition())
             .normalize();
+          if (fromSun) return { viewDirection: toParent, viewUp: FROM_SUN_VIEW_UP };
           // 정확히 모체 방향이면 카메라가 「대상 ↔ 모체」 선 위에 놓여 거리 자 선 (기준점 = 지구) 이 카메라를 관통해 화면에
           // 한 줄로 늘어진다 (실 Chrome 실측). 카메라 위 (+Y) 쪽으로 조금 기울여 지구 쪽 반구를 보면서 선은 지구 쪽으로
           // 물러나게 한다. 위 방향과 평행 (극) 이면 기울일 축이 정의되지 않아 그대로 둔다.
           const up = toParent.clone().scaleInPlace(-toParent.y);
           up.y += 1;
           const upLength = up.length();
-          if (upLength < FOCUS_VIEW_TILT_MIN_AXIS) return toParent;
-          return toParent
-            .scaleInPlace(Math.cos(FOCUS_VIEW_TILT_RAD))
-            .addInPlace(up.scaleInPlace(Math.sin(FOCUS_VIEW_TILT_RAD) / upLength));
+          if (upLength < FOCUS_VIEW_TILT_MIN_AXIS) return { viewDirection: toParent };
+          return {
+            viewDirection: toParent
+              .scaleInPlace(Math.cos(FOCUS_VIEW_TILT_RAD))
+              .addInPlace(up.scaleInPlace(Math.sin(FOCUS_VIEW_TILT_RAD) / upLength)),
+          };
         };
 
         const syncFocusToScene = (bodyId: string | null) => {
@@ -1252,7 +1267,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               controller.focusOn({
                 mesh,
                 radius: desiredRadius,
-                viewDirection: consumeFocusView(bodyId),
+                ...consumeFocusView(bodyId),
               });
               // #693 — focus 진입 시 패닝 비활성 (ADR §결정 3 옵션 A). focus 중 followObserver 가
               // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.

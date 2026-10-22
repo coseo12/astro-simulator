@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isAbsoluteFocusView } from '@astro-simulator/core';
 import type { CoreCommand } from '@astro-simulator/shared';
@@ -50,6 +50,8 @@ function fakeCore(cmd: CoreCommand) {
 }
 vi.mock('@/core/sim-context', () => ({
   useSimCommand: () => fakeCore,
+  // 거리 자 readout (`useRulerDistance`) — 엔진 상태 없음 → Kepler 폴백 (#1390 PR3).
+  useSimBodyState: () => null,
 }));
 
 const setDisplayUrl = vi.fn();
@@ -250,6 +252,8 @@ describe.each(TOURS.map((t) => [t.id, t] as const))(
           );
         }
         expect(s.rulerAnchorId, label).toBe(step.ruler ?? null);
+        // 거리 자 단계는 카드가 거리를 보인다 (교육 모드엔 관찰 카드 거리 자 행이 없다 — #1390 PR3).
+        expect(screen.queryByTestId('tour-ruler') !== null, label).toBe(Boolean(step.ruler));
         expect(useTourStore.getState().drift, label).toEqual([]);
         expect(useTourStore.getState().unavailable, label).toEqual([]);
         expect(screen.getByTestId('tour-step-title'), label).toHaveTextContent(step.title);
@@ -258,6 +262,28 @@ describe.each(TOURS.map((t) => [t.id, t] as const))(
     });
   },
 );
+
+describe('TourCard — 계절 투어 거리 자 (#1390 PR3)', () => {
+  it('1 · 2 단계 카드가 태양까지 거리를 AU 소수 3자리로 보인다 — 원일점 1.017 · 근일점 0.983', async () => {
+    render(<TourCard />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('tour-item-seasons'));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('tour-ruler')).toHaveTextContent('태양까지 거리');
+    expect(screen.getByTestId('tour-ruler-distance')).toHaveTextContent(/^1\.017 AU · /);
+    act(() => fireEvent.click(screen.getByTestId('tour-next')));
+    // 같은 쌍 (태양 · 지구) 이라 거리는 다음 갱신 주기 (`DISTANCE_REFRESH_MS` 4 Hz) 에 바뀐다.
+    await waitFor(() =>
+      expect(screen.getByTestId('tour-ruler-distance')).toHaveTextContent(/^0\.983 AU · /),
+    );
+    // 사용자가 기준점을 바꾸면 (이탈) 단계 거리를 보이지 않는다.
+    act(() => useSimStore.getState().setRulerAnchor('moon'));
+    expect(screen.queryByTestId('tour-ruler')).toBeNull();
+  });
+});
 
 describe('TourCard — 키보드 (E3)', () => {
   it('카드 안 → ← 로 단계 이동, 첫 단계 ← · 마지막 단계 → 는 제자리', async () => {

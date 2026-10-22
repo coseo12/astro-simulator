@@ -1,14 +1,6 @@
 import { time as timeApi } from '@astro-simulator/core';
+import { DECEMBER_SOLSTICE_2024_JD, JUNE_SOLSTICE_2024_JD } from './season-dates';
 import type { TourDef } from './types';
-
-/**
- * 2024 년 지점 (至點) [JD, TT≈UT 구분 없이 장면 시각]. 출처: USNO Astronomical Applications Dept., 「Earth's Seasons —
- * Equinoxes, Solstices, Perihelion, and Aphelion」 2024 — June Solstice 06-20 20:51 UT · December Solstice 12-21 09:20 UT.
- * 사건 파일 (`time-events.json`) 에 지점 종류가 없어 상수로 둔다 (ADR `20261021-1390` §Visual Fidelity 1 — 하드코딩 + 출처).
- * ADR 실측 1-F 가 이 두 시각에서 별자리 장면을 쟀다.
- */
-export const JUNE_SOLSTICE_2024_JD = 2460482.3688;
-export const DECEMBER_SOLSTICE_2024_JD = 2460665.8889;
 
 /**
  * 공전 재생 단계 (T4-4) 의 재생 구간 [일] — 하지부터 12월 말 (2024-12-27) 까지. 30 일/초면 실시간 약 6 초.

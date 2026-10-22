@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { isAbsoluteFocusView, isRPhaseFocusable } from '@astro-simulator/core';
+import solarSystemData from '@astro-simulator/shared/data/solar-system.json';
 import { describe, expect, it } from 'vitest';
 import { decodeTimeEvents } from '@/lib/time-events-data';
 import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from '@/lib/time-scrubber';
 import { TOURS } from './index';
+import { SEASONS_TOUR } from './seasons-tour';
 import { TOUR_BODY_MAX_CHARS, TOUR_OVERVIEW } from './types';
 
 /**
@@ -51,6 +53,10 @@ describe.each(TOURS.map((t) => [t.id, t] as const))('투어 %s', (_id, tour) => 
       expect(step.timeScale ?? 0).toBeGreaterThan(0);
       expect(step.time).toBeDefined();
     }
+    // `from-sun` (태양 → 대상 직선) 은 태양이 아닌 천체에만 — 태양이면 방향이 영벡터다 (#1390 PR3).
+    if (step.camera.view === 'from-sun') {
+      expect(step.camera.focus).not.toBe('sun');
+    }
     // 거리 자 기준점 — 선택 가능한 천체.
     if (step.ruler !== undefined && step.ruler !== null) {
       expect(isRPhaseFocusable(step.ruler)).toBe(true);
@@ -59,5 +65,34 @@ describe.each(TOURS.map((t) => [t.id, t] as const))('투어 %s', (_id, tour) => 
     expect(step.title.trim().length).toBeGreaterThan(0);
     expect(step.body.trim().length).toBeGreaterThan(0);
     expect([...step.body].length).toBeLessThanOrEqual(TOUR_BODY_MAX_CHARS);
+  });
+});
+
+/**
+ * #1390 PR3 — 계절 투어 문안 수치를 앱 천체 데이터로 검산한다 (문안이 데이터와 따로 노는 것을 막는다). 원일점 · 근일점 거리는
+ * 지구 궤도 요소의 a(1 ± e), 자전축 기울기는 `axialTiltDeg` 다. 화면 거리 자 값 (장면 궤도 모델 · 소수 3자리) 의 실측은 PR 본문.
+ */
+describe('계절 투어 — 문안 수치 = 앱 데이터', () => {
+  const earth = (
+    solarSystemData as {
+      bodies: Array<{
+        id: string;
+        axialTiltDeg?: number;
+        orbit?: { semiMajorAxisAU: number; eccentricity: number };
+      }>;
+    }
+  ).bodies.find((b) => b.id === 'earth')!;
+  const { semiMajorAxisAU: a, eccentricity: e } = earth.orbit!;
+  const body = (id: string) => SEASONS_TOUR.steps.find((s) => s.id === id)!.body;
+
+  it('원일점 a(1+e) · 근일점 a(1−e) [AU, 소수 3자리]', () => {
+    expect(body('aphelion')).toContain(`${(a * (1 + e)).toFixed(3)} AU`);
+    expect(body('perihelion')).toContain(`${(a * (1 - e)).toFixed(3)} AU`);
+  });
+
+  it('자전축 기울기 · 지점의 태양 직하 위도 [°, 소수 1자리]', () => {
+    const tilt = `${earth.axialTiltDeg!.toFixed(1)}°`;
+    expect(body('june-solstice')).toContain(tilt);
+    expect(body('december-solstice')).toContain(tilt);
   });
 });
