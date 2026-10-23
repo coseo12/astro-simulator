@@ -21,9 +21,12 @@ import {
  */
 export const RULER_AU_DISPLAY_MIN = 0.01;
 
-/** 두 천체 거리 — `≥ 0.01 AU` 는 `1.52 AU · 2.28억 km`, 미만은 `38.4만 km`. 입력은 m. */
-export function formatRulerDistance(meters: number): string {
-  if (meters >= RULER_AU_DISPLAY_MIN * AU) return formatSunDistance(meters);
+/**
+ * 두 천체 거리 — `≥ 0.01 AU` 는 `1.52 AU · 2.28억 km`, 미만은 `38.4만 km`. 입력은 m.
+ * `auDigits` 는 AU 소수 자리 ({@link formatSunDistance} — 기본 2). km 경계 (`RULER_AU_DISPLAY_MIN`) 는 자리 수와 무관하다.
+ */
+export function formatRulerDistance(meters: number, auDigits?: number): string {
+  if (meters >= RULER_AU_DISPLAY_MIN * AU) return formatSunDistance(meters, auDigits);
   return formatKmKo(meters / 1000);
 }
 

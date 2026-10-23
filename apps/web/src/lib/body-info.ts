@@ -127,9 +127,16 @@ export function formatKmKo(km: number): string {
   return `${groupThousands(km)} km`;
 }
 
-/** 태양 거리 — `1.01 AU · 1.51억 km`. 입력은 m. */
-export function formatSunDistance(meters: number): string {
-  return `${(meters / AU).toFixed(2)} AU · ${formatKmKo(meters / 1000)}`;
+/** AU 표기 기본 소수 자리 (관찰 카드 · 거리 자). */
+export const AU_DISPLAY_DIGITS = 2;
+
+/**
+ * 태양 거리 — `1.01 AU · 1.51억 km`. 입력은 m.
+ * `auDigits` — AU 소수 자리 (기본 2). 교육 투어의 근원일점 단계는 3 (`1.017 AU` — 2자리면 근원일점 차 0.034 AU 가 `1.02` ·
+ * `0.98` 로 뭉개진다, #1390 PR3).
+ */
+export function formatSunDistance(meters: number, auDigits = AU_DISPLAY_DIGITS): string {
+  return `${(meters / AU).toFixed(auDigits)} AU · ${formatKmKo(meters / 1000)}`;
 }
 
 /** 반지름 — km. 100 미만 소수 1자리, 이상 정수 콤마. 입력은 m. */
