@@ -200,7 +200,8 @@ export const EARTH_SPIN_SIGN = -1;
  * `θ = 2π(0.7790572732640 + 1.00273781191135448·(jd − 2451545.0))`.
  *
  * 정수 회전수를 먼저 떼어 (`T % 1`) 큰 수 곱의 유효숫자 손실을 피한다 (IERS 권고 형태 — 율에서 1 을 빼면
- * 나머지 항이 작다). 장면 jd 는 UTC 기반이라 UT1 근사로 쓴다 (`|UT1 − UTC| < 0.9 s`).
+ * 나머지 항이 작다). 장면 jd 는 UTC 기반이라 UT1 근사로 쓴다 (`|UT1 − UTC| < 0.9 s`). #1370 — 인자는 **장면 시계** JD 다.
+ * 천체 위치는 TT (`clockJdToTt`) 로 계산하지만 자전은 시계 그대로다 (ADR `20261023-1370` §결정 P).
  */
 export function earthRotationAngle(jd: number): number {
   const tu = jd - J2000_JD;

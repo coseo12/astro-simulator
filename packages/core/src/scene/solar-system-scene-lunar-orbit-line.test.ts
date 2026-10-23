@@ -18,6 +18,7 @@ import { toScene, toSceneZ } from '../coords/scene-handedness.js';
 import { resolveBodyChainPosition } from '../physics/body-chain.js';
 import { orbitMu, positionAt } from '../physics/kepler.js';
 import { elementsAt } from '../physics/orbit-elements-at.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { sampleOrbitPoints } from './orbit-sampling.js';
 import { getOrbitVisualScale } from './orbit-visual-scale.js';
 import {
@@ -104,10 +105,13 @@ function positionsOf(f: Fixture, name: string): Float32Array {
   return Float32Array.from(mesh.getVerticesData(VertexBuffer.PositionKind)!);
 }
 
-/** 기대 정점 — `rebuildOrbitLines` 와 같은 식 (그 시각 요소 × 위성 배율 → 장면 경계 z 반전 #1366), float32. */
-function expectedMoonLine(f: Fixture, jd: number): Float32Array {
+/**
+ * 기대 정점 — `rebuildOrbitLines` 와 같은 식 (그 시각 요소 × 위성 배율 → 장면 경계 z 반전 #1366), float32.
+ * #1370 — `clockJd` 는 장면에 넘긴 시계 시각이다. 요소는 TT (`clockJdToTt`) 에서 만든다 (장면과 같은 변환).
+ */
+function expectedMoonLine(f: Fixture, clockJd: number): Float32Array {
   const scale = getOrbitVisualScale('earth', 'moon');
-  const pts = sampleOrbitPoints(moon, f.handles.getTier(), jd)!;
+  const pts = sampleOrbitPoints(moon, f.handles.getTier(), clockJdToTt(clockJd))!;
   return Float32Array.from(pts.flatMap((p) => [p.x * scale, p.y * scale, toSceneZ(p.z * scale)]));
 }
 
@@ -175,8 +179,9 @@ describe('#1354 V1 — 달 궤도선 정점 갱신 (장면)', () => {
     f.handles.setTrailsVisible(true);
     const specs = f.handles.getTrailBodySpecs();
     const moonSpec = specs.find((s) => s.id === 'moon')!;
-    expect(moonSpec.epoch).toBe(jd);
-    const el = elementsAt(moon.orbit!, jd);
+    // #1370 — 궤적 사양 epoch 는 장면 위치 시각 (TT).
+    expect(moonSpec.epoch).toBe(clockJdToTt(jd));
+    const el = elementsAt(moon.orbit!, clockJdToTt(jd));
     expect(moonSpec.meanAnomalyAtEpoch).toBe(el.meanAnomalyAtEpoch);
     for (const s of specs)
       if (s.id !== 'moon') expect(s).toEqual(loadSpecs.find((x) => x.id === s.id));
@@ -209,8 +214,10 @@ describe('#1354 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × reso
     f.handles.updateAt(JD);
     const { scale } = f.handles.getBodyReferenceFrame();
     const visualScale = getOrbitVisualScale('earth', 'moon');
-    const local = resolveBodyChainPosition(bodiesById, 'moon', JD)!.local!;
-    const earthWorld = resolveBodyChainPosition(bodiesById, 'earth', JD)!.world;
+    // #1370 — `updateAt(JD)` 의 JD 는 장면 시계, 체인 위치 (물리 함수) 는 TT 에서.
+    const ttJd = clockJdToTt(JD);
+    const local = resolveBodyChainPosition(bodiesById, 'moon', ttJd)!.local!;
+    const earthWorld = resolveBodyChainPosition(bodiesById, 'earth', ttJd)!.world;
     // #1366 — 체인 위치는 데이터 공간, 메시 차는 장면 공간 (z 반전).
     const expected = toScene(local).map((x) => x * visualScale * scale);
     const got = moonMinusEarthMesh(f);
@@ -219,7 +226,7 @@ describe('#1354 결정 M4 — 장면 달 메시 = 지구 메시 + 배율 × reso
     expect(err).toBeLessThanOrEqual(tolerance);
 
     // 양성 대조 — 고정 요소 (V0) 경로라면 같은 자리에서 허용의 1,000 배 넘게 벗어난다.
-    const v0Local = positionAt(moon.orbit!, JD, orbitMu(moon, bodiesById.get('earth')!));
+    const v0Local = positionAt(moon.orbit!, ttJd, orbitMu(moon, bodiesById.get('earth')!));
     const v0 = toScene(v0Local).map((x) => x * visualScale * scale);
     expect(Math.hypot(got[0] - v0[0]!, got[1] - v0[1]!, got[2] - v0[2]!)).toBeGreaterThan(
       tolerance * 1_000,

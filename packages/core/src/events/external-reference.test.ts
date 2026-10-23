@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { dateToJulianDate, julianDateToDate } from '../time/julian-date.js';
 import {
   EXTERNAL_REFERENCE_SAMPLES,
@@ -52,9 +53,13 @@ function modelTimeFor(sample: ExternalReferenceSample): number {
   return inYear[0]!;
 }
 
-/** 판정 술어 — (i) ∧ (ii). `shiftDays` 는 결함판 (사건 시각을 일정하게 민 판본) 재현용. */
+/**
+ * 판정 술어 — (i) ∧ (ii). `shiftDays` 는 결함판 (사건 시각을 일정하게 민 판본) 재현용.
+ *
+ * #1370 (ADR `20261023-1370` Q4) — 모델 사건 시각 (장면 시계) 을 `clockJdToTt` 로 옮겨 기준 (TDB) 과 같은 척도로 비교한다.
+ */
 function sampleVerdict(sample: ExternalReferenceSample, shiftDays: number) {
-  const error = modelTimeFor(sample) + shiftDays - sample.referenceJd;
+  const error = clockJdToTt(modelTimeFor(sample)) + shiftDays - sample.referenceJd;
   const withinTolerance = Math.abs(error) <= EVENT_KIND_TOLERANCE_DAYS[sample.kind];
   const withinBand = Math.abs(error - sample.recordedErrorDays) <= RECORDED_ERROR_BAND_DAYS;
   return { error, withinTolerance, withinBand };

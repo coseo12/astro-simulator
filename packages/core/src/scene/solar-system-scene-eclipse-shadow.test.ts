@@ -26,6 +26,7 @@ import {
 } from '../events/eclipse-shadow-uniforms.js';
 import { toSceneZ } from '../coords/scene-handedness.js';
 import { lunarEclipseGeometry } from '../events/eclipse-geometry.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import { ECLIPSE_SHADOW_GLSL, ECLIPSE_SHADOW_UNIFORM_NAMES } from './procedural-planet-shader.js';
 import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
@@ -96,6 +97,8 @@ const RADII = {
 };
 /** 2022-11-08 개기월식 최대식 근처 (UTC 11:00) — 판정 `total` (ADR §1-E 표). */
 const ECLIPSE_JD = dateToJulianDate(new Date(Date.UTC(2022, 10, 8, 11, 0, 0)));
+/** #1370 — 위 장면 시계 시각의 위치 시각 (TT). 판정식 · 체인 기대값은 이 값에서 만든다. */
+const ECLIPSE_TT_JD = clockJdToTt(ECLIPSE_JD);
 
 function makeScene(opts: { jd?: number; surfaceDetail?: boolean; clouds?: boolean } = {}): Fixture {
   const engine = new NullEngine({
@@ -166,7 +169,7 @@ describe('#1360 PR2 — 월식 그림자 uniform 출처 · D2 · D8', () => {
     const f = makeScene();
     f.handles.updateAt(ECLIPSE_JD);
     const u = f.handles.getLunarEclipseShadowUniforms();
-    const geo = syzygyGeometryAt(bodiesById, 'moon', ECLIPSE_JD)!;
+    const geo = syzygyGeometryAt(bodiesById, 'moon', ECLIPSE_TT_JD)!;
     const g = lunarEclipseGeometry(geo.moon, geo.sun, RADII);
     expect(g.type).toBe('total');
     expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.lunar);
@@ -220,7 +223,7 @@ describe('#1360 PR2 — 월식 그림자 uniform 출처 · D2 · D8', () => {
     expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.lunar);
     expect(bitsEqual(flatten(u), flatten(fromEngine))).toBe(true);
     // 경로 분기 판별 — 같은 시각 Kepler 체인 위치로 만든 값과 다르다 (적분 vs 해석해).
-    const geo = syzygyGeometryAt(bodiesById, 'moon', ECLIPSE_JD)!;
+    const geo = syzygyGeometryAt(bodiesById, 'moon', ECLIPSE_TT_JD)!;
     expect(
       bitsEqual(
         flatten(u),
@@ -308,6 +311,8 @@ describe('#1360 PR2 — 셰이더 텍스트 (결정 R1)', () => {
 
 /** 2024-04-08 개기일식 최대식 근처 (UTC 18:17) — 판정 `total`. */
 const SOLAR_JD = dateToJulianDate(new Date(Date.UTC(2024, 3, 8, 18, 17, 0)));
+/** #1370 — 위 장면 시계 시각의 위치 시각 (TT). 판정식 · 체인 기대값은 이 값에서 만든다 (`updateAt` 이 같은 변환을 한다). */
+const SOLAR_TT_JD = clockJdToTt(SOLAR_JD);
 const CLOUD_MESH = 'earth-cloud';
 
 function solarRef(jd: number): EclipseShadowUniforms {
@@ -323,10 +328,10 @@ describe('#1360 PR3 — 일식 그림자 uniform 출처 · D2 · D8', () => {
     expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.solar);
     expect(classifySolarShadowUniforms(u)).toBe('total');
     // 장면 입력 (배율 전 위치) 과 사건 입력 (체인 위치) 은 태양 벡터 뺄셈 순서가 달라 비트 동일까지는 요구하지 않는다.
-    const ref = flatten(solarRef(SOLAR_JD));
+    const ref = flatten(solarRef(SOLAR_TT_JD));
     flatten(u).forEach((v, i) => expect(v).toBeCloseTo(ref[i]!, 10));
     // #1366 — 핸들 · 머티리얼 값은 장면 공간 (z 반전). 데이터 공간 그대로면 이 단언이 FAIL 한다 (거울 위치 결함판).
-    const geo = syzygyGeometryAt(bodiesById, 'moon', SOLAR_JD)!;
+    const geo = syzygyGeometryAt(bodiesById, 'moon', SOLAR_TT_JD)!;
     expect(u.a[2]).toBeCloseTo(-geo.moon[2] / RADII.earth, 8);
     expect(Math.abs(u.a[2])).toBeGreaterThan(1e-3);
     expect(bitsEqual(materialShadow(f, 'earth'), flatten(u))).toBe(true);
@@ -368,7 +373,7 @@ describe('#1360 PR3 — 일식 그림자 uniform 출처 · D2 · D8', () => {
     );
     expect(u.mode).toBe(ECLIPSE_SHADOW_MODE.solar);
     expect(bitsEqual(flatten(u), flatten(fromEngine))).toBe(true);
-    expect(bitsEqual(flatten(u), flatten(solarRef(SOLAR_JD)))).toBe(false);
+    expect(bitsEqual(flatten(u), flatten(solarRef(SOLAR_TT_JD)))).toBe(false);
     const b = run(1);
     expect(bitsEqual(flatten(u), flatten(b.handles.getSolarEclipseShadowUniforms()))).toBe(true);
   });

@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { meanAnomalyAt, orbitMu } from '../physics/kepler.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import {
   computeEventsForKind,
@@ -58,6 +59,10 @@ function normalizedMeanAnomaly(bodyId: string, jd: number): number {
   return m;
 }
 
+/**
+ * #1370 — `computeEventsForKind` 의 `julianDate` 는 장면 시계다. 조건식 (`heliocentricLongitudeDifference` · `meanAnomalyAt`) 은
+ * 물리 함수라 TT 를 받으므로 `clockJdToTt(t*)` 에서 평가한다 (ADR `20261023-1370` §실측 1-F — parity 기대값을 TT 로).
+ */
 describe('M1 — 사건 조건 정합 (1900~2100 전 사건)', () => {
   const alignmentKinds = EVENT_KINDS.filter((k) => k.computation.type === 'heliocentric-alignment');
   const perihelionKinds = EVENT_KINDS.filter((k) => k.computation.type === 'perihelion');
@@ -71,7 +76,12 @@ describe('M1 — 사건 조건 정합 (1900~2100 전 사건)', () => {
       for (const e of events) {
         const ref =
           kind.computation.type === 'heliocentric-alignment' ? kind.computation.referenceId : '';
-        const d = heliocentricLongitudeDifference(bodiesById, kind.subjectId, ref, e.julianDate);
+        const d = heliocentricLongitudeDifference(
+          bodiesById,
+          kind.subjectId,
+          ref,
+          clockJdToTt(e.julianDate),
+        );
         worst = Math.max(worst, Math.abs(d));
       }
       expect(worst).toBeLessThanOrEqual(ALIGNMENT_RESIDUAL_MAX_RAD);
@@ -84,9 +94,9 @@ describe('M1 — 사건 조건 정합 (1900~2100 전 사건)', () => {
       const events = eventsByKind.get(kind.id)!;
       expect(events.length).toBeGreaterThan(0);
       for (const e of events) {
-        expect(Math.abs(normalizedMeanAnomaly(kind.subjectId, e.julianDate))).toBeLessThanOrEqual(
-          PERIHELION_RESIDUAL_MAX_RAD,
-        );
+        expect(
+          Math.abs(normalizedMeanAnomaly(kind.subjectId, clockJdToTt(e.julianDate))),
+        ).toBeLessThanOrEqual(PERIHELION_RESIDUAL_MAX_RAD);
       }
     },
   );
@@ -105,7 +115,7 @@ describe('M1 — 사건 조건 정합 (1900~2100 전 사건)', () => {
                   bodiesById,
                   kind.subjectId,
                   ref,
-                  e.julianDate + shift,
+                  clockJdToTt(e.julianDate) + shift,
                 ),
               ),
             ),
@@ -117,7 +127,7 @@ describe('M1 — 사건 조건 정합 (1900~2100 전 사건)', () => {
       for (const e of eventsByKind.get(kind.id)!) {
         for (const shift of [-1, 1]) {
           expect(
-            Math.abs(normalizedMeanAnomaly(kind.subjectId, e.julianDate + shift)),
+            Math.abs(normalizedMeanAnomaly(kind.subjectId, clockJdToTt(e.julianDate) + shift)),
           ).toBeGreaterThan(PERIHELION_RESIDUAL_MAX_RAD);
         }
       }
@@ -200,5 +210,40 @@ describe('M2 — 완전성', () => {
       expect(e.julianDate).toBeGreaterThanOrEqual(START_JD);
       expect(e.julianDate).toBeLessThan(END_JD);
     }
+  });
+});
+
+/**
+ * #1370 착수 전 확인 2 (ADR `20261023-1370` §구현 인계) — `computeEventsForKind` 는 `[from, to)` (시계) 를 TT 로 옮겨 계산하고
+ * 결과를 시계로 되돌린다. 경계에 사건을 정확히 둔 청크 둘을 이어 붙여도 전 범위 결과와 같아야 한다 (누락 · 중복 0).
+ * 경계 `B` = 사건 시각 자신 (시계) — `clockJdToTt(B)` 가 그 사건의 TT 와 같은 자리라 가장 불리한 배치다.
+ */
+describe('#1370 — 청크 경계 왕복 (경계에 사건을 둔 이음 == 전 범위)', () => {
+  const HALF_SPAN_DAYS = 3_652.5;
+  /** 청크마다 스캔 시작이 달라 근의 마지막 자리가 갈릴 수 있다 — 이분법 · 할선법 수렴 판정보다 큰 값 [일] (≈ 0.09 s). */
+  const ROOT_MATCH_DAYS = 1e-6;
+  /** 경계로 쓸 사건 — 2024 일식 · 2025 월식 · 화성 충 · 핼리 근일점 (종류 4계열: 식 2 · 일치 1 · 근일점 1). */
+  const CASES: readonly [EventKindId, string][] = [
+    ['solar-eclipse', 'solar-eclipse:2024-04-08'],
+    ['lunar-eclipse', 'lunar-eclipse:2025-03-14'],
+    ['mars-opposition', 'mars-opposition:2025-01-16'],
+    ['halley-perihelion', 'halley-perihelion:1986-02-17'],
+  ];
+
+  it.each(CASES)('%s — 경계 = %s', (kindId, eventId) => {
+    const kind = getEventKind(kindId);
+    const boundary = eventsByKind.get(kindId)!.find((e) => e.id === eventId);
+    expect(boundary, `${eventId} 없음`).toBeDefined();
+    const b = boundary!.julianDate;
+    const whole = computeEventsForKind(bodiesById, kind, b - HALF_SPAN_DAYS, b + HALF_SPAN_DAYS);
+    const chunked = [
+      ...computeEventsForKind(bodiesById, kind, b - HALF_SPAN_DAYS, b),
+      ...computeEventsForKind(bodiesById, kind, b, b + HALF_SPAN_DAYS),
+    ];
+    expect(chunked.map((e) => e.id)).toEqual(whole.map((e) => e.id));
+    expect(chunked.filter((e) => e.id === eventId)).toHaveLength(1);
+    chunked.forEach((e, i) => {
+      expect(Math.abs(e.julianDate - whole[i]!.julianDate)).toBeLessThan(ROOT_MATCH_DAYS);
+    });
   });
 });

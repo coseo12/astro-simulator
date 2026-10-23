@@ -18,6 +18,7 @@ import {
   loadSolarSystem,
   type LoadedCelestialBody,
 } from '../ephemeris/solar-system-loader.js';
+import { clockJdToTt, ttJdToClock } from '../time/delta-t.js';
 import { dateToJulianDate } from '../time/julian-date.js';
 import { DE441_FULL_MOON_JD, DE441_NEW_MOON_JD } from './__test-utils__/lunar-reference-fixture.js';
 import {
@@ -113,7 +114,12 @@ interface MatchResult {
   errorsHours: number[];
 }
 
-/** NASA 행마다 ±3일 안 미사용 모델 사건을 짝짓는다 (ADR 측정 스크립트와 같은 규칙). */
+/**
+ * NASA 행마다 ±3일 안 미사용 모델 사건을 짝짓는다 (ADR 측정 스크립트와 같은 규칙).
+ *
+ * #1370 (ADR `20261023-1370` Q4) — 모델 사건 시각은 장면 시계라 `clockJdToTt` 로 옮겨 NASA TD 와 같은 척도로 비교한다. 그래서 오차는
+ * 순수 모델 오차다 (ΔT 적용 전 실측값과 같다 — 그때는 장면 시계를 TT 처럼 썼다).
+ */
 function matchAgainstNasa(events: readonly AstroEvent[], kind: EclipseKindId): MatchResult {
   const used = new Set<AstroEvent>();
   let hits = 0;
@@ -121,11 +127,13 @@ function matchAgainstNasa(events: readonly AstroEvent[], kind: EclipseKindId): M
   const errorsHours: number[] = [];
   for (const row of NASA[kind]) {
     const jd = nasaEclipseJulianDate(row);
-    const m = events.find((e) => !used.has(e) && Math.abs(e.julianDate - jd) < MATCH_WINDOW_DAYS);
+    const m = events.find(
+      (e) => !used.has(e) && Math.abs(clockJdToTt(e.julianDate) - jd) < MATCH_WINDOW_DAYS,
+    );
     if (!m) continue;
     used.add(m);
     hits += 1;
-    errorsHours.push((m.julianDate - jd) * HOURS_PER_DAY);
+    errorsHours.push((clockJdToTt(m.julianDate) - jd) * HOURS_PER_DAY);
     const nasaType = row[2];
     const ok =
       nasaType === 'hybrid'
@@ -345,11 +353,13 @@ describe('#1354 최대식 정합 · 사전 필터', () => {
    * NASA 대비 최대 |오차| 일식 `0.767` · 월식 `0.816` h 로 E4 `1.0` h 안, 적중 · 오탐 · 종류는 451 · 4 · 444 / 456 · 2 · 438 로
    * E2 · E3 임계 안).
    */
+  // #1370 — 사건 시각 (장면 시계) 을 TT 로 옮겨 식 지표 (물리 함수) 를 평가한다.
   it.each(ECLIPSE_KINDS)('%s — 모든 사건 시각에서 식 지표가 ±1분보다 작거나 같다', (kind) => {
     for (const e of fullEvents[kind]) {
-      const at = metricAt(kind, e.julianDate);
-      expect(at).toBeLessThanOrEqual(metricAt(kind, e.julianDate - GREATEST_ECLIPSE_PROBE_DAYS));
-      expect(at).toBeLessThanOrEqual(metricAt(kind, e.julianDate + GREATEST_ECLIPSE_PROBE_DAYS));
+      const ttJd = clockJdToTt(e.julianDate);
+      const at = metricAt(kind, ttJd);
+      expect(at).toBeLessThanOrEqual(metricAt(kind, ttJd - GREATEST_ECLIPSE_PROBE_DAYS));
+      expect(at).toBeLessThanOrEqual(metricAt(kind, ttJd + GREATEST_ECLIPSE_PROBE_DAYS));
     }
   });
 
@@ -357,11 +367,18 @@ describe('#1354 최대식 정합 · 사전 필터', () => {
     '%s — 사전 필터는 결과를 바꾸지 않는다 (전 삭망 무필터 탐색과 같은 사건 · 같은 시각)',
     (kind) => {
       const phase = kind === 'solar-eclipse' ? 'new' : 'full';
-      const unfiltered = syzygyTimes(fullById, 'moon', phase, START_JD, END_JD)
+      // #1370 — 내부 함수는 TT 다. `computeEventsForKind` 와 같은 TT 범위로 돌려 결과를 시계로 되돌려 비교한다 (비트 동일).
+      const unfiltered = syzygyTimes(
+        fullById,
+        'moon',
+        phase,
+        clockJdToTt(START_JD),
+        clockJdToTt(END_JD),
+      )
         .map((s) => greatestEclipseNear(fullById, 'moon', phase, s)!)
         .filter((g) => g.type !== null);
       expect(fullEvents[kind].map((e) => [e.julianDate, e.eclipseType])).toEqual(
-        unfiltered.map((g) => [g.julianDate, g.type]),
+        unfiltered.map((g) => [ttJdToClock(g.julianDate), g.type]),
       );
     },
   );
@@ -373,7 +390,7 @@ describe('#1354 최대식 정합 · 사전 필터', () => {
       const events = fullEvents[kind];
       for (let i = 0; i < events.length; i += 1) {
         const e = events[i]!;
-        const nearest = Math.min(...syz.map((s) => Math.abs(s - e.julianDate)));
+        const nearest = Math.min(...syz.map((s) => Math.abs(s - clockJdToTt(e.julianDate))));
         expect(nearest).toBeLessThan(GREATEST_ECLIPSE_HALF_WINDOW_DAYS);
         expect(e.subjectId).toBe('moon');
         if (i > 0) expect(e.julianDate).toBeGreaterThan(events[i - 1]!.julianDate);
