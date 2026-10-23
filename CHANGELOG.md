@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.105.1] - 2026-10-23
+
 ### Fixed
 
 - **[#1370] 천체 위치 계산에 ΔT (역학시) 를 적용했다** ([#1370](https://github.com/coseo12/astro-simulator/issues/1370)). 위치 식 (Kepler 요소 · 달 B9 · N-body 초기 상태 · 사건 판정) 의 시각 인자는 역학시 (TT) 인데, 장면 시계 (UTC) JD 를 그대로 넣어 위치가 ΔT (2017 이후 `69.184 s`) 만큼 늦었다. 지구 자전 (#1362) 은 시계를 UT1 로 쓰므로 맞았다 — 한 장면 안에서 위치와 자전이 다른 시각척도를 썼다. ADR [`20261023-1370`](docs/decisions/20261023-1370-delta-t-dynamical-time.md).
