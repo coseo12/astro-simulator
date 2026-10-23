@@ -13,12 +13,51 @@ const SECONDS_PER_DAY = 86_400;
 /** 1972-01-01T00:00:00Z 의 시계 JD — 윤초 표 첫 행 (ADR §결정 M). */
 const JD_1972 = 2_441_317.5;
 const JD_2017 = isoToJulianDate('2017-01-01T00:00:00Z');
-/** 이음매 바로 아래 · 위 표본 간격 [일] (`1e-6` 일 ≈ 0.086 s — ΔT 다항식 기울기 `~1 s/년` 이라 그 사이 변화는 `~3e-9 s`). */
+/** 이음매 바로 아래 · 위 표본 간격 [일] (`1e-6` 일 ≈ 0.086 s). */
 const SEAM_EPSILON_DAYS = 1e-6;
 /** 왕복 허용 오차 [s] (DoD D2). */
 const ROUND_TRIP_TOLERANCE_SECONDS = 1e-6;
 /** 왕복 표본 간격 [일] — ADR 실측과 같은 7.3일. */
 const ROUND_TRIP_STEP_DAYS = 7.3;
+/**
+ * 변환 부호 단언 허용 [s] — JD `~2.46e6` 근처 배정밀도 1 ulp 는 `2^-31` 일 (`≈ 4.0e-5 s`) 이다. 부호가 뒤집히면 차는 `~138 s` 다.
+ */
+const JD_ULP_SECONDS = 2 ** -31 * SECONDS_PER_DAY;
+
+/**
+ * 윤초 표 기대값 — IERS Bulletin C (IANA `leap-seconds.list`, 조회 2026-10-23) 28행을 모듈과 **독립으로** 옮겨 적었다.
+ * `[그날 00:00:00Z 부터, TAI − UTC [s]]`. 모듈 표의 한 행이라도 바뀌면 아래 전수 테스트가 FAIL 한다.
+ */
+const EXPECTED_LEAP_SECONDS: ReadonlyArray<readonly [string, number]> = [
+  ['1972-01-01', 10],
+  ['1972-07-01', 11],
+  ['1973-01-01', 12],
+  ['1974-01-01', 13],
+  ['1975-01-01', 14],
+  ['1976-01-01', 15],
+  ['1977-01-01', 16],
+  ['1978-01-01', 17],
+  ['1979-01-01', 18],
+  ['1980-01-01', 19],
+  ['1981-07-01', 20],
+  ['1982-07-01', 21],
+  ['1983-07-01', 22],
+  ['1985-07-01', 23],
+  ['1988-01-01', 24],
+  ['1990-01-01', 25],
+  ['1991-01-01', 26],
+  ['1992-07-01', 27],
+  ['1993-07-01', 28],
+  ['1994-07-01', 29],
+  ['1996-01-01', 30],
+  ['1997-07-01', 31],
+  ['1999-01-01', 32],
+  ['2006-01-01', 33],
+  ['2009-01-01', 34],
+  ['2012-07-01', 35],
+  ['2015-07-01', 36],
+  ['2017-01-01', 37],
+];
 
 /** 소수 연도 y 의 시계 JD (ADR 연속식의 역). */
 function clockJdOfYear(y: number): number {
@@ -48,12 +87,21 @@ describe('ttMinusClockSeconds — 정의값 (DoD D2)', () => {
     expect(ttMinusClockSeconds(clockJdOfYear(1000))).toBe(at1900);
   });
 
-  it('윤초 표 28행 — 행 경계는 `>=` (경계 순간부터 새 값)', () => {
+  it('윤초 표 28행 전수 — 각 행 시작 순간 = 32.184 + TAI−UTC, 1초 전 = 직전 행 값 (행 경계 `>=`)', () => {
+    expect(EXPECTED_LEAP_SECONDS).toHaveLength(28);
     expect(LEAP_SECOND_TABLE_START_JD).toBe(JD_1972);
-    expect(ttMinusClockSeconds(isoToJulianDate('1972-06-30T23:59:59Z'))).toBeCloseTo(42.184, 9);
-    expect(ttMinusClockSeconds(isoToJulianDate('1972-07-01T00:00:00Z'))).toBeCloseTo(43.184, 9);
-    expect(ttMinusClockSeconds(isoToJulianDate('1999-01-01T00:00:00Z'))).toBeCloseTo(64.184, 9);
-    expect(ttMinusClockSeconds(isoToJulianDate('2015-07-01T00:00:00Z'))).toBeCloseTo(68.184, 9);
+    for (const [i, [isoDate, taiMinusUtc]] of EXPECTED_LEAP_SECONDS.entries()) {
+      const start = isoToJulianDate(`${isoDate}T00:00:00Z`);
+      expect(ttMinusClockSeconds(start), isoDate).toBeCloseTo(32.184 + taiMinusUtc, 9);
+      // 첫 행 1초 전은 E–M 구간이라 제외 (이음매 테스트가 덮는다).
+      if (i > 0) {
+        const before = ttMinusClockSeconds(start - 1 / SECONDS_PER_DAY);
+        expect(before, `${isoDate} − 1 s`).toBeCloseTo(
+          32.184 + EXPECTED_LEAP_SECONDS[i - 1]![1],
+          9,
+        );
+      }
+    }
   });
 });
 
@@ -80,6 +128,21 @@ describe('ttMinusClockSeconds — 이음매 연속성 (ADR §결정 M 수치)', 
     for (const jd of [clockJdOfYear(1920), clockJdOfYear(1941), clockJdOfYear(1961), JD_1972]) {
       expect(Math.abs(jump(jd))).toBeLessThan(0.07);
     }
+  });
+});
+
+describe('변환 부호 — 시계 → TT 는 ΔT 를 더하고, TT → 시계는 뺀다', () => {
+  it.each([
+    ['2024-04-08T18:17:20Z', 69.184],
+    ['1990-06-01T00:00:00Z', 57.184],
+  ])('%s — clockJdToTt(t) − t = +ΔT · ttJdToClock(t) − t = −ΔT (1 ulp 안)', (iso, deltaT) => {
+    const t = isoToJulianDate(iso);
+    expect(Math.abs((clockJdToTt(t) - t) * SECONDS_PER_DAY - deltaT)).toBeLessThanOrEqual(
+      JD_ULP_SECONDS,
+    );
+    expect(Math.abs((ttJdToClock(t) - t) * SECONDS_PER_DAY + deltaT)).toBeLessThanOrEqual(
+      JD_ULP_SECONDS,
+    );
   });
 });
 

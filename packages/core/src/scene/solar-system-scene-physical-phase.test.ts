@@ -23,6 +23,7 @@ import {
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { toScene } from '../coords/scene-handedness.js';
 import { resolveBodyChainPosition } from '../physics/body-chain.js';
+import { buildInitialState } from '../physics/nbody-engine.js';
 import { clockJdToTt } from '../time/delta-t.js';
 import {
   PHYSICAL_PHASE_BODY_IDS,
@@ -97,7 +98,12 @@ const system = getSolarSystem();
 const bodiesById = new Map(system.bodies.map((b) => [b.id, b] as const));
 
 function makeScene(
-  opts: { jd?: number; surfaceDetail?: boolean; selfRotation?: boolean } = {},
+  opts: {
+    jd?: number;
+    surfaceDetail?: boolean;
+    selfRotation?: boolean;
+    physicsEngine?: 'kepler' | 'newton';
+  } = {},
 ): Fixture {
   const engine = new NullEngine({
     renderWidth: 1280,
@@ -113,6 +119,7 @@ function makeScene(
     surfaceDetail: opts.surfaceDetail ?? false,
     starfield: false,
     selfRotation: opts.selfRotation ?? false,
+    physicsEngine: opts.physicsEngine ?? 'kepler',
     initialJulianDate: opts.jd ?? J2000,
   });
   const f = { engine, scene, handles };
@@ -345,4 +352,25 @@ describe('#1370 — 자전 quaternion 은 장면 시계 (위치만 TT)', () => {
       expect(bitsEqual(q, spinAt(clockJdToTt(clockJd)))).toBe(false);
     },
   );
+});
+
+/**
+ * #1370 — 초기 엔진이 N-body 이면 엔진 초기 상태를 TT (`initialTtJd`) 에서 만든다. 생성 직후 `updateAt(initialJulianDate)` 는
+ * 같은 TT 로 바꾸므로 적분 간격이 `0` 이라 엔진 위치 = 초기 상태 그대로다. 초기 상태를 시계 시각에서 만들면 첫 `updateAt` 이
+ * ΔT 만큼 적분해 비트가 갈린다.
+ */
+describe('#1370 — 초기 N-body 엔진 상태는 TT 에서 만든다', () => {
+  it('생성 직후 지구 − 태양 = buildInitialState(clockJdToTt(t)) 의 차 (비트 동일)', () => {
+    const clockJd = J2000 + 9_000.5;
+    const f = makeScene({ jd: clockJd, physicsEngine: 'newton' });
+    expect(f.handles.getPhysicsEngine()).toBe('newton');
+    const got = [...f.handles.getBodyState('earth', 'sun')!.pos];
+    const state = buildInitialState(system, clockJdToTt(clockJd));
+    const e = state.ids.indexOf('earth');
+    const s = state.ids.indexOf('sun');
+    const expected = [0, 1, 2].map(
+      (c) => state.positions[3 * e + c]! - state.positions[3 * s + c]!,
+    );
+    expect(bitsEqual(got, expected)).toBe(true);
+  });
 });
