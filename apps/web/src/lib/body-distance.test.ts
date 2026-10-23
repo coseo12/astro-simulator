@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ephemeris, physics } from '@astro-simulator/core';
+import { clockJdToTt, ephemeris, physics } from '@astro-simulator/core';
 import { AU, GRAVITATIONAL_CONSTANT } from '@astro-simulator/shared';
 import type { BodyStateFn } from '@/core/sim-context';
 import {
@@ -14,6 +14,8 @@ const bodies = ephemeris.getSolarSystem().bodies;
 const byId = indexBodies(bodies);
 const J2000 = ephemeris.J2000_JD;
 const DAYS_PER_YEAR = 365.25;
+// #1370 — 카드 함수 인자는 장면 시계 JD 다. 기대값을 만드는 물리 함수 (`orbitalStateAt` · `positionAt` ·
+// `parentRelativePositionAt`) 는 TT 를 받으므로 `clockJdToTt` 로 옮겨 부른다 (ADR `20261023-1370` §결정 P 진입점 3).
 
 function norm(v: readonly number[]): number {
   return Math.hypot(v[0]!, v[1]!, v[2]!);
@@ -26,7 +28,8 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     for (const jd of [J2000, J2000 + 100, J2000 + 9_000.5]) {
       const got = computeBodyDistances(byId, 'earth', jd).fromSunM!;
       const ref = norm(
-        physics.orbitalStateAt(earth.orbit!, jd, GRAVITATIONAL_CONSTANT * sun.mass).position,
+        physics.orbitalStateAt(earth.orbit!, clockJdToTt(jd), GRAVITATIONAL_CONSTANT * sun.mass)
+          .position,
       );
       expect(Math.abs(got - ref) / ref).toBeLessThan(1e-12);
       expect(formatSunDistance(got)).toBe(formatSunDistance(ref));
@@ -56,11 +59,12 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const earth = byId.get('earth')!;
     const sun = byId.get('sun')!;
     const moon = byId.get('moon')!;
-    const e = physics.orbitalStateAt(earth.orbit!, J2000, GRAVITATIONAL_CONSTANT * sun.mass);
+    const tt = clockJdToTt(J2000);
+    const e = physics.orbitalStateAt(earth.orbit!, tt, GRAVITATIONAL_CONSTANT * sun.mass);
     // #1354 결정 M4 — 달은 율 · 주기 항 보유라 장면과 같은 단일 함수 `parentRelativePositionAt` 로 기대값을 만든다
     // (그 함수의 정확도는 core `orbit-elements-at.test.ts` E1 · P1 이 DE441 로 단언). 종전 `orbitalStateAt(moon.orbit)` 은
     // J2000 에서도 주기 9항만큼 (`5,357 km`) 다르다.
-    const m = physics.parentRelativePositionAt(moon, earth, sun, J2000);
+    const m = physics.parentRelativePositionAt(moon, earth, sun, tt);
     const ref = norm([e.position[0] + m[0], e.position[1] + m[1], e.position[2] + m[2]]);
     expect(Math.abs(d.fromSunM! - ref) / ref).toBeLessThan(1e-12);
   });
@@ -73,10 +77,10 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const sun = byId.get('sun')!;
     const jd = J2000 + 9_496.5 + 3.3; // epoch 와 다른 시각 — μ 가 위치를 바꾸는 구간
     const d = computeBodyDistances(byId, 'charon', jd);
-    const p = physics.positionAt(pluto.orbit!, jd, GRAVITATIONAL_CONSTANT * sun.mass);
+    const p = physics.positionAt(pluto.orbit!, clockJdToTt(jd), GRAVITATIONAL_CONSTANT * sun.mass);
     const c = physics.positionAt(
       charon.orbit!,
-      jd,
+      clockJdToTt(jd),
       GRAVITATIONAL_CONSTANT * (pluto.mass + charon.mass),
     );
     const ref = norm([p[0] + c[0], p[1] + c[1], p[2] + c[2]]);
@@ -129,6 +133,33 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const kepler = computeBodyDistances(byId, 'moon', J2000);
     expect(computeBodyDistances(byId, 'moon', J2000, () => null)).toEqual(kepler);
   });
+
+  /**
+   * #1370 착수 전 확인 3 (ADR `20261023-1370` §구현 인계) — 엔진 상태 고리와 Kepler 폴백 고리가 섞인 체인. 엔진 상태는 장면
+   * `updateAt(clockJd)` 이 TT 로 적분한 값이라 시각 인자가 없다. 폴백 고리가 같은 TT 를 보면, 「모체만 엔진이 TT 위치를 준」 체인이
+   * 전부 Kepler 인 체인 (`clockJdToTt` 경로) 과 비트 동일해야 한다. 폴백이 시계를 그대로 쓰면 위성 고리가 ΔT 만큼 어긋난다.
+   */
+  it('#1370 — 섞인 체인 (모체 = 엔진 상태 · 위성 = Kepler 폴백) 도 같은 TT 를 본다', () => {
+    const clockJd = J2000 + 9_000.5;
+    const tt = clockJdToTt(clockJd);
+    const earth = byId.get('earth')!;
+    const sun = byId.get('sun')!;
+    const moon = byId.get('moon')!;
+    // 엔진이 TT 시각에 둔 지구 (여기서는 그 시각의 Kepler 위치로 흉내 낸다) — 달 고리는 상태 없음 (폴백).
+    const earthAtTt = physics.parentRelativePositionAt(earth, sun, null, tt);
+    const getBodyState: BodyStateFn = (id) =>
+      id === 'earth' ? { pos: [earthAtTt[0], earthAtTt[1], earthAtTt[2]], vel: [0, 0, 0] } : null;
+    const mixed = computeBodyWorldPosition(byId, 'moon', clockJd, getBodyState)!;
+    const allKepler = computeBodyWorldPosition(byId, 'moon', clockJd)!;
+    expect(mixed).toEqual(allKepler);
+    // 판별력 — 폴백 고리가 시계 시각 그대로였다면 (달 위치를 clockJd 로) 같지 않다.
+    const moonAtClock = physics.parentRelativePositionAt(moon, earth, sun, clockJd);
+    expect(mixed).not.toEqual([
+      earthAtTt[0] + moonAtClock[0],
+      earthAtTt[1] + moonAtClock[1],
+      earthAtTt[2] + moonAtClock[2],
+    ]);
+  });
 });
 
 /**
@@ -139,7 +170,9 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
  * 테스트에 기댄다). 그 고리만 장면과 같은 `parentRelativePositionAt` 로 만든다. 정확도는 core E1 · P1 (DE441) 이 단언한다.
  */
 describe('#1341 computeBodyPairDistance — 두 천체 물리 거리 (E1)', () => {
-  function independentWorld(id: string, jd: number): [number, number, number] {
+  /** `clockJd` = 카드에 넘기는 장면 시계 — 독립 계산도 TT 로 옮겨 부른다 (#1370). */
+  function independentWorld(id: string, clockJd: number): [number, number, number] {
+    const jd = clockJdToTt(clockJd);
     const w: [number, number, number] = [0, 0, 0];
     let cur = byId.get(id)!;
     while (cur.parentId != null) {

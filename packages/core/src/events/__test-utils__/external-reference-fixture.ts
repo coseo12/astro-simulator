@@ -23,8 +23,9 @@ import type { EventKindId } from '../event-kinds.js';
  * ## `recordedErrorDays`
  *
  * `모델 − 기준` (일) — #1349 (태양 GM IAU 교정) 머지 후 develop `76ed1d71` 에서 잰 값. DoD M3 (ii) 는 표본마다
- * `|오차 − recordedErrorDays| ≤ 0.2` 일을 요구한다. 모델 시각은 UTC 해석 JD, 기준은 TDB 라 그 차 (ΔT, 이 범위에서 분 단위) 가
- * 섞여 있다 — 일 단위 판정에는 영향이 없다 (ADR 1-A).
+ * `|오차 − recordedErrorDays| ≤ 0.2` 일을 요구한다. #1370 이후 비교는 모델 사건 시각 (장면 시계) 을 `clockJdToTt` 로 TT 로 옮긴 뒤
+ * 한다 (TT ≈ TDB, 차 `< 2 ms` — ADR `20261023-1370` Q4). 기록값은 ΔT 적용 전에 잰 값이다. 그때 모델은 장면 시계 JD 를 TT 자리에
+ * 그대로 넣었으므로, 기록값도 같은 TT ↔ TDB 척도의 오차다.
  */
 export interface ExternalReferenceSample {
   kind: EventKindId;

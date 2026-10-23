@@ -16,7 +16,8 @@
  *
  * 스크러버 범위 (1900-01-01 ~ 2100-01-01) 안 전건이다 — 일식 452 (부분 155 · 금환 145 · 개기 139 · 혼성 13), 월식 457
  * (반영 169 · 개기 166 · 부분 122). 가공은 HTML 표 행 → 날짜 · TD · 종류 추출뿐이다 (일회성 스크립트 — 커밋하지 않음, volt #67
- * 패턴). 모델 JD 는 앱과 같이 그대로 쓰고 기준은 TD 다 — ΔT (이 범위에서 분 단위) 는 판정 대역 (시 단위) 안에 들어 있다.
+ * 패턴). 기준은 TD (역학시) 다. `computeEventsForKind` 의 사건 시각은 장면 시계라 비교 전에 `clockJdToTt` 로 TT 로 옮긴다
+ * (#1370 — ADR `20261023-1370` Q4, `eclipse-events.test.ts` `matchAgainstNasa`).
  */
 
 import { MILLIS_PER_DAY, UNIX_EPOCH_JD } from '../../time/julian-date.js';

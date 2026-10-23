@@ -19,6 +19,7 @@ import { ArcRotateCamera, NullEngine, Scene, Vector3, type Mesh } from '@babylon
 import { AU, J2000_JD } from '@astro-simulator/shared';
 import { fromSceneZ } from '../coords/scene-handedness.js';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { renderScaleForTier } from './tier.js';
 import { ASTEROID_BELT_MAX_N } from './asteroid-belt.js';
 import { BELT_DEFAULT_COUNTS, scaleAsteroidBeltCounts } from './belt-population.js';
@@ -385,7 +386,8 @@ describe('#1319 PR3 — 로드 시 생성 옵션 · 런타임 토글 (ADR 결정
     f.handles.setAsteroidBeltVisible(true);
     f.handles.setKuiperBeltVisible(true);
     for (const h of [f.handles.getBeltParticles()!, f.handles.getKuiperParticles()!]) {
-      expect(h.getEpochBase()).toBe(jd);
+      // #1370 — `updateAt` 인자는 장면 시계, 장면 시각 (`currentJd`) 은 TT 다 — 띠 epoch 는 위치 시각 (TT).
+      expect(h.getEpochBase()).toBe(clockJdToTt(jd));
       h.mesh.onBeforeRenderObservable.notifyObservers(h.mesh);
       expect(h.readFrameUniforms()!.days).toBe(0);
     }

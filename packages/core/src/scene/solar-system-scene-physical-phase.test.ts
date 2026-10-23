@@ -14,6 +14,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import {
   ArcRotateCamera,
   NullEngine,
+  Quaternion,
   Scene,
   Vector3,
   type Mesh,
@@ -22,12 +23,15 @@ import {
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
 import { toScene } from '../coords/scene-handedness.js';
 import { resolveBodyChainPosition } from '../physics/body-chain.js';
+import { buildInitialState } from '../physics/nbody-engine.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import {
   PHYSICAL_PHASE_BODY_IDS,
   createSolarSystemScene,
   type SolarSystemSceneHandles,
 } from './solar-system-scene.js';
 import type * as OrbitVisualScaleModule from './orbit-visual-scale.js';
+import { computeRotationState, computeSpinQuaternion } from './self-rotation.js';
 
 /** 위성 배율 덮어쓰기 — `null` 이면 실제 값. 장면이 쓰는 모든 배율 호출을 덮는다 (D2). */
 const scaleOverride = vi.hoisted(() => ({ value: null as number | null }));
@@ -93,7 +97,14 @@ const D6_DISCRIMINATION_FACTOR = 100;
 const system = getSolarSystem();
 const bodiesById = new Map(system.bodies.map((b) => [b.id, b] as const));
 
-function makeScene(opts: { jd?: number; surfaceDetail?: boolean } = {}): Fixture {
+function makeScene(
+  opts: {
+    jd?: number;
+    surfaceDetail?: boolean;
+    selfRotation?: boolean;
+    physicsEngine?: 'kepler' | 'newton';
+  } = {},
+): Fixture {
   const engine = new NullEngine({
     renderWidth: 1280,
     renderHeight: 800,
@@ -107,6 +118,8 @@ function makeScene(opts: { jd?: number; surfaceDetail?: boolean } = {}): Fixture
   const handles = createSolarSystemScene(scene, {
     surfaceDetail: opts.surfaceDetail ?? false,
     starfield: false,
+    selfRotation: opts.selfRotation ?? false,
+    physicsEngine: opts.physicsEngine ?? 'kepler',
     initialJulianDate: opts.jd ?? J2000,
   });
   const f = { engine, scene, handles };
@@ -141,12 +154,19 @@ function boundSunDirection(f: Fixture, meshName: string): Vector3 {
 }
 
 /**
+ * #1370 — 장면에 넘긴 시계 시각 `clockJd` 의 체인 위치 (물리 함수 — TT 에서 평가, 장면 `updateAt` 과 같은 변환).
+ */
+function chainAt(id: string, clockJd: number) {
+  return resolveBodyChainPosition(bodiesById, id, clockJdToTt(clockJd))!;
+}
+
+/**
  * 물리 기준 태양 방향 — 장면과 무관한 체인 위치 (`resolveBodyChainPosition`, 배율 미적용) 로 만든다.
  * #1366 — 체인 위치는 데이터 공간이고 셰이더 uniform 은 장면 공간이라 `toScene` (장면 경계 z 반전) 으로 옮겨 비교한다.
  */
-function physicalSunDirection(jd: number): readonly [number, number, number] {
-  const moon = resolveBodyChainPosition(bodiesById, 'moon', jd)!.world;
-  const sun = resolveBodyChainPosition(bodiesById, 'sun', jd)!.world;
+function physicalSunDirection(clockJd: number): readonly [number, number, number] {
+  const moon = chainAt('moon', clockJd).world;
+  const sun = chainAt('sun', clockJd).world;
   return toScene([sun[0] - moon[0], sun[1] - moon[1], sun[2] - moon[2]]);
 }
 
@@ -171,7 +191,7 @@ describe('#1360 G3 — getPhysicalLocal (배율 전 물리 위치) · DoD D2', (
     const pb = [...b.handles.getPhysicalLocal('moon')];
     expect(bitsEqual(pa, pb)).toBe(true);
     // 값 자체도 체인 위치 local 과 비트 동일 — 장면이 같은 함수 (`parentRelativePositionAt`) 를 쓴다 (#1354 M4).
-    expect(bitsEqual(pa, resolveBodyChainPosition(bodiesById, 'moon', jd)!.local!)).toBe(true);
+    expect(bitsEqual(pa, chainAt('moon', jd).local!)).toBe(true);
 
     // 양성 대조 — 메시 (화면) 위치는 배율을 따른다. 이것이 같으면 위 단언은 판별력이 없다.
     const rel = (f: Fixture) => {
@@ -211,9 +231,7 @@ describe('#1360 G3 — getPhysicalLocal (배율 전 물리 위치) · DoD D2', (
     // 엔진 상태 (`getBodyState` — 같은 positions 배열의 차) 와 비트 동일.
     expect(bitsEqual(pa, a.handles.getBodyState('moon', 'earth')!.pos)).toBe(true);
     // 경로 분기 판별 — N-body 값은 같은 시각의 Kepler 체인 위치와 다르다 (적분 vs 해석해).
-    expect(bitsEqual(pa, resolveBodyChainPosition(bodiesById, 'moon', J2000 + 10)!.local!)).toBe(
-      false,
-    );
+    expect(bitsEqual(pa, chainAt('moon', J2000 + 10).local!)).toBe(false);
   });
   it('N-body → Kepler 복귀 — 다시 Kepler 배율 전 위치 (체인 local) 와 비트 동일 · 배율 30 ↔ 1 비트 동일', () => {
     // 초기값이 'kepler' 라서, 복귀 경로를 밟지 않으면 `updateAt` Kepler 분기의 `positionSource = 'kepler'` 대입이
@@ -233,8 +251,25 @@ describe('#1360 G3 — getPhysicalLocal (배율 전 물리 위치) · DoD D2', (
     };
     const a = run(30);
     const b = run(1);
-    expect(bitsEqual(a, resolveBodyChainPosition(bodiesById, 'moon', jd)!.local!)).toBe(true);
+    expect(bitsEqual(a, chainAt('moon', jd).local!)).toBe(true);
     expect(bitsEqual(a, b)).toBe(true);
+  });
+  it('#1370 — 일시정지 중 N-body → Kepler 복귀 재진입은 장면 시계로 다시 계산한다 (TT 를 넘기면 ΔT 가 두 번 더해진다)', () => {
+    // 복귀 뒤 `updateAt` 이 더 오지 않는다 — `setPhysicsEngine` 의 재진입 `updateAt(currentClockJd)` 만이 위치를 쓴다.
+    const f = makeScene();
+    f.handles.updateAt(J2000);
+    f.handles.setPhysicsEngine('newton');
+    f.handles.updateAt(J2000 + 10);
+    f.handles.setPhysicsEngine('kepler');
+    const local = [...f.handles.getPhysicalLocal('moon')];
+    expect(bitsEqual(local, chainAt('moon', J2000 + 10).local!)).toBe(true);
+    // 판별력 — 재진입에 TT (`currentJd`) 를 넘긴 판본의 위치 (TT 에서 ΔT 를 한 번 더 더한 시각) 와는 다르다.
+    const doubled = resolveBodyChainPosition(
+      bodiesById,
+      'moon',
+      clockJdToTt(clockJdToTt(J2000 + 10)),
+    )!;
+    expect(bitsEqual(local, doubled.local!)).toBe(false);
   });
 });
 
@@ -290,5 +325,52 @@ describe('#1360 G4 — 달 uSunDirection 물리 기준점 · DoD D6', () => {
     expect(angleDeg(boundSunDirection(f, 'moon'), meshSunDirection(f))).toBeLessThanOrEqual(
       D6_TOLERANCE_DEG,
     );
+  });
+});
+
+/**
+ * #1370 DoD D5 (장면 쪽) — 자전은 장면 시계 JD 를 쓴다 (ADR `20261023-1370` §결정 P). `self-rotation.test.ts` 는 순수 함수만
+ * 보므로, 장면이 자전에 TT 를 넘기는 결함판을 잡지 못한다 (변이 실측 — 그 판본에서 장면 테스트 전부 통과). 여기서 장면 메시의
+ * quaternion 을 시계 시각의 순수 함수 값과 비트 대조한다.
+ */
+describe('#1370 — 자전 quaternion 은 장면 시계 (위치만 TT)', () => {
+  it.each(['earth', 'mars'] as const)(
+    '%s — 메시 quaternion == computeSpinQuaternion(시계) · TT 판본과 다르다',
+    (id) => {
+      const clockJd = J2000 + 9_000.5;
+      const f = makeScene({ jd: clockJd, selfRotation: true });
+      f.handles.updateAt(clockJd);
+      const got = f.handles.meshes.get(id)!.rotationQuaternion!;
+      const state = computeRotationState(bodiesById.get(id)!)!;
+      const spinAt = (jd: number) => {
+        const out = new Quaternion();
+        computeSpinQuaternion(jd, system.epoch, state, new Quaternion(), new Quaternion(), out);
+        return [out.x, out.y, out.z, out.w];
+      };
+      const q = [got.x, got.y, got.z, got.w];
+      expect(bitsEqual(q, spinAt(clockJd))).toBe(true);
+      expect(bitsEqual(q, spinAt(clockJdToTt(clockJd)))).toBe(false);
+    },
+  );
+});
+
+/**
+ * #1370 — 초기 엔진이 N-body 이면 엔진 초기 상태를 TT (`initialTtJd`) 에서 만든다. 생성 직후 `updateAt(initialJulianDate)` 는
+ * 같은 TT 로 바꾸므로 적분 간격이 `0` 이라 엔진 위치 = 초기 상태 그대로다. 초기 상태를 시계 시각에서 만들면 첫 `updateAt` 이
+ * ΔT 만큼 적분해 비트가 갈린다.
+ */
+describe('#1370 — 초기 N-body 엔진 상태는 TT 에서 만든다', () => {
+  it('생성 직후 지구 − 태양 = buildInitialState(clockJdToTt(t)) 의 차 (비트 동일)', () => {
+    const clockJd = J2000 + 9_000.5;
+    const f = makeScene({ jd: clockJd, physicsEngine: 'newton' });
+    expect(f.handles.getPhysicsEngine()).toBe('newton');
+    const got = [...f.handles.getBodyState('earth', 'sun')!.pos];
+    const state = buildInitialState(system, clockJdToTt(clockJd));
+    const e = state.ids.indexOf('earth');
+    const s = state.ids.indexOf('sun');
+    const expected = [0, 1, 2].map(
+      (c) => state.positions[3 * e + c]! - state.positions[3 * s + c]!,
+    );
+    expect(bitsEqual(got, expected)).toBe(true);
   });
 });

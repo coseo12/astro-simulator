@@ -1,5 +1,5 @@
 /**
- * #1390 — 투어가 쓰는 지구의 계절 · 근원일점 시각 [JD, TT≈UT 구분 없이 장면 시각]. 계절 투어 (T3) 와 별자리 투어 (T4) 가
+ * #1390 — 투어가 쓰는 지구의 계절 · 근원일점 시각 [JD, UT (= 장면 시계 — #1370 이후 위치는 장면이 TT 로 바꿔 계산한다)]. 계절 투어 (T3) 와 별자리 투어 (T4) 가
  * 함께 쓴다 — 같은 하지 · 동지 값이 두 파일에 따로 있으면 한쪽만 고쳐지는 숨은 상수 drift 가 된다 (volt #69).
  *
  * 출처: USNO Astronomical Applications Dept., 「Earth's Seasons and Apsides」 (API `aa.usno.navy.mil/api/seasons`, 2024 · 2025,

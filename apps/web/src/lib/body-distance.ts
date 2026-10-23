@@ -2,7 +2,11 @@
 // physics_wasm `__dirname` 평가로 SSR 500 — 카드는 app-shell 직접 import 라 SSR 평가 대상이다.
 // core/src/index.ts 가 체인 위치 함수를 별도 named export 한다 (ADR `20260504-r-phase-allowlist-guard`
 // §Amendment 결정 D1 패턴).
-import { resolveBodyChainPosition, type BodyChainPosition } from '@astro-simulator/core';
+import {
+  clockJdToTt,
+  resolveBodyChainPosition,
+  type BodyChainPosition,
+} from '@astro-simulator/core';
 import type { BodyStateFn } from '@/core/sim-context';
 import type { LoadedCelestialBody } from './body-info';
 
@@ -28,17 +32,22 @@ export type Vec3 = [number, number, number];
  * 화면에 그려진 위치와 같아야 하기 때문이다 — Kepler 식만 쓰면 Newton 모드에서 달-지구 거리가
  * 2.9% 어긋났다 (PR #1282 실측: 엔진 `354,781 km` ↔ Kepler `365,248 km`, 표시 `35.5만` ↔ `36.5만`).
  * 판정은 체인의 고리마다 한다 — 한 엔진 안에서는 모든 고리가 같은 쪽으로 간다.
+ *
+ * #1370 — `clockJd` 는 장면 시계 (store 시각) 다. Kepler 폴백은 물리 함수라 TT 를 받으므로 여기서 **한 번** 바꾼다 (ADR
+ * `20261023-1370` §결정 P 진입점 3 — 장면 `updateAt` 과 같은 TT 위치). 엔진 상태값 (`getBodyState`) 은 엔진이 이미 장면 `updateAt`
+ * 의 TT 로 적분한 값이라 시각 인자가 없다 — 두 경로가 섞인 체인도 같은 TT 를 본다.
  */
 function resolveBodyChain(
   bodiesById: ReadonlyMap<string, LoadedCelestialBody>,
   id: string,
-  jd: number,
+  clockJd: number,
   getBodyState: BodyStateFn | null,
 ): BodyChainPosition | null {
+  const ttJd = clockJdToTt(clockJd);
   return resolveBodyChainPosition(
     bodiesById,
     id,
-    jd,
+    ttJd,
     getBodyState ? (bodyId, parentId) => getBodyState(bodyId, parentId)?.pos : null,
   );
 }

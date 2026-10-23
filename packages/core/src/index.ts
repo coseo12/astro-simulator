@@ -89,6 +89,10 @@ export {
   siderealPeriodOf,
 } from './physics/orbit-elements-at.js';
 export type { OrbitPositionBody, PeriodicPerturbation } from './physics/orbit-elements-at.js';
+// #1370 — 장면 시계 ↔ TT 변환 직접 named export (ADR `20261023-1370` §결정 P). web 거리 카드 (`body-distance.ts`) 는 SSR 평가
+// 대상이라 `time` namespace 를 쓰지 않는다 — 위 #402 와 같은 D1 패턴. `delta-t.ts` 는 `time/julian-date.ts` · shared 상수만
+// 가져 모듈 그래프 영향이 위 `kepler.ts` 와 같다. exports field 불변.
+export { clockJdToTt, ttJdToClock, ttMinusClockSeconds } from './time/delta-t.js';
 
 // #845 — GpuTier / LodLevel 루트 type re-export.
 //
