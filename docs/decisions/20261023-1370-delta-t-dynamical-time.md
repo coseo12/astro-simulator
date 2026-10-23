@@ -1,8 +1,8 @@
 # ADR 20261023-1370 — 위치는 역학시(TT), 자전 · 표시는 장면 시계(UTC): ΔT 를 진입점 3곳에서 한 번씩 더한다
 
-- **상태**: Provisional — cross-validate · 사용자 결정 (Q1~Q6) 대기. 메인이 둘을 거친 뒤 Accepted 로 전이한다
+- **상태**: Accepted (cross-validate 2026-10-23) — 사용자 결정 (2026-10-23): Q1~Q6 전부 권고안
 - **날짜**: 2026-10-23
-- **결정자**: 사용자 (Q 표 — 대기) · 설계 architect (이슈 [#1370](https://github.com/coseo12/astro-simulator/issues/1370) · 사용자 선택 2026-10-23)
+- **결정자**: 사용자 (2026-10-23 — Q 표 전부 권고안, 메인 오케스트레이터 경유) · 설계 architect (이슈 [#1370](https://github.com/coseo12/astro-simulator/issues/1370) · 사용자 선택 2026-10-23)
 - **관련**:
   - [ADR 20261018-1360](20261018-1360-moon-phase-eclipse-shadows.md) — 일식 그림자 · §1-D NASA 거리. 지리 오차 축 분해는 PR [#1369 반영 코멘트](https://github.com/coseo12/astro-simulator/pull/1369#issuecomment-6248802718) (R1)
   - #1362 — 지구 자전 ERA (`earthRotationAngle`, 장면 jd 를 UT1 근사로 쓴다 — `|UT1 − UTC| < 0.9 s`)
@@ -50,7 +50,7 @@
 
 - 1972년 이후 (b) 는 **TT − UTC 의 정의값**이다. 실제 ΔT (TT − UT1) 는 UTC 정의상 `|UT1 − UTC| < 0.9 s` 이므로 (b) 의 `±0.9 s` 안에 있다. 2026년이면 `68.3 ~ 70.1 s` 다.
 - (a) 의 2005~2050 구간은 2005년 시점의 예측식이다. 2026.0 값 `75.07 s` 는 위 상한 `70.1 s` 를 `5 s` 넘는다. 이 구간은 이미 관측에서 벗어났다.
-- (b) 의 1972 이음매는 `42.241 → 42.184` (`−0.057 s`) 다. 윤초마다 `+1 s` 계단이 생긴다 — 정의상 그렇다.
+- (b) 의 1972 이음매 (`clockJd = 2441317.5` 바로 아래 · 위) 는 `42.2505 → 42.1840` (`−0.0665 s`) 다 (표의 1971.99 행은 이음매 직전이 아니다). 윤초마다 `+1 s` 계단이 생긴다 — 정의상 그렇다.
 
 #### 1-B. 일식 그림자 지표 교점 — ΔT 축만 분리
 
@@ -167,18 +167,29 @@
 
 ---
 
-## 결정 (권고안 — 사용자 결정 대기)
+## 결정 (사용자 결정 2026-10-23 — 전부 권고안)
 
 ### M — ΔT 모델: (b) 윤초 표 + 1972 이전 E–M + 표 이후 상수 (Q1 · Q2 · Q3)
 
-`packages/core/src/time/` 에 신규 모듈 하나를 둔다. 이름은 아래로 고정한다 (dev · 리뷰 · 문서가 같은 이름을 쓰도록).
+신규 모듈 **`packages/core/src/time/delta-t.ts`** 하나를 둔다 (같은 디렉토리 `julian-date.ts` · `time-controller.ts` 의 kebab-case 관례). 파일명 · 함수명은 아래로 고정한다 (dev · 리뷰 · 문서가 같은 이름을 쓰도록).
 
-- `ttMinusClockSeconds(clockJd)` — TT − 장면 시계 [s]
-  - `clockJd ≥ 1972-01-01` → `32.184 + TAI−UTC(clockJd)` (윤초 표 28행, 키 = 시계 JD. 2017-01-01 이후 `69.184`)
-  - `1900 ≤ y < 1972` → E–M 다항식 (1900–1920 · 1920–1941 · 1941–1961 · 1961–1986 구간식, 1-A 출처)
-  - `y < 1900` → 1900.0 값 (`−2.79`) 유지 (Q3)
+- `ttMinusClockSeconds(clockJd)` — TT − 장면 시계 [s]. 분기는 **시계 JD 의 부등호**로 정한다:
+  - `clockJd >= 2441317.5` (1972-01-01T00:00:00Z — 윤초 표 첫 행과 같은 값) → `32.184 + TAI−UTC(clockJd)`. 윤초 표 28행이고, 키는 시계 JD 이며, 행 경계도 `>=` 로 판정한다. 2017-01-01 이후 값은 `69.184` 다.
+  - `clockJd < 2441317.5` → E–M 다항식 (1900–1920 · 1920–1941 · 1941–1961 · 1961–1986 구간식, 1-A 출처). 소수 연도는 **`y = 2000 + (clockJd − 2451545.0) / 365.25`** (율리우스년, J2000.0 기준 연속식) 으로 둔다.
+  - `y < 1900` 이면 `y = 1900` 으로 고정한다 (Q3 — 값 `−2.79`).
+- **y 정의와 E–M 원문의 관계** — 원문은 날짜가 속한 달의 중순 값 `y = 연 + (월 − 0.5)/12` 을 쓴다 (달 안에서는 계단). 이 ADR 은 연속식을 쓴다.
+  - 1900~1972 매월 중순에서 두 y 의 차는 최대 `0.0078` 년이다.
+  - 같은 달 안에서 「원문 계단값 ↔ 연속식」 의 ΔT 차는 최대 `0.067 s` 다.
+  - 연속식을 고른 이유: 달 경계마다 생기는 계단이 없어 `ttJdToClock` 반복이 윤초 경계에서만 불연속을 만난다.
+- **이음매 (수치 확인 — §교차검증 반영 1)**: 경계 바로 아래 · 위 값의 차.
+  - E–M 구간 이음매 — 1920 `+0.0124 s` · 1941 `+0.0009 s` · 1961 `+0.0296 s` (원문 다항식 자체의 불연속).
+  - 1972 이음매 (`clockJd = 2441317.5`) — `42.2505 → 42.1840` (`−0.0665 s`).
+  - 모두 `0.07 s` 미만이다. 달이 `0.07 s` 에 움직이는 거리는 `≈ 0.07 km` 다.
 - `clockJdToTt(clockJd)` = `clockJd + ttMinusClockSeconds(clockJd) / 86400`
-- `ttJdToClock(ttJd)` — 역변환. 고정점 반복 (`c ← tt − Δ(c)/86400`) 2~3회로 충분하다 (ΔT 변화율 `≤ 1 s/년`). 윤초 직후 TT `1 s` 구간은 역상이 없다 — 근처 값을 돌려준다 (사건 시각이 그 1초에 들 확률은 무시).
+- `ttJdToClock(ttJd)` — 역변환. **고정 3회 for-loop** 로 한다: `c = ttJd` 에서 시작해 `c = ttJd − ttMinusClockSeconds(c) / 86400` 를 3번 반복한다. 수렴 판정 · `while` 은 쓰지 않는다. 확인한 성질 (scratchpad 일회성 스크립트, Node 24.14.0):
+  - 1900~2100 을 7.3일 간격으로 돌린 왕복 `ttJdToClock(clockJdToTt(t)) − t` 의 최대 오차는 `0 s` 다. 마지막 윤초 경계 `±2 s` 안 6점도 `0 s` 다.
+  - 윤초 직후 역상이 없는 TT `1 s` 구간 (`[L + 68.184 s, L + 69.184 s)`, `L` = 2017-01-01) 에서는 반복이 두 값 사이를 **진동**한다. 횟수가 고정이라 결과는 결정적이다 — 같은 입력에 같은 출력 (예: `L + 69.0 s → L − 0.184 s`). 경계에서 `1 s` 안이다.
+  - `NaN → NaN` · `+Infinity → +Infinity` · `−Infinity → −Infinity`. 반복 횟수가 고정이라 무한 루프가 없다.
 - 표 · 다항식 계수 주석에 1-A 의 출처 URL 과 조회일 · 표 만료일을 적는다 (principles §1 — 하드코딩 + 출처).
 
 ### P — 적용 지점: 진입점 3곳 (P3)
@@ -192,6 +203,7 @@
 **진입점:**
 
 1. **장면** — `solar-system-scene.ts` `updateAt(clockJd)` 첫 줄에서 `jd = clockJdToTt(clockJd)`. 장면 안 `currentJd` 는 TT, 새 `currentClockJd` 는 시계다.
+   - 불변식 (주석으로 박제): `currentJd` · `newtonLastJd` 는 TT, `currentClockJd` 는 시계다. `updateAt` 이 끝나면 `currentJd === clockJdToTt(currentClockJd)`. N-body 전환 (`buildNewton(currentJd)`) 과 Kepler 복귀 (`updateAt(currentClockJd)`) 는 이 두 변수만 읽는다.
    - TT 를 쓰는 곳 (변경 없음 — 이미 `jd` · `currentJd` 를 쓴다): Kepler (`updateAtKepler`) · N-body `advance` 간격과 `buildNewton` · 궤도선 (`rebuildOrbitLines` · `refreshPrecessingOrbitLines`) · 궤적 · 소행성대 · 카이퍼대. 식 그림자 uniform 과 장면 거리 자는 `worldPositions` · 메시에서 읽으므로 따라온다.
    - 시계로 바꾸는 곳 4개: `computeSpinQuaternion(clockJd, …)` · `applyCloudDrift(cloudLayer, clockJd, …)` · 구름 지연 생성의 `applyCloudDrift(layer, currentClockJd, …)` · 엔진 복귀 재진입 `updateAt(currentClockJd)`.
    - 초기값: `currentJd = clockJdToTt(initialJulianDate)` · `newtonLastJd` 도 같다.
@@ -217,13 +229,13 @@
 ### PR 분할 (Q6)
 
 - **PR0** — 이 ADR (`docs/1370-delta-t-adr`).
-- **PR1** — 구현 1개: 신규 모듈 + 진입점 3곳 + 자전 분리 + 테스트 기대값 갱신 + 사건 파일 재생성 + 주석 정정. 변이 실측 기준 소스 5파일 · 테스트 9파일 · 데이터 1파일이라 나누면 중간 상태 (장면은 TT · 사건 파일은 옛 시각) 가 develop 에 남는다. 그 상태가 이슈가 없애려는 「경로 간 불일치」 다.
+- **PR1** — 구현 1개: 신규 모듈 + 진입점 3곳 + 자전 분리 + 테스트 기대값 갱신 + 사건 파일 재생성 + 주석 정정. 변이 실측 기준 소스 6파일 · 테스트 9파일 · 데이터 1파일이라 나누면 중간 상태 (장면은 TT · 사건 파일은 옛 시각) 가 develop 에 남는다. 그 상태가 이슈가 없애려는 「경로 간 불일치」 다.
 
 ---
 
-## 사용자 결정 (Q 표)
+## 사용자 결정 (Q 표 — 2026-10-23 전부 권고안)
 
-| Q | 질문 | 선택지 | 권고 | 근거 |
+| Q | 질문 | 선택지 | 권고 = 결정 | 근거 |
 | --- | --- | --- | --- | --- |
 | Q1 | ΔT 모델 | (a) E–M / **(b) 윤초 표 + 1972 이전 E–M** / (c) 69 s | **(b)** | 2024 ΔT 축 잔차 `0.02 km` (a `5.08` · c `0.21`). 1972 이후는 정의값이라 출처 검증이 가능하다. (c) 는 1900년 `72 s` 틀린다 |
 | Q2 | 표 이후 (2017-01-01~) 외삽 | **F1 상수 `69.184 s`** / F2 E–M 이어 붙이기 / F3 E–M 그대로 | **F1** | 2017 이후 윤초 0건 · 표 만료 2027-06-28. E–M 예측식은 2026년에 이미 관측 상한을 `5 s` 넘었다. 대가 — 2100년 사건 시계 시각이 NASA 목록 UT 보다 약 `134 s` 늦다 (축 F) |
@@ -264,10 +276,10 @@
 
 변이 실측 (§실측 1-F) 에 근거한다.
 
-- **소스 6파일 (신규 1 + 기존 5)**: 신규 `packages/core/src/time/<ΔT 모듈>.ts` · 기존 `packages/core/src/time/index.ts` (export) · `packages/core/src/index.ts` (named export) · `packages/core/src/scene/solar-system-scene.ts` · `packages/core/src/events/compute-events.ts` · `apps/web/src/lib/body-distance.ts`. 변이가 건드린 파일과 같다.
+- **소스 6파일 (신규 1 + 기존 5)**: 신규 `packages/core/src/time/delta-t.ts` · 기존 `packages/core/src/time/index.ts` (export) · `packages/core/src/index.ts` (named export) · `packages/core/src/scene/solar-system-scene.ts` · `packages/core/src/events/compute-events.ts` · `apps/web/src/lib/body-distance.ts`. 변이가 건드린 파일과 같다.
 - **변환 호출 지점 = 3** (진입점 1 · 2 · 3) + 역변환 1 (사건 결과). **자전 쪽 시계 전환 = 4곳** (§결정 P 진입점 1).
 - **물리 함수 본문 변경 = 0.**
-- **테스트**: 신규 1 (ΔT 모듈) + 기대값 갱신 9파일 (1-F) + Q4 대조 테스트 비교식 (`eclipse-events.test.ts` E4 · `external-reference.test.ts`).
+- **테스트**: 신규 1 (`delta-t.test.ts`) + 기대값 갱신 9파일 (1-F) + Q4 대조 테스트 비교식 (`eclipse-events.test.ts` E4 · `external-reference.test.ts`).
 - **데이터 1파일**: `time-events.json` 재생성.
 - **주석 정정**: `season-dates.ts` · `eclipse-tour.ts` (「TT≈UT 구분 없이」) · NASA · 외부 · DE441 fixture 머리 주석 (「모델 JD 는 앱과 같이 그대로」) · `AstroEvent.julianDate` · `earthRotationAngle` (시계 = UT1 근사 문장은 유지).
 - 반증 조건: PR1 에서 위 밖의 소스 파일이 바뀌면 (예: 다른 web 위치 계산 경로 발견) PR 본문에 반증으로 적고 이 ADR 을 Amendment 한다.
@@ -294,7 +306,12 @@
 ## 구현 인계 (PR1)
 
 - **시작 지점**: 신규 ΔT 모듈 → 단위 테스트 (D2) → `solar-system-scene.ts` `updateAt` (진입점 1) → `computeEventsForKind` (진입점 2) → `body-distance.ts` `resolveBodyChain` (진입점 3) → 1-F 테스트 기대값 → core 빌드 → `generate:time-events` → 주석.
-- 자전 쪽 4곳은 `jd` 를 `clockJd` 로 **이름부터** 바꿔 둔다 — `updateAt` 안에서 `jd` 가 TT 를, `clockJd` 가 시계를 뜻하게 하면 이후 수정자가 헷갈리지 않는다.
+- **변수명 컨벤션 (§교차검증 반영 — 부분 수용)**: 새로 만드는 변수와 진입점 지역 변수는 `clockJd` (시계) 와 `ttJd` (TT) 로 엄격히 구분한다. `updateAt` 안의 TT 변수는 `jd` 가 아니라 `ttJd` 로 둔다. 물리 함수의 기존 매개변수 이름 (`julianDate` · `jd`) 을 일괄로 `ttJd` 로 바꾸는 일은 범위 밖이다 (물리 함수 본문 변경 0 원칙). 그 대신 JSDoc 규약 (§결정 P) 으로 대신한다.
+- **PR1 착수 전 확인 항목** (§교차검증 반영 — 수용. 결과는 PR1 본문에 적는다):
+  1. **고정 시각 장면을 비교하는 CI 브라우저 가드 (`verify:*`) · e2e 의 기대값 변동 스캔**. 이 ADR 셀프 체크가 남긴 미확인 축이다. 스캔 출발 목록은 `apps/web/scripts/` 에서 시각을 고정하는 스크립트 8개다 (`git grep` 술어 `[?&]t=|jumpToJulianDate|isoUtc|'t'` — 2026-10-23 develop): `browser-verify-1119-earth-mask` · `-1202-atmosphere-rim` · `-1215-cloud-layer` · `-1226-night-lights` · `-1265-display-panel` · `-1274-surface-invariance` · `-783-earth-detail` · `-glow-marker`. 이 목록은 술어 결과일 뿐이고 영향 판정은 아니다. 판정은 PR1 CI 실발화로 한다.
+  2. **`computeEventsForKind` 의 `[from, to)` 경계 왕복**: 범위를 TT 로 옮겨 계산하고 결과를 되돌릴 때, 경계에 걸친 사건이 누락되거나 중복되지 않는지 본다. 청크 경계에 사건을 하나 둔 단위 테스트로 확인한다 (이음 붙인 청크 결과 == 전 범위 결과).
+  3. **`body-distance` 두 경로의 같은 TT**: N-body 상태 경로 (`getBodyState`) 와 `resolveBodyChainPosition` 폴백 경로가 섞인 체인 (예: N-body 상태가 없는 위성 + 상태가 있는 모체) 에서 두 경로가 같은 TT 를 보는지 확인한다.
+  4. **바뀐 id 2건의 저장 경로**: URL · 북마크 · `localStorage` 에 사건 id 를 저장하는 경로가 있는지 확인한다. 사전 스캔 (`apps/web/src` 의 `localStorage|sessionStorage` 중 event · tour 매칭) 은 0건이었다. 경로가 있으면 없는 id 를 받았을 때의 처리를 확인한다.
 - **명시적 비-범위 (손대지 말 것)**: 물리 함수 본문 · `self-rotation.ts` 의 식 · `EVENT_KIND_TOLERANCE_DAYS` · 투어 상수 값 · `solar-system.json`.
 - 참조: §실측 1-F (변이에서 실패한 테스트와 이유), ADR 1347 Amendment 2 (재생성 절차 — core `dist` 선행 빌드).
 
@@ -302,11 +319,33 @@
 
 ## 교차검증 반영 사항
 
-메인 오케스트레이터가 cross-validate 1회를 수행한 뒤 이 절을 채우고 상태를 Accepted 로 전이한다 (Provisional — CLAUDE.md ADR Status 워크플로).
+agy 1회 (2026-10-23, outcome `applied` · exit 0 · `plan_bypass` false — `.claude/logs/cross-validate-architecture-20261023-131143-outcome.json`). 6기준 판정: 구조 Pass · 결정 타당성 Pass · 인터페이스 조건부 Pass · 확장성 Pass · 보안 Pass · 누락 「검토 필요」. 결론은 Q1~Q6 권고안 승인 + 보완 3건이다. 아래는 메인 재분석 판정을 거쳐 통합한 결과다.
+
+### 합의 (본문에 반영)
+
+1. **신규 모듈 파일명 확정** → `packages/core/src/time/delta-t.ts` (§결정 M · Concrete Prediction).
+2. **1972.0 분기를 부등호 · JD 로 정의** → `clockJd >= 2441317.5` (§결정 M). 1972 이음매의 차는 `−0.0665 s` 로 확인했다.
+3. **소수 연도 y 변환식 명시** → `y = 2000 + (clockJd − 2451545.0) / 365.25`. E–M 원문 y (월 중순 계단) 와의 차와 구간 이음매 3곳을 수치로 적었다 (§결정 M).
+4. **`ttJdToClock` 은 고정 3회 for-loop** → 윤초 불연속점에서는 진동하지만 결과는 결정적이다. `NaN` · `±Infinity` 는 그대로 전파되고 무한 루프가 없음을 확인했다 (§결정 M).
+5. **N-body ↔ Kepler 전환의 척도 불변식** → `currentJd` · `newtonLastJd` = TT, `currentClockJd` = 시계 를 주석 불변식 한 줄로 박제한다 (§결정 P 진입점 1).
+6. 결정 타당성 — (b) · F1 · P3 · 1 PR 의 근거를 외부 모델도 같은 이유로 지지했다 (P2 이중 변환 · TDB 기준 테스트 파손 · 중간 상태).
+
+### 이견 수용
+
+- 「PR1 전에 확인할 누락 4건」 (CI 브라우저 가드 · `[from, to)` 경계 왕복 · `body-distance` 두 경로 · 바뀐 id 저장 경로). 원안은 앞의 하나만 미확인 축으로 남기고 나머지는 다루지 않았다. 이를 **PR1 착수 전 확인 항목**으로 구현 인계에 넣었다 (§구현 인계). 이 ADR 단계에서 실측으로 닫지 않은 이유: 넷 다 PR1 의 코드 · CI 위에서만 판정할 수 있다 (가드 실발화, 청크 경계 테스트). id 저장 경로는 사전 스캔 0건을 함께 적었다.
+
+### Claude 재분석으로 기각 · 보류한 외부 모델 제안
+
+- **물리 함수 매개변수 이름을 `ttJd` 로 일괄 개명 — 부분 수용.** 물리 함수 본문 변경 0 원칙 (Concrete Prediction) 과 충돌하고, 변이 실측의 파일 목록을 크게 넓힌다. 그래서 새로 만드는 변수와 진입점 지역 변수만 `clockJd` · `ttJd` 로 엄격히 구분하는 컨벤션을 넣었다 (§구현 인계). 기존 이름의 개명은 하지 않는다.
+- **연속식의 분모 `365.2425` (그레고리력 평균년) 제안 — 기각.** 장면 · `@astro-simulator/shared` 가 쓰는 기준 epoch 가 J2000.0 (`J2000_JD` = `2451545.0`) 이다. 그래서 짝이 되는 율리우스년 `365.25` 를 쓴다. 두 분모로 얻는 y 의 차는 1900년에서 `0.0021` 년이다 (월 중순 계단 최대 `0.0078` 년보다 작다).
+
+### 고유 발견 (후속 분리)
+
+- 없음. 외부 모델이 낸 항목은 전부 위 세 분류로 이 ADR 안에서 처리했다. 범위 밖 발견 (계절 투어 장면 지점 ↔ USNO 약 9 h) 은 원안 §비-범위 그대로다.
 
 ### 호출 전 Claude 편향 셀프 체크
 
 - 낙관적 일정 — Concrete Prediction 을 변이 실측 파일 목록으로만 적었다. 통과.
-- 결합 간과 — 자전 · 구름 · 엔진 복귀 재진입 · 초기값 (`newtonLastJd`) 을 변이로 찾았다. **미확인 축**: CI 브라우저 가드 (`verify:*`) 중 고정 시각 장면을 비교하는 것의 기대값 변동 — 변이에서 돌리지 않았다. cross-validate 질문에 넣는다.
+- 결합 간과 — 자전 · 구름 · 엔진 복귀 재진입 · 초기값 (`newtonLastJd`) 을 변이로 찾았다. **미확인 축**: CI 브라우저 가드 (`verify:*`) 중 고정 시각 장면을 비교하는 것의 기대값 변동 — 변이에서 돌리지 않았다. cross-validate 가 같은 축을 독립으로 지적했다 (누락 3). PR1 착수 전 확인 항목 1로 넘겼다.
 - 폐기 프레이밍 — (a) · (c) 를 수치로 기각했다. 통과.
 - 순수주의 — TT ↔ TDB · UT1 실측표를 넣지 않는 쪽을 골랐다 (`< 0.9 s` · `< 2 ms`). 통과.
