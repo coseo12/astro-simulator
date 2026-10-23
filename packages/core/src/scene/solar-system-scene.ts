@@ -16,6 +16,7 @@ import { getSolarSystem, type LoadedCelestialBody } from '../ephemeris/solar-sys
 import type { BootPhaseHook } from '../engine/boot-phase.js';
 import { orbitMu } from '../physics/kepler.js';
 import { elementsAt, parentRelativePositionAt } from '../physics/orbit-elements-at.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { FloatingOrigin } from '../coords/floating-origin.js';
 import { axialToScene, fromSceneZ, toSceneZ } from '../coords/scene-handedness.js';
 import type { Vec3Double } from '../coords/vec3.js';
@@ -261,7 +262,7 @@ export const AMBIENT_UP_DIR = { x: 0, y: 1, z: 0 } as const;
 export interface SolarSystemSceneHandles {
   /** id → 메쉬 */
   meshes: Map<string, Mesh>;
-  /** 주어진 Julian Date 시점으로 모든 천체 위치 갱신 */
+  /** 주어진 Julian Date 시점으로 모든 천체 위치 갱신. 인자는 **장면 시계** JD (#1370 — 위치는 내부에서 TT 로 바꿔 계산한다). */
   updateAt: (julianDate: number) => void;
   /**
    * #1205 — 프레임 위상. 매 프레임 1회, **일시정지에서도** 호출돼야 한다.
@@ -654,7 +655,7 @@ export interface LodBodyInfo {
 export type PhysicsEngineKind = 'kepler' | 'newton' | 'barnes-hut' | 'webgpu' | 'auto';
 
 export interface SolarSystemSceneOptions {
-  /** 초기 시각 (Julian Date). 기본: J2000.0 */
+  /** 초기 시각 (Julian Date, **장면 시계** — #1370). 기본: J2000.0 */
   initialJulianDate?: number;
   /** 궤도선 초기 가시성. 기본: true */
   showOrbitLines?: boolean;
@@ -932,6 +933,9 @@ export function createSolarSystemScene(
   } = options;
   // #1234 C2-H3 — 구간 종료 통지 (미주입 시 호출 0). 이름은 「방금 끝난 구간」이다.
   const phase = (name: string): void => onBootPhase?.(name);
+  // #1370 — `initialJulianDate` 는 장면 시계 (UTC) 다. 위치 · 궤도선 · 띠 epoch · N-body 초기 상태는 TT 로 계산한다
+  // (ADR `20261023-1370` §결정 P 진입점 1 — 초기값). 자전 · 구름은 첫 `updateAt(initialJulianDate)` 가 시계로 쓴다.
+  const initialTtJd = clockJdToTt(initialJulianDate);
   // grMode 우선 — 미지정 시 enableGR (호환) 반영.
   const resolvedGrMode: GrMode = grMode ?? (enableGR ? 'single-1pn' : 'off');
   const SECONDS_PER_DAY = 86_400;
@@ -1555,7 +1559,7 @@ export function createSolarSystemScene(
     earthOrbitLine.color =
       focusedBodyId === 'earth' ? MOON_ORBIT_COLOR_EARTH_FOCUS : MOON_ORBIT_COLOR_DEFAULT;
   };
-  rebuildOrbitLines(initialJulianDate);
+  rebuildOrbitLines(initialTtJd);
   // 궤도선 — body 별 샘플링 (혜성 e≥0.6 은 256 seg) + LineSystem 빌드. 정점 수가 가장 많은 구간.
   phase('scene:orbit-lines');
   disposables.push({
@@ -1982,7 +1986,7 @@ export function createSolarSystemScene(
   if (asteroidBeltAtLoad && asteroidNbody && asteroidBeltN > 0) {
     asteroidBelt = createAsteroidBelt(scene, {
       n: asteroidBeltN,
-      epoch: initialJulianDate,
+      epoch: initialTtJd,
       // P12-A #298 B1 (#998 축 C) — 생성 시점 배치도 프레임 경로와 **동일 SSoT** 로 주입한다.
       // 이전에는 belt 모듈이 자기 init 에서 `1 / AU` 를 하드코딩해 초기 배치가 solar tier 정답의
       // 1/12.566 였다 (덮어쓰기 경로에 의존해야만 화면이 맞는 상태).
@@ -1990,9 +1994,9 @@ export function createSolarSystemScene(
     });
     disposables.push({ dispose: () => asteroidBelt?.dispose() });
   } else if (asteroidBeltAtLoad) {
-    beltParticles = createAsteroidBeltParticles(initialJulianDate);
+    beltParticles = createAsteroidBeltParticles(initialTtJd);
   }
-  if (kuiperBeltAtLoad) kuiperParticles = createKuiperBeltParticles(initialJulianDate);
+  if (kuiperBeltAtLoad) kuiperParticles = createKuiperBeltParticles(initialTtJd);
   // 이견 수용 1 — 장면 dispose 시 메시 · 머티리얼 해제. 지연 생성분도 같은 변수에 담기므로 항상 등록한다.
   disposables.push({
     dispose: () => {
@@ -2217,8 +2221,12 @@ export function createSolarSystemScene(
   // WebGPU의 경우 마지막 readback 캐시 — 1-frame 지연 허용).
   let activeEngine: PhysicsEngineKind = physicsEngine;
   let newtonEngine: NBodyEngine | BarnesHutNBodyEngine | WebGpuNBodyEngine | null = null;
-  let newtonLastJd = initialJulianDate;
-  let currentJd = initialJulianDate;
+  // #1370 척도 불변식 (ADR `20261023-1370` §결정 P 진입점 1): `currentJd` · `newtonLastJd` 는 **TT**, `currentClockJd` 는
+  // **장면 시계** 다. `updateAt` 이 끝나면 `currentJd === clockJdToTt(currentClockJd)`. N-body 전환 (`buildNewton(currentJd)`) 과
+  // Kepler 복귀 (`updateAt(currentClockJd)`) 는 이 두 변수만 읽는다 — 섞으면 ΔT (≈69 s) 가 두 번 더해지거나 빠진다.
+  let newtonLastJd = initialTtJd;
+  let currentJd = initialTtJd;
+  let currentClockJd = initialJulianDate;
   let newtonIdIndex: Map<string, number> | null = null;
   // P4-A #165 — 소행성대가 N-body에 편입된 경우 flat positions 버퍼에서의 시작 인덱스.
   // (행성 개수). belt 미편입 시 -1.
@@ -2281,7 +2289,7 @@ export function createSolarSystemScene(
     newtonIdIndex = null;
   };
   if (physicsEngine === 'newton' || physicsEngine === 'barnes-hut' || physicsEngine === 'webgpu') {
-    buildNewton(initialJulianDate, physicsEngine);
+    buildNewton(initialTtJd, physicsEngine);
   }
   // N-body 엔진 빌드 (kepler 경로면 빈 구간. webgpu 경로는 compute 파이프라인 생성 포함).
   phase('scene:physics-engine');
@@ -2623,17 +2631,23 @@ export function createSolarSystemScene(
     return { pos, vel };
   };
 
-  const updateAt = (jd: number) => {
-    currentJd = jd;
+  /**
+   * 시간 위상 진입점 — 인자는 **장면 시계** JD 다 (`TimeController` · store · URL `t`). #1370 — 위치 계산은 여기서 한 번 바꾼 TT
+   * (`ttJd`) 로 하고, 자전 · 구름 드리프트만 시계 (`clockJd`) 로 한다 (ADR `20261023-1370` §결정 P 진입점 1).
+   */
+  const updateAt = (clockJd: number) => {
+    const ttJd = clockJdToTt(clockJd);
+    currentClockJd = clockJd;
+    currentJd = ttJd;
     if (
       (activeEngine === 'newton' || activeEngine === 'barnes-hut' || activeEngine === 'webgpu') &&
       newtonEngine &&
       newtonIdIndex
     ) {
-      const dtSec = (jd - newtonLastJd) * SECONDS_PER_DAY;
+      const dtSec = (ttJd - newtonLastJd) * SECONDS_PER_DAY;
       if (dtSec !== 0) {
         newtonEngine.advance(dtSec);
-        newtonLastJd = jd;
+        newtonLastJd = ttJd;
       }
       const flat = newtonEngine.positions();
       positionSource = 'nbody';
@@ -2651,7 +2665,7 @@ export function createSolarSystemScene(
         world[2] = flat[3 * idx + 2] ?? 0;
       }
     } else {
-      updateAtKepler(jd);
+      updateAtKepler(ttJd);
       positionSource = 'kepler';
     }
 
@@ -2714,7 +2728,7 @@ export function createSolarSystemScene(
     // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
     syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
     // #1354 결정 V1 — 율 보유 천체 (달) 궤도선을 현재 시각 평균 요소로 (문턱을 넘을 때만 정점 갱신).
-    refreshPrecessingOrbitLines(jd);
+    refreshPrecessingOrbitLines(ttJd);
     // #1341 결정 T3 — trail 정점도 위 mesh 루프와 같은 스냅샷 기준계로 (아래 primary follow 가 origin 을 옮기기 전 값).
     syncTrails(ox, oy, oz, sceneUnitPerMeter);
     // #1341 결정 R2 — 자 선 끝점도 같은 스냅샷 기준계로.
@@ -2731,8 +2745,9 @@ export function createSolarSystemScene(
         const mesh = meshes.get(id);
         if (!mesh || !mesh.rotationQuaternion) continue;
         // host mesh 에 tilt ∘ spin quaternion 직접 (mid variant 는 parent 상속으로 자동 동기 회전).
+        // #1370 — 자전은 장면 시계 (≈ UT1 — 지구 ERA #1362). 위치의 TT 와 섞지 않는다.
         computeSpinQuaternion(
-          jd,
+          clockJd,
           rotationEpoch,
           state,
           tmpSpinQuat,
@@ -2744,7 +2759,7 @@ export function createSolarSystemScene(
       // (`rotationStates.has`). `?rotate=off` 면 이 블록 전체가 skip 되어 구름은 identity 로 남는다
       // (구조적 상속 — 결정적 가드 783 / 1119 / 1202 의 `rotate=off` 전제 보존).
       if (cloudLayer && rotationStates.has(CLOUD_LAYER_BODY_ID)) {
-        applyCloudDrift(cloudLayer, jd, rotationEpoch);
+        applyCloudDrift(cloudLayer, clockJd, rotationEpoch);
       }
       // ring-anchor 동기 — ring disc 를 host 자전에서 격리 (wobble 0). host 의 position/scaling 만
       // 복사 (rotation 제외) → ring 은 host 자전 미상속, tilt 만 (ring disc `rotation.x = RING_DISC_BASE_TILT_X + tiltRad`).
@@ -2871,8 +2886,8 @@ export function createSolarSystemScene(
 
     // 소행성대 업데이트.
     // #1319 — GPU 경로는 시간 uniform 만 갱신한다 (위치는 셰이더, 기준계는 draw 직전 `bodyFrame` 읽기).
-    beltParticles?.updateAt(jd);
-    kuiperParticles?.updateAt(jd);
+    beltParticles?.updateAt(ttJd);
+    kuiperParticles?.updateAt(ttJd);
     // P4-A #165 — N-body 편입 경로: 엔진이 이미 advance 됐으니 flat positions에서 읽어 ThinInstance에 반영.
     // 그 외(`?beltNbody=1` + Kepler 엔진): 기존 해석해 경로 유지.
     if (asteroidBelt) {
@@ -2886,7 +2901,7 @@ export function createSolarSystemScene(
         const flat = newtonEngine.positions();
         asteroidBelt.writeWorldPositions(flat, asteroidStartIndex, asteroidBelt.n, bodyFrame);
       } else {
-        asteroidBelt.updateAt(jd, bodyFrame);
+        asteroidBelt.updateAt(ttJd, bodyFrame);
       }
     }
   };
@@ -3649,7 +3664,9 @@ export function createSolarSystemScene(
     // (b) 구름 상대 자전 즉시 동기 — 드리프트는 시간 위상 (`updateAt`) 에만 있어 일시정지 중 켜면 identity
     //     로 남는다 (#1205 클래스 — ADR 1205 §결정 2). 게이트는 `updateAt` 과 같은 `rotationStates.has`.
     //     가시성 (`isVisible`) 은 프레임 위상 (`runFramePass`) 이 렌더 직전 매 프레임 쓰므로 여기서 불요.
-    if (rotationStates.has(CLOUD_LAYER_BODY_ID)) applyCloudDrift(layer, currentJd, rotationEpoch);
+    // #1370 — 구름 드리프트는 자전과 같은 장면 시계 (`currentClockJd`).
+    if (rotationStates.has(CLOUD_LAYER_BODY_ID))
+      applyCloudDrift(layer, currentClockJd, rotationEpoch);
     // (c) #1360 PR3 — 새 구름 머티리얼은 그림자 없음 기본값으로 생긴다. 일식 uniform 갱신은 시간 위상 (`updateAt`) 에만 있어
     //     일시정지 중 켜면 다음 시각 변경까지 구름이 그림자 위에서 밝게 남는다 — 지금 쓴다 (위 (b) 와 같은 #1205 클래스).
     //     로드 경로 (`enableClouds` 직접 호출) 는 그 뒤 첫 `updateAt` 이 쓴다.
@@ -3692,7 +3709,8 @@ export function createSolarSystemScene(
     // 경로 재사용 — 새 기준계 없음). 이것이 없으면 일시정지 중 복귀에서 `worldPositions` 가 N-body 물리 위치 (위성 시각
     // 배율 미적용, ADR 1341 1-A) 로 남아, trail 머리 (= 그 값) 와 몸통 (Kepler × 시각 배율) 이 다른 모델에서 나온다 —
     // 위성 첫 선분이 정상의 90 ~ 313 배 (리뷰 실측). 재생 중이면 다음 tick 이 같은 일을 하므로 결과가 같다.
-    if (effective === 'kepler' && previousEngine !== 'kepler') updateAt(currentJd);
+    // #1370 — `updateAt` 인자는 장면 시계다 (`currentJd` 는 TT — 넘기면 ΔT 가 두 번 더해진다).
+    if (effective === 'kepler' && previousEngine !== 'kepler') updateAt(currentClockJd);
     // #1341 결정 T8 — N-body 엔진이면 trail 을 끄고, Kepler 로 돌아오면 사용자 의도대로 다시 켠다 (명령 경로).
     applyTrailsEnabled();
   };

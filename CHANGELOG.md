@@ -5,6 +5,21 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Fixed
+
+- **[#1370] 천체 위치 계산에 ΔT (역학시) 를 적용했다** ([#1370](https://github.com/coseo12/astro-simulator/issues/1370)). 위치 식 (Kepler 요소 · 달 B9 · N-body 초기 상태 · 사건 판정) 의 시각 인자는 역학시 (TT) 인데, 장면 시계 (UTC) JD 를 그대로 넣어 위치가 ΔT (2017 이후 `69.184 s`) 만큼 늦었다. 지구 자전 (#1362) 은 시계를 UT1 로 쓰므로 맞았다 — 한 장면 안에서 위치와 자전이 다른 시각척도를 썼다. ADR [`20261023-1370`](docs/decisions/20261023-1370-delta-t-dynamical-time.md).
+  - 신규 모듈 `packages/core/src/time/delta-t.ts` — `ttMinusClockSeconds` · `clockJdToTt` · `ttJdToClock` (core 루트 named export). 1972-01-01 이후 = `32.184 s` + 윤초 표 (IERS Bulletin C · IANA `leap-seconds.list`, 만료 2027-06-28), 1900~1972 = Espenak–Meeus 다항식, 표 이후 = `69.184 s` 상수, 1900 이전 = 1900.0 값.
+  - 변환은 진입점 3곳에서 한 번씩 한다 — 장면 `updateAt` · `computeEventsForKind` · web `body-distance` (`resolveBodyChain`). 물리 함수 본문은 바뀌지 않았다. 자전 · 구름 드리프트 · N-body → Kepler 복귀 재진입은 시계를 쓴다.
+  - 일식 그림자 지표 교점의 ΔT 축 잔차 (NASA 최대식 순간 · 같은 자전에서 위치 시각만 바꿈, 위치를 TD 로 계산한 교점까지): 2024-04-08 `72.61 → 0.017 km`, 2017-08-21 `68.52 → 0.785 km` (2017 잔차는 NASA 가 가정한 ΔT `68.4 s` 와 TT − UTC `69.184 s` 의 차). 측정: macOS · Node 24.14.0 · 이 PR 의 `packages/core/dist`.
+  - 사건 파일 `time-events.json` 을 다시 만들었다. TT 시각은 1,510건 모두 비트 그대로이고 (`clockJdToTt(새 시각) === 이전 시각`), 종류별 건수 · 식 종류는 바뀌지 않았다.
+  - NASA (TD) · JPL Horizons (TDB) 대조 테스트는 모델 사건 시각을 `clockJdToTt` 로 옮겨 같은 척도로 비교한다. `EVENT_KIND_TOLERANCE_DAYS` 는 바뀌지 않았다.
+
+### Behavior Changes
+
+- **사건 시각이 최대 약 69 s 이르게 표시된다** (#1370). 사건 패널 · 투어 · URL `t` 의 사건 시각은 장면 시계 (UTC) 다. 2017 이후 사건은 `69.2 s` 이르고 (예: 2024-04-08 개기일식 `17:56:58 → 17:55:49 UTC`), 1900년대 초 사건은 ΔT 가 음수라 최대 `2.2 s` 늦다. 종류별 범위는 PR 본문 표.
+- **사건 id 2건의 날짜가 바뀌었다** (#1370 — ADR Q5) — `solar-eclipse:1997-09-02 → 1997-09-01`, `lunar-eclipse:1996-04-04 → 1996-04-03`. 둘 다 UTC 자정 직후 (`00:00:16` · `00:00:27`) 사건이라 69 s 앞당기면 전날이 된다. 코드 · 투어 · URL 어디에도 두 id 를 참조하는 곳이 없다.
+- **같은 시계 시각의 천체 위치가 ΔT 만큼 앞으로 간다** (#1370). 장면 · 정보 카드 · 거리 자가 모두 TT 위치를 쓴다. 자전 (지표 경도) 은 바뀌지 않았다.
+
 ## [0.105.0] - 2026-10-23
 
 ### Added

@@ -17,6 +17,7 @@ import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArcRotateCamera, Constants, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { toSceneZ } from '../coords/scene-handedness.js';
+import { clockJdToTt } from '../time/delta-t.js';
 import { createSolarSystemScene, type SolarSystemSceneHandles } from './solar-system-scene.js';
 import { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
 import {
@@ -124,8 +125,15 @@ function headMismatches(f: Fixture): string[] {
 /**
  * 기대 world 정점 (m) — 같은 (jd, 방향) 로 샘플러를 장면과 독립으로 부른다. 모체 world = 0 으로 두므로 **태양 직속**
  * 천체에만 유효하다 (Kepler 경로에서 태양 world = 원점). 머리는 비교에 쓰지 않는다.
+ *
+ * #1370 — `clockJd` 는 `updateAt` 에 넘긴 장면 시계다. 샘플러는 물리 함수라 TT (`clockJdToTt`) 로 부른다 (장면과 같은 변환).
  */
-function expectedSunChildWorld(f: Fixture, jd: number, direction: TrailDirection): Float64Array {
+function expectedSunChildWorld(
+  f: Fixture,
+  clockJd: number,
+  direction: TrailDirection,
+): Float64Array {
+  const jd = clockJdToTt(clockJd);
   const specs = f.handles.getTrailBodySpecs();
   const world = new Float64Array(3 * trailVertexCount(specs));
   let offset = 0;

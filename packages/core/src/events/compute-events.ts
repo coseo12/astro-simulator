@@ -3,6 +3,7 @@ import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { ChainBody } from '../physics/body-chain.js';
 import { heliocentricPositionAt, resolveBodyChainPosition } from '../physics/body-chain.js';
 import { meanAnomalyAt, orbitMu } from '../physics/kepler.js';
+import { clockJdToTt, ttJdToClock } from '../time/delta-t.js';
 import { isoToJulianDate, julianDateToIso } from '../time/julian-date.js';
 import {
   lunarEclipseGeometry,
@@ -21,6 +22,10 @@ import type { EventKindDef, EventKindId } from './event-kinds.js';
  *
  * 분기는 계산 유형 (`EventComputation.type`) 뿐이다 — 종류 id 로 분기하지 않는다 (ADR §Concrete Prediction). #1354 가
  * 유형 `syzygy-eclipse` (지구 중심 삭망 + 그림자 판정 — 일식 · 월식) 를 더했다 (ADR `20261017-1354-...` 결정 E1).
+ *
+ * #1370 — 시각척도. 이 파일의 내부 함수 (`heliocentricAlignmentTimes` · `perihelionTimes` · `syzygyTimes` · `eclipseEvents` ·
+ * `greatestEclipseNear` 등) 는 물리 함수라 시각 인자 · 반환이 **TT JD** 다. 장면 시계 ↔ TT 변환은 진입점
+ * {@link computeEventsForKind} 한 곳에서만 한다 (ADR `20261023-1370` §결정 P 진입점 2).
  */
 
 const TWO_PI = Math.PI * 2;
@@ -45,7 +50,10 @@ export interface AstroEvent {
   id: string;
   kind: EventKindId;
   subjectId: string;
-  /** 사건 시각 `t*` (JD, UTC 해석 — 앱 `dateToJulianDate` 와 같다). */
+  /**
+   * 사건 시각 `t*` (JD, **장면 시계** — UTC 해석, 앱 `dateToJulianDate` 와 같다). #1370 — 모델은 TT 로 계산하고 시계로 되돌린 값이다.
+   * NASA (TD) · JPL (TDB) 와 비교할 때는 `clockJdToTt` 로 옮긴다.
+   */
   julianDate: number;
   /** 식 종류 (#1354 결정 E3) — `syzygy-eclipse` 계산 유형에만 있다. */
   eclipseType?: EclipseType;
@@ -398,6 +406,10 @@ export function eventDateIso(julianDate: number): string {
 
 /**
  * 한 종류의 사건 목록 (시각 오름차순). 범위는 `[startJd, endJd)` 와 종류의 `window` 의 교집합.
+ *
+ * #1370 — 시각 인자 · 범위 · 결과 `julianDate` 는 모두 **장면 시계** JD 다. 범위를 TT 로 옮겨 내부 함수를 부르고, 결과를
+ * `ttJdToClock` 으로 되돌린다. id 날짜도 되돌린 시계 시각으로 만든다. 청크 경계 `B` 는 양쪽 청크가 같은 `clockJdToTt(B)` 로
+ * 옮기므로 TT 범위도 빈틈 · 겹침 없이 이어진다 (이음 붙인 청크 == 전 범위 — `compute-events.test.ts`).
  */
 export function computeEventsForKind(
   bodiesById: ReadonlyMap<string, EventBody>,
@@ -405,32 +417,44 @@ export function computeEventsForKind(
   startJd: number,
   endJd: number,
 ): AstroEvent[] {
-  const from = kind.window
+  const fromClockJd = kind.window
     ? Math.max(startJd, isoToJulianDate(`${kind.window.start}T00:00:00Z`))
     : startJd;
-  const to = kind.window ? Math.min(endJd, isoToJulianDate(`${kind.window.end}T00:00:00Z`)) : endJd;
-  if (!(from < to)) return [];
+  const toClockJd = kind.window
+    ? Math.min(endJd, isoToJulianDate(`${kind.window.end}T00:00:00Z`))
+    : endJd;
+  if (!(fromClockJd < toClockJd)) return [];
+  const fromTtJd = clockJdToTt(fromClockJd);
+  const toTtJd = clockJdToTt(toClockJd);
 
   const computation = kind.computation;
-  if (computation.type === 'syzygy-eclipse') {
-    return eclipseEvents(bodiesById, kind.subjectId, computation.phase, from, to).map((e) => ({
-      id: `${kind.id}:${eventDateIso(e.julianDate)}`,
+  // 내부 함수 결과 (TT) — 식이면 식 종류를 함께 든다. `eclipseEvents` 는 식인 것만 돌려준다 (type 은 null 이 아니다).
+  const found: { ttJd: number; eclipseType?: EclipseType }[] =
+    computation.type === 'syzygy-eclipse'
+      ? eclipseEvents(bodiesById, kind.subjectId, computation.phase, fromTtJd, toTtJd).map((e) => ({
+          ttJd: e.julianDate,
+          eclipseType: e.type!,
+        }))
+      : (computation.type === 'perihelion'
+          ? perihelionTimes(bodiesById, kind.subjectId, fromTtJd, toTtJd)
+          : heliocentricAlignmentTimes(
+              bodiesById,
+              kind.subjectId,
+              computation.referenceId,
+              fromTtJd,
+              toTtJd,
+            )
+        ).map((ttJd) => ({ ttJd }));
+
+  return found.map(({ ttJd, eclipseType }) => {
+    const clockJd = ttJdToClock(ttJd);
+    const event: AstroEvent = {
+      id: `${kind.id}:${eventDateIso(clockJd)}`,
       kind: kind.id,
       subjectId: kind.subjectId,
-      julianDate: e.julianDate,
-      // `eclipseEvents` 는 식인 것만 돌려준다 — type 은 null 이 아니다.
-      eclipseType: e.type!,
-    }));
-  }
-  const times =
-    computation.type === 'perihelion'
-      ? perihelionTimes(bodiesById, kind.subjectId, from, to)
-      : heliocentricAlignmentTimes(bodiesById, kind.subjectId, computation.referenceId, from, to);
-
-  return times.map((julianDate) => ({
-    id: `${kind.id}:${eventDateIso(julianDate)}`,
-    kind: kind.id,
-    subjectId: kind.subjectId,
-    julianDate,
-  }));
+      julianDate: clockJd,
+    };
+    if (eclipseType !== undefined) event.eclipseType = eclipseType;
+    return event;
+  });
 }
