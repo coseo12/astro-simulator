@@ -107,13 +107,16 @@ await withBrowser({}, async (browser) => {
     check('research 모드 클릭 시 data-mode 갱신', false, 'research 버튼 없음');
   }
 
-  // education 비활성 확인
+  // #1390 PR1 — education 활성 (가이드 투어). sandbox 는 여전히 비활성.
   const educationBtn = await page.$('[data-testid="mode-education"]');
-  if (educationBtn) {
-    const disabled = await educationBtn.isDisabled();
-    check('education 모드는 P1에서 비활성', disabled);
+  const sandboxBtn = await page.$('[data-testid="mode-sandbox"]');
+  if (educationBtn && sandboxBtn) {
+    check(
+      'education 모드 활성 · sandbox 비활성',
+      !(await educationBtn.isDisabled()) && (await sandboxBtn.isDisabled()),
+    );
   } else {
-    check('education 모드는 P1에서 비활성', false, '버튼 없음');
+    check('education 모드 활성 · sandbox 비활성', false, '버튼 없음');
   }
 
   // TimeControls 검증

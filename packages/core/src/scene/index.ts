@@ -7,6 +7,9 @@
 
 export {
   setupArcRotateCamera,
+  // #1390 Amendment 1 — 앱 첫 화면 시점 각 (`ecliptic-oblique` 시점의 SSoT).
+  DEFAULT_CAMERA_ALPHA,
+  DEFAULT_CAMERA_BETA,
   ZOOM_DELTA_PERCENTAGE,
   PANNING_DELTA_PERCENTAGE,
   WASD_DELTA_PERCENTAGE,
@@ -23,8 +26,10 @@ export {
   // #790 — focus body 시각 반경 기반 lowerRadiusLimit 하한 (mesh 내부 진입 암전 차단).
   FOCUS_LOWER_RADIUS_SURFACE_MARGIN,
   computeFocusLowerRadiusFloor,
+  // #1390 Amendment 1 — 고정 시점 각 → `viewDirection`.
+  arcAnglesToViewDirection,
 } from './camera-controller.js';
-export type { FocusTarget } from './camera-controller.js';
+export type { FocusTarget, ViewDirectionLike } from './camera-controller.js';
 // R4 #539 Amendment 3 — satellite focus multiplier 분기 SSoT.
 export {
   FOCUS_USER_RADIUS_MULTIPLIER_SATELLITE,

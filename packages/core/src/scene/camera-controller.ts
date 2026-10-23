@@ -2,6 +2,7 @@ import {
   Animation,
   EasingFunction,
   ExponentialEase,
+  Matrix,
   Vector3,
   type ArcRotateCamera,
   type Mesh,
@@ -159,14 +160,28 @@ export interface FocusTarget {
    * #1360 PR2 결정 C3 (ADR 1354 Q-S Amendment) — 시점 방향: 대상 → 카메라 world 방향 (정규화 불요). 주면 카메라 `alpha` ·
    * `beta` 도 같은 전환 시간으로 그 방향에 맞춘다 (`alpha` 는 짧은 쪽으로 돈다). 생략하면 현행대로 시점 각을 유지한다.
    */
-  viewDirection?: Vector3;
+  viewDirection?: ViewDirectionLike;
+  /**
+   * #1390 PR3 (ADR `20261021-1390` Amendment 2) — 화면 위로 둘 world 방향 (정규화 불요). 주면 카메라 `upVector` 를 그 방향으로
+   * 바꾸고 `alpha` · `beta` 를 그 축 기준으로 다시 센다 (카메라 위치는 그대로 — 화면 롤만 바뀐다). 생략하면 장면 기본 위 방향 (+Y)
+   * 으로 되돌린다. 시점 방향과 평행하면 화면 위가 정의되지 않으므로 호출자가 평행하지 않은 방향을 준다.
+   */
+  viewUp?: ViewDirectionLike;
 }
+
+/** 장면 기본 위 방향 — `setupArcRotateCamera` (Babylon `ArcRotateCamera` 기본 `upVector`). */
+const DEFAULT_VIEW_UP: ViewDirectionLike = { x: 0, y: 1, z: 0 };
+/** 위 방향 비교 허용 오차 (단위 벡터 성분차) — 같으면 `upVector` 를 다시 쓰지 않는다. */
+const VIEW_UP_EPSILON = 1e-12;
 
 /** 시점 방향 → ArcRotate 각. `beta` 는 카메라 한계로 자른다 (극 방향이면 `alpha` 는 정의상 임의 — 현재 값을 유지). */
 export interface ArcAngles {
   alpha: number;
   beta: number;
 }
+
+/** 시점 방향 — Babylon `Vector3` 또는 같은 모양의 평범한 객체. */
+export type ViewDirectionLike = { readonly x: number; readonly y: number; readonly z: number };
 
 const TWO_PI = Math.PI * 2;
 /** 극 방향 판정 — 수평 성분이 이보다 작으면 `alpha` 를 바꾸지 않는다 (atan2(0, 0) 회피). */
@@ -178,7 +193,7 @@ const POLAR_HORIZONTAL_EPSILON = 1e-9;
  * `alpha` 는 `currentAlpha` 에서 짧은 쪽으로 도는 값 (`|Δ| ≤ π`) 을 돌려준다 — 전환 애니메이션이 한 바퀴 돌지 않게.
  */
 export function viewDirectionToArcAngles(
-  dir: { readonly x: number; readonly y: number; readonly z: number },
+  dir: ViewDirectionLike,
   currentAlpha: number,
   lowerBetaLimit: number | null,
   upperBetaLimit: number | null,
@@ -197,6 +212,31 @@ export function viewDirectionToArcAngles(
   if (delta > Math.PI) delta -= TWO_PI;
   if (delta <= -Math.PI) delta += TWO_PI;
   return { alpha: currentAlpha + delta, beta };
+}
+
+/**
+ * #1390 PR3 — world 방향 → 카메라 위 방향 기준 프레임 (`up` 이 +Y 가 되는 회전). Babylon `ArcRotateCamera` 가 `upVector` 를
+ * 다룰 때 쓰는 회전 (`Matrix.RotationAlignToRef(up, +Y)` — `_upToYMatrix`) 과 같은 식이라, 결과에 {@link viewDirectionToArcAngles}
+ * 를 쓰면 그 `upVector` 의 `alpha` · `beta` 가 된다. 기본 위 방향 (+Y) 이면 입력을 그대로 돌려준다 (종전 경로 — 값 불변).
+ */
+export function toCameraUpFrame(dir: ViewDirectionLike, up: ViewDirectionLike): ViewDirectionLike {
+  if (up.x === 0 && up.y === 1 && up.z === 0) return dir;
+  const m = new Matrix();
+  Matrix.RotationAlignToRef(new Vector3(up.x, up.y, up.z).normalize(), Vector3.Up(), m);
+  return Vector3.TransformNormal(new Vector3(dir.x, dir.y, dir.z), m);
+}
+
+/**
+ * #1390 Amendment 1 — ArcRotate 각 → 시점 방향 (대상 → 카메라, 단위 벡터). {@link viewDirectionToArcAngles} 의 역이다 (같은 위치식).
+ * 고정 시점 각 (예: 앱 첫 화면 각) 을 `viewDirection` 계약으로 넘길 때 쓴다.
+ */
+export function arcAnglesToViewDirection(angles: ArcAngles): ViewDirectionLike {
+  const sinBeta = Math.sin(angles.beta);
+  return {
+    x: Math.cos(angles.alpha) * sinBeta,
+    y: Math.cos(angles.beta),
+    z: Math.sin(angles.alpha) * sinBeta,
+  };
 }
 
 /**
@@ -306,6 +346,8 @@ export class CameraController {
    */
   focusOn(target: FocusTarget): void {
     const { mesh } = target;
+    // #1390 PR3 — 위 방향을 먼저 맞춘다 (아래 시점 방향 → 각 환산이 그 축 기준이다). 생략 = 기본 (+Y) 복원.
+    this.#applyViewUp(target.viewUp);
     // #378 옵션 B (defense-in-depth) — boundingInfo 명시 갱신.
     // mesh.scaling 이 setTier 등에서 갱신된 직후 boundingSphere.radiusWorld 가 다음 frame 의
     // world matrix 갱신 전까지 잔존 값을 반환하는 timing race 방지. focusOn 호출자
@@ -387,39 +429,79 @@ export class CameraController {
     );
 
     // #1360 PR2 결정 C3 — 선택적 시점 방향. 같은 전환 시간 · easing 으로 alpha · beta 를 맞춘다.
-    if (target.viewDirection) {
-      const angles = viewDirectionToArcAngles(
-        target.viewDirection,
-        this.camera.alpha,
-        this.camera.lowerBetaLimit,
-        this.camera.upperBetaLimit,
+    if (target.viewDirection) this.#animateViewDirection(target.viewDirection);
+  }
+
+  /**
+   * #1390 PR3 — 카메라 `upVector` 를 `up` (생략 = 기본 +Y) 으로 둔다. 이미 같으면 아무것도 하지 않는다 — 기본 위 방향만 쓰는 경로
+   * (`from-sun` 을 거치지 않은 모든 포커스 · reset) 는 `upVector` 를 한 번도 쓰지 않아 종전과 같다.
+   *
+   * Babylon `upVector` 는 값만 바꾸면 같은 `alpha` · `beta` 가 새 축 기준으로 읽혀 카메라가 튄다. 그래서 바꾼 직후
+   * `rebuildAnglesAndRadius` 로 **현재 위치를 고정한 채** 각을 다시 센다 — 화면의 롤만 바뀐다.
+   */
+  #applyViewUp(up: ViewDirectionLike | undefined): void {
+    const want = up ?? DEFAULT_VIEW_UP;
+    const len = Math.hypot(want.x, want.y, want.z);
+    if (!(len > 0)) return;
+    const cur = this.camera.upVector;
+    if (
+      Math.abs(cur.x - want.x / len) < VIEW_UP_EPSILON &&
+      Math.abs(cur.y - want.y / len) < VIEW_UP_EPSILON &&
+      Math.abs(cur.z - want.z / len) < VIEW_UP_EPSILON
+    ) {
+      return;
+    }
+    // 기본 복원은 정확히 (0, 1, 0) 으로 쓴다 — Babylon 은 성분 정확 비교로 「기본 축」 경로를 고른다.
+    this.camera.upVector =
+      up === undefined ? Vector3.Up() : new Vector3(want.x / len, want.y / len, want.z / len);
+    this.camera.rebuildAnglesAndRadius();
+  }
+
+  /** 시점 방향 (대상 → 카메라) 으로 alpha · beta 를 전환 시간 · easing 에 맞춰 옮긴다. 방향이 영벡터면 아무것도 하지 않는다. */
+  #animateViewDirection(viewDirection: ViewDirectionLike): void {
+    const angles = viewDirectionToArcAngles(
+      toCameraUpFrame(viewDirection, this.camera.upVector),
+      this.camera.alpha,
+      this.camera.lowerBetaLimit,
+      this.camera.upperBetaLimit,
+    );
+    if (!Number.isFinite(angles.beta)) return;
+    for (const [name, from, to] of [
+      ['alpha', this.camera.alpha, angles.alpha],
+      ['beta', this.camera.beta, angles.beta],
+    ] as const) {
+      Animation.CreateAndStartAnimation(
+        `cam-${name}`,
+        this.camera,
+        name,
+        FRAMES_PER_SECOND,
+        (TRANSITION_MS / 1000) * FRAMES_PER_SECOND,
+        from,
+        to,
+        Animation.ANIMATIONLOOPMODE_CONSTANT,
+        this.#easing,
       );
-      if (Number.isFinite(angles.beta)) {
-        for (const [name, from, to] of [
-          ['alpha', this.camera.alpha, angles.alpha],
-          ['beta', this.camera.beta, angles.beta],
-        ] as const) {
-          Animation.CreateAndStartAnimation(
-            `cam-${name}`,
-            this.camera,
-            name,
-            FRAMES_PER_SECOND,
-            (TRANSITION_MS / 1000) * FRAMES_PER_SECOND,
-            from,
-            to,
-            Animation.ANIMATIONLOOPMODE_CONSTANT,
-            this.#easing,
-          );
-        }
-      }
     }
   }
 
-  /** 카메라 reset — 기본 위치로 복귀 */
-  reset(targetRadius = 35, target: Vector3 = Vector3.Zero()): void {
+  /**
+   * 카메라 reset — 기본 위치로 복귀.
+   *
+   * #1390 Amendment 1 — `viewDirection` 을 주면 alpha · beta 도 같은 전환으로 그 방향에 맞춘다 (`focusOn` 의 `viewDirection` 과
+   * 같은 계약). 생략하면 현행대로 alpha · beta 를 애니메이션하지 않는다 — 관찰 · 연구 모드의 reset 은 인자를 주지 않는다.
+   * 생략이 시점 각 보존을 뜻하지는 않는다 — target tween 이 Babylon `setTarget` (`rebuildAnglesAndRadius`) 을 거쳐 카메라 위치를
+   * 고정한 채 각을 다시 셈하므로, 화면의 각은 직전 카메라 위치가 정한다 (PR #1396 리뷰 실측).
+   */
+  reset(
+    targetRadius = 35,
+    target: Vector3 = Vector3.Zero(),
+    viewDirection?: ViewDirectionLike,
+  ): void {
     // R-Phase #507 — focus 해제 시 follow observer detach. observer 잔존 시 Animation 의
     // target=(0,0,0) 을 매 프레임 mesh 위치로 덮어써 reset 자체가 무효화됨.
     this.#detachFollow();
+    // #1390 PR3 — 개요는 기본 위 방향 (+Y) 이다 (`viewDirection` 각도 그 축 기준 — `DEFAULT_CAMERA_*`).
+    this.#applyViewUp(undefined);
 
     Animation.CreateAndStartAnimation(
       'cam-reset-target',
@@ -443,6 +525,7 @@ export class CameraController {
       Animation.ANIMATIONLOOPMODE_CONSTANT,
       this.#easing,
     );
+    if (viewDirection) this.#animateViewDirection(viewDirection);
   }
 
   dispose(): void {

@@ -51,8 +51,22 @@ export type EventFilterId =
  * #1360 PR2 결정 C3 (ADR 1354 Q-S Amendment) — 선택 시 카메라 시점. `facing-parent` = 포커스 천체의 모체 쪽 반구를 본다 — 월식은
  * 달의 지구 쪽 반구, 일식 (PR3 — 포커스 천체 = 지구 · 모체 = 태양) 은 지구의 태양 쪽 반구 (그림자가 그 반구에 떨어진다). 웹 레이어가
  * 장면 메시에서 방향을 만들어 `FocusTarget.viewDirection` 으로 넘긴다.
+ *
+ * `from-sun` (#1390 PR3 — 교육 투어 T3 계절) = 태양 → 대상 직선 위에서 대상을 본다 (기울기 없음 — 원반 중심 = 태양 직하점). 화면 위는
+ * 황도 북극이다 (`FocusTarget.viewUp` — ADR `20261021-1390` Amendment 2). 상대 시점이라 대상 천체가 있어야 한다.
  */
-export type EventFocusView = 'facing-parent';
+export type EventFocusView = 'facing-parent' | 'ecliptic-oblique' | 'from-sun';
+
+/**
+ * #1390 Amendment 1 — 대상과 무관한 **절대 방향** 시점. `ecliptic-oblique` = 앱 첫 화면과 같은 시점 각 (황도 북쪽 위에서 비스듬히
+ * 내려다봄 — 각의 SSoT 는 `scene` 의 `DEFAULT_CAMERA_ALPHA` · `DEFAULT_CAMERA_BETA`). 대상이 없어도 방향이 정해지므로 개요
+ * (태양 중심 — `resetCamera`) 에도 쓸 수 있다. 상대 시점 (`facing-parent` · PR3 의 `from-sun`) 은 대상 천체가 있어야 한다.
+ */
+export const ABSOLUTE_FOCUS_VIEWS: readonly EventFocusView[] = ['ecliptic-oblique'];
+
+export function isAbsoluteFocusView(view: EventFocusView): boolean {
+  return ABSOLUTE_FOCUS_VIEWS.includes(view);
+}
 
 export interface EventKindDef {
   id: EventKindId;

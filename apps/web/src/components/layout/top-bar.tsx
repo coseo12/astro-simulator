@@ -21,34 +21,54 @@ const OVERFLOW_MENU_DISABLED_QUERY = '(min-width: 640px)';
  * #1281 — 천체 메뉴가 열려 있는 동안도 같은 이유로 숨기지 않는다 (계약 D7). 터치(`pointerdown`)도 활동으로 센다
  *   (`use-mouse-inactivity.ts`).
  * #1313 — 모바일(`max-sm`) 에서는 우측 그룹을 「⋯」 버튼 뒤 패널로 접는다. 열린 동안도 숨기지 않는다.
+ * #1390 PR0 — 모바일 모드 메뉴 (`mode-switcher.tsx`) 가 열린 동안도 숨기지 않는다 (천체 메뉴 D7 과 같은 이유).
  */
 export function TopBar({ left, right }: { left?: ReactNode; right?: ReactNode }) {
   const mode = useSimStore((s) => s.mode);
   const displayPanelOpen = useSimStore((s) => s.displayPanelOpen);
   const bodyMenuOpen = useSimStore((s) => s.bodyMenuOpen);
+  const modeMenuOpen = useSimStore((s) => s.modeMenuOpen);
   const inactive = useMouseInactivity(AUTO_HIDE_INACTIVITY_MS);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowToggleRef = useRef<HTMLButtonElement | null>(null);
   const rightGroupId = useId();
   const hidden =
-    mode === 'observe' && inactive && !displayPanelOpen && !bodyMenuOpen && !overflowOpen;
+    mode === 'observe' &&
+    inactive &&
+    !displayPanelOpen &&
+    !bodyMenuOpen &&
+    !modeMenuOpen &&
+    !overflowOpen;
 
   const closeOverflow = useCallback((restoreFocus: boolean) => {
     setOverflowOpen(false);
     if (restoreFocus) overflowToggleRef.current?.focus();
   }, []);
 
+  // #1390 PR1 — 모드 메뉴가 열리면 「⋯」 패널을 닫는다 (PR0 qa 관찰 — 375 에서 두 패널이 화면상 겹쳤다). 반대 방향 (모드 메뉴가 열린
+  // 채 「⋯」) 은 모드 메뉴의 바깥 pointerdown 이 이미 닫는다. 포커스는 옮기지 않는다 — 모드 메뉴가 자기 항목으로 가져간다. Esc 순서는
+  // 그대로다: 겹칠 일이 없으니 모드 메뉴 Esc 가 먼저이고 「⋯」 Esc 는 열려 있지 않다.
+  useEffect(() => {
+    // 외부 store (모드 메뉴 열림) 에 맞춰 로컬 패널을 닫는 동기화 — 결과가 트리거를 다시 바꾸지 않아 연쇄 없음.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (modeMenuOpen) setOverflowOpen(false);
+  }, [modeMenuOpen]);
+
   // 열린 동안만 전역 리스너 — Esc (capture) · 캔버스 pointerdown · sm 이상으로 넓어짐.
   useEffect(() => {
     if (!overflowOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      // 위에 떠 있는 것이 먼저 닫힌다 — 모달 · 표시 패널 · 천체 메뉴가 열려 있으면 그쪽 Esc 에 양보한다. 이 리스너는
+      // 위에 떠 있는 것이 먼저 닫힌다 — 모달 · 표시 패널 · 천체 메뉴 · 모드 메뉴 (#1390) 가 열려 있으면 그쪽 Esc 에 양보한다. 이 리스너는
       // 그것들보다 먼저 열려 먼저 등록되므로 (같은 window capture) 순서가 아니라 상태로 물러난다.
       const st = useSimStore.getState();
       if (
         st.displayPanelOpen ||
         st.bodyMenuOpen ||
+        // #1390 PR1 이후 이 항은 현행 UI 경로로는 도달하지 않는다 — 모드 메뉴가 열리면 위 effect 가 「⋯」 를 닫아 이 리스너가
+        // 해제되고, 모드 메뉴가 열린 채 「⋯」 를 누르면 모드 메뉴의 바깥 pointerdown 이 먼저 닫는다. 그래도 남긴다: 「위에 뜬
+        // 팝업에 양보」 목록에서 하나만 빠지면, 닫기 effect 가 없어지는 날 Esc 1회가 두 패널을 함께 닫는 순서 결함이 조용히 돌아온다.
+        st.modeMenuOpen ||
         document.querySelector('[data-modal-open="true"]')
       ) {
         return;

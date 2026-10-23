@@ -5,10 +5,13 @@ import {
   scene as sceneApi,
   gpu as gpuApi,
   coords as coordsApi,
+  isAbsoluteFocusView,
   isRPhaseFocusable,
+  type EventFocusView,
 } from '@astro-simulator/core';
+import type { FocusTarget, ViewDirectionLike } from '@astro-simulator/core/scene';
 // #713 — canvas 클릭/터치 picking. PointerEventTypes 는 web Babylon (^9) 에서 직접 import.
-import { PointerEventTypes } from '@babylonjs/core';
+import { PointerEventTypes, Vector3 } from '@babylonjs/core';
 import type { Tier } from '@astro-simulator/core/scene';
 import type {
   BodyScreenInfoFn,
@@ -46,7 +49,7 @@ import {
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 import { SimCommandProvider } from '@/core/sim-context';
 import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
-import { useSimStore } from '@/store/sim-store';
+import { useSimStore, type FocusViewRequest } from '@/store/sim-store';
 import { isFocusInExpandedPopup } from '@/lib/expanded-popup';
 import { getBodyScale, getBodyScaleForP, DEFAULT_BODY_SCALE_P } from '@/constants/body-scale';
 import { parseBodyScaleP } from '@/core/parse-body-scale-p';
@@ -171,9 +174,10 @@ export function shouldPreserveFocus(active: HTMLElement): boolean {
   // 모달 열림 중에는 캔버스가 포커스를 가져가면 focus trap 이 무의미해진다 (#848 모달 계약).
   if (active.closest('[data-modal-open="true"]') !== null) return true;
   // #1380 — 펼쳐진 비모달 팝업의 트리거 또는 본체 안 포커스는 **입력 방식과 무관하게** 보존한다. 판정은 ARIA 계약만 보므로
-  // 대상은 넷이다 — 사건 패널 · 표시 패널 · 천체 메뉴 · 상단 「⋯」 오버플로 (`top-bar.tsx`, 640px 미만). 앞 셋은 「포커스가
-  // 트리거 · 팝업을 둘 다 벗어나면 닫힘」 규칙이라, 캔버스가 포커스를 가져가면 포인터가 캔버스를 스치기만 해도 닫혔다 (사건
-  // 패널은 필터를 끄면 패널이 줄어 멈춘 포인터 아래로 캔버스가 들어왔다). 「⋯」 는 blur 로 닫히지 않아 그 결함은 없었지만
+  // 대상은 `aria-expanded` + `aria-controls` 계약을 가진 팝업 전부다 (목록 · 근거는 `lib/expanded-popup.ts`). 「⋯」 오버플로를
+  // 뺀 나머지 (사건 패널 · 표시 패널 · 천체 메뉴 · 모드 메뉴) 는 「포커스가 트리거 · 팝업을 둘 다 벗어나면 닫힘」 규칙이라,
+  // 이 보호가 없으면 캔버스가 포커스를 가져갈 때 포인터가 캔버스를 스치기만 해도 닫힌다 (#1380 이전 앞 셋이 실제로 그랬다 —
+  // 사건 패널은 필터를 끄면 패널이 줄어 멈춘 포인터 아래로 캔버스가 들어왔다). 「⋯」 는 blur 로 닫히지 않아 그 결함은 없었지만
   // 같은 보존을 받는다 — 캔버스 pointerdown · sm 이상 확장으로 닫히므로 보존이 영구화되지 않는다. 팝업이 열린
   // 동안 캔버스 키보드 조작은 캔버스 클릭으로 돌아온다 — 클릭은 팝업을 닫고 (패널 밖 pointerdown) Babylon 이 캔버스에
   // 포커스를 준다. 팝업이 닫혀 있으면 이 분기는 거짓이라 #699 의 마우스 클릭 포커스 회수는 그대로다.
@@ -186,6 +190,103 @@ export function shouldPreserveFocus(active: HTMLElement): boolean {
     // (프로젝트 요구 사양이 WebGPU 이므로 실제 도달 불가 경로.)
     return true;
   }
+}
+
+/** 개요 reset 의 카메라 거리 (씬 단위) — 앱 첫 화면 (`setupArcRotateCamera` `radius: 35`) 과 같은 개요 거리. */
+const OVERVIEW_RESET_RADIUS = 35;
+
+/**
+ * #1390 Amendment 1 — 절대 방향 시점 (`isAbsoluteFocusView`) → 시점 방향 (대상 → 카메라). 대상과 무관하므로 개요에도 쓴다.
+ * 상대 시점 (`facing-parent`) 은 대상 메시가 있어야 해서 여기서는 셈하지 않는다 (`undefined` — 호출부가 따로 셈한다).
+ * 절대 시점은 현재 1종 (`ecliptic-oblique` = 앱 첫 화면 각) 이다. 2번째가 생기면 여기에 `view → 각` 분기를 더한다.
+ */
+export function absoluteViewDirection(view: EventFocusView): ViewDirectionLike | undefined {
+  if (!isAbsoluteFocusView(view)) return undefined;
+  return sceneApi.arcAnglesToViewDirection({
+    alpha: sceneApi.DEFAULT_CAMERA_ALPHA,
+    beta: sceneApi.DEFAULT_CAMERA_BETA,
+  });
+}
+
+/** #1360 PR2 — `facing-parent` 시점의 위쪽 기울기 (모체 방향에서 카메라 +Y 쪽으로) [rad]. rendering-only 구도 상수. */
+const FOCUS_VIEW_TILT_RAD = (15 * Math.PI) / 180;
+/** 모체 방향이 카메라 위 방향과 거의 평행하면 기울이지 않는다 (기울일 축의 길이 하한). */
+const FOCUS_VIEW_TILT_MIN_AXIS = 1e-6;
+/** #1390 PR3 — `from-sun` 시점의 기준 천체 (태양 메시 id). */
+const SUN_BODY_ID = 'sun';
+/**
+ * #1390 PR3 (Amendment 2) — `from-sun` 시점의 화면 위 = 황도 북극 (데이터 +Z → 장면 `S_z`, #1366 — 장면 −Z). 장면 기본 위 (+Y) 는
+ * 황도면 **안**이라 태양 → 지구 선 (황도면 안) 을 따라 보면 황도 북극이 화면 옆으로 눕고, 지점 (至點) 에는 그 선이 +Y 와 거의 평행해
+ * 카메라 `beta` 한계 (0.01 rad) 에 걸린다 (실측 — 사이각 0.189°, 북극 화면각 ±89.75°).
+ */
+const FROM_SUN_VIEW_UP: ViewDirectionLike = { x: 0, y: 0, z: coordsApi.SCENE_Z_SIGN };
+
+/** {@link resolveFocusView} 가 읽는 장면 — 천체 world 위치 (Floating Origin 이후 절대 장면 좌표) · 모체 id. */
+export interface FocusViewScene {
+  positionOf: (bodyId: string) => ViewDirectionLike | null;
+  parentIdOf: (bodyId: string) => string | null;
+}
+
+/**
+ * 포커스 시점 요청 → 카메라 시점 방향 (대상 → 카메라 world) · 화면 위 방향 (#1360 PR2 결정 C3 · #1390 Amendment 1 · 2). 요청 소비
+ * (store 비우기) 는 호출부가 한다. 대상이 이번 포커스 body 가 아니면 `undefined` (요청을 버린다).
+ * - 절대 시점 (`ecliptic-oblique`) — 대상과 무관한 고정 방향 ({@link absoluteViewDirection}).
+ * - `facing-parent` — 모체 쪽 반구. 지구 → 달 방향은 위성 배율과 무관하게 물리 방향 그대로라 (배율은 반경 방향 스칼라) 메시 위치의
+ *   차로 충분하다 (지구 → 태양은 배율 없음). 카메라 위 (+Y) 쪽으로 기울인다 (아래).
+ * - `from-sun` (#1390 PR3) — 모체 대신 태양 쪽이고 기울이지 않는다 (원반 중심 = 태양 직하점 — ADR 1-F). 화면 위 = 황도 북극.
+ */
+export function resolveFocusView(
+  request: FocusViewRequest,
+  bodyId: string | null,
+  scene: FocusViewScene,
+): Pick<FocusTarget, 'viewDirection' | 'viewUp'> | undefined {
+  if (request.bodyId !== bodyId) return undefined;
+  // #1390 Amendment 1 — 절대 방향 시점은 대상과 무관하다 (`absoluteViewDirection`).
+  const absolute = absoluteViewDirection(request.view);
+  if (absolute !== undefined) return { viewDirection: absolute };
+  if (bodyId === null) return undefined;
+  const fromSun = request.view === 'from-sun';
+  const referenceId = fromSun ? SUN_BODY_ID : scene.parentIdOf(bodyId);
+  const target = scene.positionOf(bodyId);
+  const reference = referenceId ? scene.positionOf(referenceId) : null;
+  if (!target || !reference) return undefined;
+  const toParent = new Vector3(
+    reference.x - target.x,
+    reference.y - target.y,
+    reference.z - target.z,
+  ).normalize();
+  if (fromSun) return { viewDirection: toParent, viewUp: FROM_SUN_VIEW_UP };
+  // 정확히 모체 방향이면 카메라가 「대상 ↔ 모체」 선 위에 놓여 거리 자 선 (기준점 = 지구) 이 카메라를 관통해 화면에
+  // 한 줄로 늘어진다 (실 Chrome 실측). 카메라 위 (+Y) 쪽으로 조금 기울여 지구 쪽 반구를 보면서 선은 지구 쪽으로
+  // 물러나게 한다. 위 방향과 평행 (극) 이면 기울일 축이 정의되지 않아 그대로 둔다.
+  const up = toParent.clone().scaleInPlace(-toParent.y);
+  up.y += 1;
+  const upLength = up.length();
+  if (upLength < FOCUS_VIEW_TILT_MIN_AXIS) return { viewDirection: toParent };
+  return {
+    viewDirection: toParent
+      .scaleInPlace(Math.cos(FOCUS_VIEW_TILT_RAD))
+      .addInPlace(up.scaleInPlace(Math.sin(FOCUS_VIEW_TILT_RAD) / upLength)),
+  };
+}
+
+/**
+ * 개요 복귀 reset (#1390 Amendment 1). 개요 시점 요청 (`bodyId: null`) 이 있을 때만 그 요청을 소비해 alpha · beta 까지 맞춘다.
+ * 대상이 있는 요청은 그 포커스 진입이 소비하도록 남긴다. 관찰 · 연구 모드 reset 은 요청이 없어 종전과 같다 (각을 지정하지 않음).
+ */
+export function resetCameraToOverview(
+  controller: {
+    reset: (radius?: number, target?: undefined, viewDirection?: ViewDirectionLike) => void;
+  },
+  store: Pick<typeof useSimStore, 'getState'> = useSimStore,
+): void {
+  const request = store.getState().focusViewRequest;
+  let viewDirection: ViewDirectionLike | undefined;
+  if (request !== null && request.bodyId === null) {
+    store.getState().setFocusViewRequest(null);
+    viewDirection = absoluteViewDirection(request.view);
+  }
+  controller.reset(OVERVIEW_RESET_RADIUS, undefined, viewDirection);
 }
 
 /**
@@ -1113,35 +1214,23 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // (대상 → 카메라 world) 을 돌려주고, 아니면 버린다 — 어느 쪽이든 비운다 (다음 무관한 포커스에 새지 않게).
         // `facing-parent` = 모체 메시 쪽 (월식 — 달의 지구 쪽 반구, #1360 PR3 일식 — 지구의 태양 쪽 반구). 지구 → 달 방향은
         // 위성 배율과 무관하게 물리 방향 그대로라 (배율은 반경 방향 스칼라) 메시 위치의 차로 충분하다 (지구 → 태양은 배율 없음).
-        /** #1360 PR2 — `facing-parent` 시점의 위쪽 기울기 (모체 방향에서 카메라 +Y 쪽으로) [rad]. rendering-only 구도 상수. */
-        const FOCUS_VIEW_TILT_RAD = (15 * Math.PI) / 180;
-        /** 모체 방향이 카메라 위 방향과 거의 평행하면 기울이지 않는다 (기울일 축의 길이 하한). */
-        const FOCUS_VIEW_TILT_MIN_AXIS = 1e-6;
-        const consumeFocusView = (bodyId: string | null) => {
+        // 요청 소비 (store) 는 여기서, 방향 · 위 방향 계산은 순수 함수 `resolveFocusView` 에서 한다 (#1390 PR3 — 단위 테스트 대상).
+        const focusViewScene: FocusViewScene = {
+          positionOf: (id) => {
+            const mesh = solar.meshes.get(id);
+            if (!mesh) return null;
+            mesh.computeWorldMatrix(true);
+            return mesh.getAbsolutePosition();
+          },
+          parentIdOf: (id) => solar.getBodyParentId(id) ?? null,
+        };
+        const consumeFocusView = (
+          bodyId: string | null,
+        ): Pick<FocusTarget, 'viewDirection' | 'viewUp'> | undefined => {
           const request = useSimStore.getState().focusViewRequest;
           if (request === null) return undefined;
           useSimStore.getState().setFocusViewRequest(null);
-          if (bodyId === null || request.bodyId !== bodyId) return undefined;
-          const mesh = solar.meshes.get(bodyId);
-          const parentId = solar.getBodyParentId(bodyId);
-          const parentMesh = parentId ? solar.meshes.get(parentId) : undefined;
-          if (!mesh || !parentMesh) return undefined;
-          mesh.computeWorldMatrix(true);
-          parentMesh.computeWorldMatrix(true);
-          const toParent = parentMesh
-            .getAbsolutePosition()
-            .subtract(mesh.getAbsolutePosition())
-            .normalize();
-          // 정확히 모체 방향이면 카메라가 「대상 ↔ 모체」 선 위에 놓여 거리 자 선 (기준점 = 지구) 이 카메라를 관통해 화면에
-          // 한 줄로 늘어진다 (실 Chrome 실측). 카메라 위 (+Y) 쪽으로 조금 기울여 지구 쪽 반구를 보면서 선은 지구 쪽으로
-          // 물러나게 한다. 위 방향과 평행 (극) 이면 기울일 축이 정의되지 않아 그대로 둔다.
-          const up = toParent.clone().scaleInPlace(-toParent.y);
-          up.y += 1;
-          const upLength = up.length();
-          if (upLength < FOCUS_VIEW_TILT_MIN_AXIS) return toParent;
-          return toParent
-            .scaleInPlace(Math.cos(FOCUS_VIEW_TILT_RAD))
-            .addInPlace(up.scaleInPlace(Math.sin(FOCUS_VIEW_TILT_RAD) / upLength));
+          return resolveFocusView(request, bodyId, focusViewScene);
         };
 
         const syncFocusToScene = (bodyId: string | null) => {
@@ -1209,7 +1298,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
               controller.focusOn({
                 mesh,
                 radius: desiredRadius,
-                viewDirection: consumeFocusView(bodyId),
+                ...consumeFocusView(bodyId),
               });
               // #693 — focus 진입 시 패닝 비활성 (ADR §결정 3 옵션 A). focus 중 followObserver 가
               // 매 프레임 target 을 덮어쓰므로 패닝 무의미 + jitter. free-fly 진입 시 재활성.
@@ -1229,7 +1318,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           } else {
             // P12-A #298 — focus 해제 → tier 는 free-fly 경로로 판정.
             solar.clearFocus();
-            controller.reset(35);
+            // #1390 Amendment 1 — 개요 시점 요청 (`bodyId: null`) 소비 + reset (`resetCameraToOverview` — 단위 테스트 대상).
+            resetCameraToOverview(controller);
             // #693 — reset(focus 해제 = sun 중심 복귀)도 free-fly 가 아니므로 패닝 비활성.
             freeFlyActive = false;
             freeFlyEntryRadius = null;

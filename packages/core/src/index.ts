@@ -57,10 +57,12 @@ export { getOrbitVisualScale } from './scene/orbit-visual-scale.js';
 // 위 `kepler.ts` 와 같다. exports field 불변.
 export {
   EVENT_KINDS,
+  ABSOLUTE_FOCUS_VIEWS,
   EVENT_KIND_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
   eventFocusBodyId,
+  isAbsoluteFocusView,
   eventLabelKo,
   getEventKind,
 } from './events/index.js';

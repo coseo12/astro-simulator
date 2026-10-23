@@ -12,7 +12,12 @@ const INACTIVITY_WAIT_MS = 4000;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  useSimStore.setState({ mode: 'observe', displayPanelOpen: false, bodyMenuOpen: false });
+  useSimStore.setState({
+    mode: 'observe',
+    displayPanelOpen: false,
+    bodyMenuOpen: false,
+    modeMenuOpen: false,
+  });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -56,6 +61,17 @@ describe('TopBar — 자동 숨김', () => {
     });
     expect(opacity()).toBe('1');
     act(() => useSimStore.setState({ bodyMenuOpen: false }));
+    expect(opacity()).toBe('0');
+  });
+
+  it('#1390 PR0 — 모바일 모드 메뉴 열림 · 4초 무입력 → opacity 1, 닫으면 다시 숨김', () => {
+    useSimStore.setState({ modeMenuOpen: true });
+    render(<TopBar />);
+    act(() => {
+      vi.advanceTimersByTime(INACTIVITY_WAIT_MS);
+    });
+    expect(opacity()).toBe('1');
+    act(() => useSimStore.setState({ modeMenuOpen: false }));
     expect(opacity()).toBe('0');
   });
 
@@ -167,6 +183,26 @@ describe('TopBar — 오버플로 메뉴 (#1313)', () => {
     expect(ev.defaultPrevented).toBe(false);
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
     document.querySelectorAll('[data-modal-open]').forEach((el) => el.remove());
+  });
+
+  it('#1390 PR1 — 모드 메뉴가 열리면 「⋯」 패널을 닫는다 (PR0 qa — 375 에서 두 패널이 겹쳤다) · 포커스는 옮기지 않는다', () => {
+    renderBar();
+    fireEvent.click(toggle());
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    const other = document.createElement('button');
+    document.body.appendChild(other);
+    other.focus();
+    act(() => useSimStore.setState({ modeMenuOpen: true }));
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(group()).not.toHaveAttribute('data-overflow-open');
+    expect(document.activeElement).toBe(other);
+    // 닫힌 뒤의 Esc 는 「⋯」 리스너가 받지 않는다 — 모드 메뉴 Esc 만 남는다.
+    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => {
+      window.dispatchEvent(ev);
+    });
+    expect(ev.defaultPrevented).toBe(false);
+    other.remove();
   });
 
   it('캔버스 pointerdown → 닫힘 / 패널 밖의 다른 요소 pointerdown → 유지', () => {
