@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.106.0] - 2026-10-24
+
 ### Changed
 
 - **[#1404] 달 위치를 Meeus 47장 전 항으로 계산한다** ([#1404](https://github.com/coseo12/astro-simulator/issues/1404)). 달 위치를 Kepler 평균 요소 + 주기 9항 (B9) 대신 J. Meeus 《Astronomical Algorithms》 2판 47장의 이론 전 항 (표 47.A 60행 · 47.B 60행 · 부가항 9행) 으로 계산하고, 21장 황도 세차 회전으로 J2000 황도에 옮긴다. 장면 · 정보 카드 · 거리 자 · 사건이 같은 위치를 쓴다. ADR [`20261023-1404`](docs/decisions/20261023-1404-lunar-theory-meeus47.md).
