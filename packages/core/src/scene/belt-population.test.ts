@@ -4,7 +4,7 @@
  *  1. 공명 위치 — 커크우드 간극 · 힐다 · 플루티노 장반경을 행성 `a` 와 공명비에서 도출한 값이 결정 4 표와 일치.
  *  2. 주 띠 `a` 히스토그램 간극 대비 (간극 중심 ±0.01 AU / 이웃 4~6 bin) 3:1 · 5:2 · 7:3 각 ≤ 0.5.
  *  3. 트로이 — `λ − λ_J` 가 L4 +60° / L5 −60° 중심 · 표준편차 ≤ 15° · L4:L5 = 1.6 ± 0.1 ·
- *     100 년 뒤에도 `λ − λ_J` 변화 ≤ 0.01° (장면이 목성을 움직이는 식과 대조).
+ *     100 년 뒤에도 `λ − λ_J` 변화 ≤ 0.01° (장면이 목성을 움직이는 식 — `elementsAt` — 과 대조, #1406 D15).
  *  4. 힐다 `|mean φ|` ≤ 5° · 플루티노 `mean φ` = 180° ± 5° · 평균운동 비 1.5 / (2/3) 정확 (double).
  *  5. 불변식 — 전 요소 `0 ≤ e < 1` · `a > 0` · 유한값. 빈 배열은 FAIL (공허 통과 금지).
  *  6. seed 결정성 · 그룹 스트림 독립 · `?belt=N` 개수 비율 분할.
@@ -13,7 +13,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { getSolarSystem } from '../ephemeris/solar-system-loader.js';
-import { meanAnomalyAt, orbitMu } from '../physics/kepler.js';
+import { orbitMu } from '../physics/kepler.js';
+import { elementsAt } from '../physics/orbit-elements-at.js';
 import {
   ASTEROID_BELT_GROUPS,
   BELT_DEFAULT_COUNTS,
@@ -88,12 +89,19 @@ describe('#1319 PR2 공명 위치 — 행성 a 와 공명비에서 도출 (표 �
     ).toBeLessThan(0.05);
   });
 
-  it('로더 경로 — 목성 · 해왕성 n 은 장면 Kepler 경로와 같은 μ (orbitMu) 에서 · λ = Ω + ω + M', () => {
+  it('로더 경로 — 목성 · 해왕성 n 은 장면 평균경도 율 (rates.meanLongitude — #1406 C-2) · λ = Ω + ω + M', () => {
     const sun = system.bodies.find((b) => b.id === 'sun')!;
     for (const id of ['jupiter', 'neptune'] as const) {
       const body = system.bodies.find((b) => b.id === id)!;
       const p = planets[id];
-      expect(p.meanMotion).toBe(meanMotionRadPerDay(body.orbit!.semiMajorAxis, orbitMu(body, sun)));
+      expect(body.orbit!.rates, id).toBeDefined();
+      expect(p.meanMotion).toBe(body.orbit!.rates!.meanLongitude);
+      // 양성 대조 — Kepler n (C-2 이전 기준) 과는 다르다. 목성은 100 년에 평균경도 `1°` 넘게 갈라진다 (ADR 1406 §1-J).
+      const kepler = meanMotionRadPerDay(body.orbit!.semiMajorAxis, orbitMu(body, sun));
+      expect(p.meanMotion).not.toBe(kepler);
+      if (id === 'jupiter') {
+        expect(Math.abs(p.meanMotion - kepler) * DAYS_PER_CENTURY).toBeGreaterThan(DEG);
+      }
       const o = body.orbit!;
       expect(
         Math.abs(
@@ -179,14 +187,12 @@ describe('#1319 PR2 트로이 — L4 +60° / L5 −60°, 평균운동 = n_J', ()
 
   it('평균운동 = n_J 정확 (double) — 100 년 뒤 λ − λ_J 변화 ≤ 0.01° (장면의 목성 전파식과 대조)', () => {
     const jupiter = system.bodies.find((b) => b.id === 'jupiter')!;
-    const sun = system.bodies.find((b) => b.id === 'sun')!;
-    const jOrbit = jupiter.orbit!;
     const t = planets.epoch + DAYS_PER_CENTURY;
-    // 장면이 목성을 움직이는 식 — `positionAt(orbit, jd, orbitMu(body, sun))` 의 평균이상.
-    const lambdaJ =
-      jOrbit.longitudeOfAscendingNode +
-      jOrbit.argumentOfPeriapsis +
-      meanAnomalyAt(jOrbit, t, orbitMu(jupiter, sun));
+    // 장면이 목성을 움직이는 식 — `positionAt(elementsAt(orbit, jd), jd, μ)` (#1406 — 율 보유). 반환 요소의 epoch 가
+    // `jd` 라 Kepler 항이 0 이고, 평균경도는 `Ω + ω + M₀` 그대로다.
+    const el = elementsAt(jupiter.orbit!, t);
+    expect(el.epoch).toBe(t);
+    const lambdaJ = el.longitudeOfAscendingNode + el.argumentOfPeriapsis + el.meanAnomalyAtEpoch;
     let worst = 0;
     for (const o of population.trojan) {
       expect(o.meanMotion).toBe(planets.jupiter.meanMotion);

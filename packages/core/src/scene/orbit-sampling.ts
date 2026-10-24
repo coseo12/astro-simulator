@@ -31,8 +31,9 @@ export function isSatelliteOrbit(parentId: string | null | undefined): parentId 
 }
 
 /**
- * @param julianDate 궤도 요소를 평가할 시각 (#1354 결정 V1). `rates` 보유 천체 (달) 는 이 시각의 **평균 요소** 타원이다 —
- *   주기 항은 넣지 않는다 (달이 선에서 반경 방향 최대 `1.83 %` 벗어나는 것은 ADR 이 받아들인 비용). `rates` 없는 천체는
+ * @param julianDate 궤도 요소를 평가할 시각 (#1354 결정 V1). `rates` 보유 천체 (달 · 8행성) 는 이 시각의 **평균 요소**
+ *   타원이다 (8행성은 장면 위치도 같은 요소라 선 위에 있다 — #1406). 달은 달 이론 위치 (`lunarTheory`, #1404) 와 다르다 (달이 선에서 반경 방향 최대 `1.99 %` 벗어나는 것은 ADR 1404 결정 L4 가
+ *   받아들인 비용 — B9 때 `1.83 %`). `rates` 없는 천체는
  *   시각과 무관하게 같은 점이다 (`elementsAt` 가 같은 객체). 생략하면 데이터 epoch 요소.
  */
 export function sampleOrbitPoints(

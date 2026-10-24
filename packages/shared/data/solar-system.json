@@ -40,7 +40,17 @@
         "inclinationDeg": 7.00497902,
         "longitudeOfAscendingNodeDeg": 48.33076593,
         "longitudeOfPerihelionDeg": 77.45779628,
-        "meanLongitudeDeg": 252.2503235
+        "meanLongitudeDeg": 252.2503235,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": 0.00000037,
+          "eccentricityPerCentury": 0.00001906,
+          "inclinationDegPerCentury": -0.00594749,
+          "meanLongitudeDegPerCentury": 149472.67411175,
+          "longitudeOfPerihelionDegPerCentury": 0.16047689,
+          "longitudeOfAscendingNodeDegPerCentury": -0.12534081
+        }
       }
     },
     {
@@ -65,7 +75,17 @@
         "inclinationDeg": 3.39467605,
         "longitudeOfAscendingNodeDeg": 76.67984255,
         "longitudeOfPerihelionDeg": 131.60246718,
-        "meanLongitudeDeg": 181.9790995
+        "meanLongitudeDeg": 181.9790995,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": 0.0000039,
+          "eccentricityPerCentury": -0.00004107,
+          "inclinationDegPerCentury": -0.0007889,
+          "meanLongitudeDegPerCentury": 58517.81538729,
+          "longitudeOfPerihelionDegPerCentury": 0.00268329,
+          "longitudeOfAscendingNodeDegPerCentury": -0.27769418
+        }
       }
     },
     {
@@ -90,7 +110,17 @@
         "inclinationDeg": -0.00001531,
         "longitudeOfAscendingNodeDeg": 0.0,
         "longitudeOfPerihelionDeg": 102.93768193,
-        "meanLongitudeDeg": 100.46457166
+        "meanLongitudeDeg": 100.46457166,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": 0.00000562,
+          "eccentricityPerCentury": -0.00004392,
+          "inclinationDegPerCentury": -0.01294668,
+          "meanLongitudeDegPerCentury": 35999.37244981,
+          "longitudeOfPerihelionDegPerCentury": 0.32327364,
+          "longitudeOfAscendingNodeDegPerCentury": 0.0
+        }
       }
     },
     {
@@ -117,25 +147,174 @@
         "longitudeOfAscendingNodeDeg": 125.08,
         "longitudeOfPerihelionDeg": 83.22,
         "meanLongitudeDeg": 218.32,
-        "$ratesComment": "#1354 결정 M1 · M2 — J. Meeus, Astronomical Algorithms 2판 (1998) 47장 식 47.1 (L′ 율) · 47.7 (Ω 율) 과 평균 근지점 율 (PyMeeus Moon.longitude_mean_perigee — 47장 재현, 2026-10-17 대조). 값은 문헌 원값 (날짜 평균 분점 기준, 도/율리우스 세기) 이고 로더가 일반세차 p_A 를 빼 J2000 고정 분점 율로 옮긴다. 기점 값 (위 Ω · ϖ · L) 은 바꾸지 않는다 (Q-D2 (a)).",
+        "$ratesComment": "#1354 결정 M1 · M2 — J. Meeus, Astronomical Algorithms 2판 (1998) 47장 식 47.1 (L′ 율) · 47.7 (Ω 율) 과 평균 근지점 율 (PyMeeus Moon.longitude_mean_perigee — 47장 재현, 2026-10-17 대조). 값은 문헌 원값 (날짜 평균 분점 기준, 도/율리우스 세기) 이고 로더가 일반세차 p_A 를 빼 J2000 고정 분점 율로 옮긴다. 기점 값 (위 Ω · ϖ · L) 은 바꾸지 않는다 (Q-D2 (a)). #1404 결정 L4 — 달 위치는 아래 lunarTheory 가 정하고, 이 기점 값 · 율은 평균 요소 (궤도선 · 궤적 · N-body 초기 상태 · 정보 카드 공전주기) 에만 쓰인다.",
         "rates": {
           "frame": "mean-equinox-of-date",
           "meanLongitudeDegPerCentury": 481267.88123421,
           "longitudeOfAscendingNodeDegPerCentury": -1934.1362891,
           "longitudeOfPerihelionDegPerCentury": 4069.0137287
         },
-        "$periodicTermsComment": "#1354 결정 M1 (B9) — Meeus 47장 표 47.A (경도 Σl · 거리 Σr) · 47.B (위도 Σb) 중 Kepler 타원 · 경사가 이미 담는 항 (D · M 계수가 모두 0) 을 뺀 진폭 상위 경도 4 · 위도 3 · 거리 2 항. 경도 · 위도 = 도, 거리 = km. 인자는 장면 요소에서 만든다 (D = L′ − L☉, M = 지구 평균근점이각, M′ = 달 평균근점이각, F = L′ − Ω).",
-        "periodicTerms": [
-          { "component": "longitude", "D": 2, "M": 0, "Mp": -1, "F": 0, "amplitude": 1.274027 },
-          { "component": "longitude", "D": 2, "M": 0, "Mp": 0, "F": 0, "amplitude": 0.658314 },
-          { "component": "longitude", "D": 0, "M": 1, "Mp": 0, "F": 0, "amplitude": -0.185116 },
-          { "component": "longitude", "D": 2, "M": 0, "Mp": -2, "F": 0, "amplitude": 0.058793 },
-          { "component": "latitude", "D": 2, "M": 0, "Mp": 0, "F": -1, "amplitude": 0.173237 },
-          { "component": "latitude", "D": 2, "M": 0, "Mp": -1, "F": 1, "amplitude": 0.055413 },
-          { "component": "latitude", "D": 2, "M": 0, "Mp": -1, "F": -1, "amplitude": 0.046271 },
-          { "component": "distance", "D": 2, "M": 0, "Mp": -1, "F": 0, "amplitude": -3699.111 },
-          { "component": "distance", "D": 2, "M": 0, "Mp": 0, "F": 0, "amplitude": -2955.968 }
-        ]
+        "lunarTheory": {
+          "$comment": "#1404 결정 L1 · L2 — J. Meeus, Astronomical Algorithms 2판 (1998) 47장 식 47.1 ~ 47.5 (인자) · 이심률 인자 E · 표 47.A (경도 Σl · 거리 Σr, 행 = [D, M, M′, F, Σl 진폭, Σr 진폭]) · 표 47.B (위도 Σb, 행 = [D, M, M′, F, Σb 진폭]) · 부가항 (A1 · A2 · A3 · L′ 계열). 날짜 평균 황도 · 분점. 진폭은 원 단위 그대로 (경도 · 위도 1e-6 °, 거리 1e-3 km). 다항식은 T (J2000 기준 율리우스 세기, TT) 의 오름차순 계수 [도]. 분수 계수는 소수로 옮겼다 — 원 표기: L′ T³ 1/538841 · T⁴ −1/65194000, D T³ 1/545868 · T⁴ −1/113065000, M T³ 1/24490000, M′ T³ 1/69699 · T⁴ −1/14712000, F T³ −1/3526000 · T⁴ 1/863310000. J2000 황도로의 세차 회전 (21장) 은 좌표계 변환이라 코드 상수 (packages/core/src/physics/lunar-theory.ts) 에 둔다.",
+          "frame": "mean-equinox-of-date",
+          "meanArgumentsDeg": {
+            "Lp": [
+              218.3164477, 481267.88123421, -0.0015786, 0.000001855835023689734,
+              -1.5338834862103876e-8
+            ],
+            "D": [
+              297.8501921, 445267.1114034, -0.0018819, 0.0000018319447192361523,
+              -8.844469995135542e-9
+            ],
+            "M": [357.5291092, 35999.0502909, -0.0001536, 4.083299305839118e-8],
+            "Mp": [
+              134.9633964, 477198.8675055, 0.0087414, 0.000014347408140719379, -6.797172376291463e-8
+            ],
+            "F": [
+              93.272095, 483202.0175233, -0.0036539, -2.8360748723766307e-7, 1.1583324645839848e-9
+            ],
+            "A1": [119.75, 131.849],
+            "A2": [53.09, 479264.29],
+            "A3": [313.45, 481266.484]
+          },
+          "eccentricityFactor": [1, -0.002516, -0.0000074],
+          "meanDistanceKm": 385000.56,
+          "longitudeDistanceTerms": [
+            [0, 0, 1, 0, 6288774, -20905355],
+            [2, 0, -1, 0, 1274027, -3699111],
+            [2, 0, 0, 0, 658314, -2955968],
+            [0, 0, 2, 0, 213618, -569925],
+            [0, 1, 0, 0, -185116, 48888],
+            [0, 0, 0, 2, -114332, -3149],
+            [2, 0, -2, 0, 58793, 246158],
+            [2, -1, -1, 0, 57066, -152138],
+            [2, 0, 1, 0, 53322, -170733],
+            [2, -1, 0, 0, 45758, -204586],
+            [0, 1, -1, 0, -40923, -129620],
+            [1, 0, 0, 0, -34720, 108743],
+            [0, 1, 1, 0, -30383, 104755],
+            [2, 0, 0, -2, 15327, 10321],
+            [0, 0, 1, 2, -12528, 0],
+            [0, 0, 1, -2, 10980, 79661],
+            [4, 0, -1, 0, 10675, -34782],
+            [0, 0, 3, 0, 10034, -23210],
+            [4, 0, -2, 0, 8548, -21636],
+            [2, 1, -1, 0, -7888, 24208],
+            [2, 1, 0, 0, -6766, 30824],
+            [1, 0, -1, 0, -5163, -8379],
+            [1, 1, 0, 0, 4987, -16675],
+            [2, -1, 1, 0, 4036, -12831],
+            [2, 0, 2, 0, 3994, -10445],
+            [4, 0, 0, 0, 3861, -11650],
+            [2, 0, -3, 0, 3665, 14403],
+            [0, 1, -2, 0, -2689, -7003],
+            [2, 0, -1, 2, -2602, 0],
+            [2, -1, -2, 0, 2390, 10056],
+            [1, 0, 1, 0, -2348, 6322],
+            [2, -2, 0, 0, 2236, -9884],
+            [0, 1, 2, 0, -2120, 5751],
+            [0, 2, 0, 0, -2069, 0],
+            [2, -2, -1, 0, 2048, -4950],
+            [2, 0, 1, -2, -1773, 4130],
+            [2, 0, 0, 2, -1595, 0],
+            [4, -1, -1, 0, 1215, -3958],
+            [0, 0, 2, 2, -1110, 0],
+            [3, 0, -1, 0, -892, 3258],
+            [2, 1, 1, 0, -810, 2616],
+            [4, -1, -2, 0, 759, -1897],
+            [0, 2, -1, 0, -713, -2117],
+            [2, 2, -1, 0, -700, 2354],
+            [2, 1, -2, 0, 691, 0],
+            [2, -1, 0, -2, 596, 0],
+            [4, 0, 1, 0, 549, -1423],
+            [0, 0, 4, 0, 537, -1117],
+            [4, -1, 0, 0, 520, -1571],
+            [1, 0, -2, 0, -487, -1739],
+            [2, 1, 0, -2, -399, 0],
+            [0, 0, 2, -2, -381, -4421],
+            [1, 1, 1, 0, 351, 0],
+            [3, 0, -2, 0, -340, 0],
+            [4, 0, -3, 0, 330, 0],
+            [2, -1, 2, 0, 327, 0],
+            [0, 2, 1, 0, -323, 1165],
+            [1, 1, -1, 0, 299, 0],
+            [2, 0, 3, 0, 294, 0],
+            [2, 0, -1, -2, 0, 8752]
+          ],
+          "latitudeTerms": [
+            [0, 0, 0, 1, 5128122],
+            [0, 0, 1, 1, 280602],
+            [0, 0, 1, -1, 277693],
+            [2, 0, 0, -1, 173237],
+            [2, 0, -1, 1, 55413],
+            [2, 0, -1, -1, 46271],
+            [2, 0, 0, 1, 32573],
+            [0, 0, 2, 1, 17198],
+            [2, 0, 1, -1, 9266],
+            [0, 0, 2, -1, 8822],
+            [2, -1, 0, -1, 8216],
+            [2, 0, -2, -1, 4324],
+            [2, 0, 1, 1, 4200],
+            [2, 1, 0, -1, -3359],
+            [2, -1, -1, 1, 2463],
+            [2, -1, 0, 1, 2211],
+            [2, -1, -1, -1, 2065],
+            [0, 1, -1, -1, -1870],
+            [4, 0, -1, -1, 1828],
+            [0, 1, 0, 1, -1794],
+            [0, 0, 0, 3, -1749],
+            [0, 1, -1, 1, -1565],
+            [1, 0, 0, 1, -1491],
+            [0, 1, 1, 1, -1475],
+            [0, 1, 1, -1, -1410],
+            [0, 1, 0, -1, -1344],
+            [1, 0, 0, -1, -1335],
+            [0, 0, 3, 1, 1107],
+            [4, 0, 0, -1, 1021],
+            [4, 0, -1, 1, 833],
+            [0, 0, 1, -3, 777],
+            [4, 0, -2, 1, 671],
+            [2, 0, 0, -3, 607],
+            [2, 0, 2, -1, 596],
+            [2, -1, 1, -1, 491],
+            [2, 0, -2, 1, -451],
+            [0, 0, 3, -1, 439],
+            [2, 0, 2, 1, 422],
+            [2, 0, -3, -1, 421],
+            [2, 1, -1, 1, -366],
+            [2, 1, 0, 1, -351],
+            [4, 0, 0, 1, 331],
+            [2, -1, 1, 1, 315],
+            [2, -2, 0, -1, 302],
+            [0, 0, 1, 3, -283],
+            [2, 1, 1, -1, -229],
+            [1, 1, 0, -1, 223],
+            [1, 1, 0, 1, 223],
+            [0, 1, -2, -1, -220],
+            [2, 1, -1, -1, -220],
+            [1, 0, 1, 1, -185],
+            [2, -1, -2, -1, 181],
+            [0, 1, 2, 1, -177],
+            [4, 0, -2, -1, 176],
+            [4, -1, -1, -1, 166],
+            [1, 0, 1, -1, -164],
+            [4, 0, 1, -1, 132],
+            [1, 0, -1, -1, -119],
+            [4, -1, 0, -1, 115],
+            [2, -2, 0, 1, 107]
+          ],
+          "additiveTerms": [
+            { "component": "longitude", "argument": { "A1": 1 }, "amplitude": 3958 },
+            { "component": "longitude", "argument": { "Lp": 1, "F": -1 }, "amplitude": 1962 },
+            { "component": "longitude", "argument": { "A2": 1 }, "amplitude": 318 },
+            { "component": "latitude", "argument": { "Lp": 1 }, "amplitude": -2235 },
+            { "component": "latitude", "argument": { "A3": 1 }, "amplitude": 382 },
+            { "component": "latitude", "argument": { "A1": 1, "F": -1 }, "amplitude": 175 },
+            { "component": "latitude", "argument": { "A1": 1, "F": 1 }, "amplitude": 175 },
+            { "component": "latitude", "argument": { "Lp": 1, "Mp": -1 }, "amplitude": 127 },
+            { "component": "latitude", "argument": { "Lp": 1, "Mp": 1 }, "amplitude": -115 }
+          ]
+        }
       }
     },
     {
@@ -161,7 +340,17 @@
         "inclinationDeg": 1.84969142,
         "longitudeOfAscendingNodeDeg": 49.55953891,
         "longitudeOfPerihelionDeg": -23.94362959,
-        "meanLongitudeDeg": -4.55343205
+        "meanLongitudeDeg": -4.55343205,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": 0.00001847,
+          "eccentricityPerCentury": 0.00007882,
+          "inclinationDegPerCentury": -0.00813131,
+          "meanLongitudeDegPerCentury": 19140.30268499,
+          "longitudeOfPerihelionDegPerCentury": 0.44441088,
+          "longitudeOfAscendingNodeDegPerCentury": -0.29257343
+        }
       }
     },
     {
@@ -238,7 +427,17 @@
         "inclinationDeg": 1.30439695,
         "longitudeOfAscendingNodeDeg": 100.47390909,
         "longitudeOfPerihelionDeg": 14.72847983,
-        "meanLongitudeDeg": 34.39644051
+        "meanLongitudeDeg": 34.39644051,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": -0.00011607,
+          "eccentricityPerCentury": -0.00013253,
+          "inclinationDegPerCentury": -0.00183714,
+          "meanLongitudeDegPerCentury": 3034.74612775,
+          "longitudeOfPerihelionDegPerCentury": 0.21252668,
+          "longitudeOfAscendingNodeDegPerCentury": 0.20469106
+        }
       },
       "$ringAlphaHintComment": "R7 #641 §축 2c — ring × bodyScale generic 결합 (ADR 20260610-r7)으로 jupiter ring 이 가시화됨 (R6 비-범위 해제, Behavior Change). PM Q3 'saturn prominent vs jupiter faint 대조' — faint 0.15 (P9 densityProfile 데이터는 보존, rendering hint 만).",
       "ringAlphaHint": 0.15,
@@ -389,7 +588,17 @@
         "inclinationDeg": 2.48599187,
         "longitudeOfAscendingNodeDeg": 113.66242448,
         "longitudeOfPerihelionDeg": 92.59887831,
-        "meanLongitudeDeg": 49.95424423
+        "meanLongitudeDeg": 49.95424423,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": -0.0012506,
+          "eccentricityPerCentury": -0.00050991,
+          "inclinationDegPerCentury": 0.00193609,
+          "meanLongitudeDegPerCentury": 1222.49362201,
+          "longitudeOfPerihelionDegPerCentury": -0.41897216,
+          "longitudeOfAscendingNodeDegPerCentury": -0.28867794
+        }
       },
       "$axialTiltDegComment": "R8 #647 §축 2a — NASA obliquity to orbit 26.73° (R7 비-범위 → R8 동반 적용, PM Q3). ring disc rotation.x = RING_DISC_BASE_TILT_X + tiltRad (#1130 — base 가 π/2 → π 로 이동, body 의 ORBITAL_NORMAL_OFFSET 과 짝). #782 §A2 — self-rotation 도입으로 이 tilt 가 본체 자전축에도 적용 (동일 SSoT 1값이 ring + body 양쪽 구동, drift 0). ring 은 spin-pivot/ring-anchor 계층 격리로 wobble 0. r1-guard pixel baseline 변경은 의도된 Behavior Change (ADR 20260610-r8 §위험 #2).",
       "axialTiltDeg": 26.73,
@@ -573,7 +782,17 @@
         "inclinationDeg": 0.77263783,
         "longitudeOfAscendingNodeDeg": 74.01692503,
         "longitudeOfPerihelionDeg": 170.9542763,
-        "meanLongitudeDeg": 313.23810451
+        "meanLongitudeDeg": 313.23810451,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": -0.00196176,
+          "eccentricityPerCentury": -0.00004397,
+          "inclinationDegPerCentury": -0.00242939,
+          "meanLongitudeDegPerCentury": 428.48202785,
+          "longitudeOfPerihelionDegPerCentury": 0.40805281,
+          "longitudeOfAscendingNodeDegPerCentury": 0.04240589
+        }
       },
       "$ringAlphaHintComment": "R8 #647 §축 2c — 어두운 고리 (albedo ~0.05, 토성의 1/10) 지만 R8 showcase (세로 고리) 가시성 우선 0.8 (saturn 0.9 / jupiter 0.15 사이). 어두움은 colorHint #5A5E66 dark gray 로 분리 표현. D-T2 과밝음 보고 시 0.8 → 0.5 (ADR 20260610-r8 §재검토 트리거 #3).",
       "ringAlphaHint": 0.8,
@@ -675,7 +894,17 @@
         "inclinationDeg": 1.77004347,
         "longitudeOfAscendingNodeDeg": 131.78422574,
         "longitudeOfPerihelionDeg": 44.96476227,
-        "meanLongitudeDeg": -55.12002969
+        "meanLongitudeDeg": -55.12002969,
+        "$ratesComment": "#1406 결정 R · F — JPL Solar System Dynamics 「Approximate Positions of the Planets」 (https://ssd.jpl.nasa.gov/planets/approx_pos.html, 2026-10-24 조회) 표 1 「Keplerian elements and their rates, with respect to the mean ecliptic and equinox of J2000, valid for the time-interval 1800 AD - 2050 AD」 의 율 행 (원 출전 E.M. Standish · J.G. Williams 1992). 값은 표 숫자 그대로 [/율리우스 세기]: a au/Cy · e (표 표기 rad/Cy — 이심률이라 무차원) · I · L · ϖ · Ω deg/Cy. 이미 J2000 틀이라 로더는 단위만 바꾼다 (p_A 를 빼지 않는다). 기점 값 (위 6요소) 은 같은 표의 요소 행과 같아 바꾸지 않는다.",
+        "rates": {
+          "frame": "J2000",
+          "semiMajorAxisAuPerCentury": 0.00026291,
+          "eccentricityPerCentury": 0.00005105,
+          "inclinationDegPerCentury": 0.00035372,
+          "meanLongitudeDegPerCentury": 218.45945325,
+          "longitudeOfPerihelionDegPerCentury": -0.32241464,
+          "longitudeOfAscendingNodeDegPerCentury": -0.00508664
+        }
       },
       "$ringAlphaHintComment": "R9 #653 §축 2c — dusty 어두운 고리 (광학 깊이 Adams ~0.01 대 — saturn 의 1/100). jupiter 0.15 / uranus 0.8 사이 — DoD '고리 visible' 가시 우선이되 R8 showcase (세로 고리) 보다 한 단계 낮춤. 어두움은 colorHint #6F635A 로 분리 표현 (R8 동일 논리). D-T2 과밝음/안 보임 보고 시 0.7 → 0.5 / 0.9 (ADR 20260610-r9 §재검토 트리거 #3).",
       "ringAlphaHint": 0.7,

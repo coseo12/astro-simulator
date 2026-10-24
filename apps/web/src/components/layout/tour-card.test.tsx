@@ -149,7 +149,9 @@ describe('TourCard — 시작 · 단계 적용 (E2)', () => {
     expect(s.timeScale).toBe(0);
     expect(s.rulerAnchorId).toBe('moon');
     // #1370 — 사건 파일 재생성 (ΔT 적용) 으로 2024-04-08 일식 시각이 `17:56:58 → 17:55:49 UTC` (`2460409.2479 → .2471`).
-    expect(s.julianDate).toBeCloseTo(2460409.2471, 3);
+    // #1404 — 달 이론 (Meeus 47 전 항) 재생성으로 `17:55:49 → 18:13:32 UTC` (`.2471 → .2594`).
+    // #1406 — 8행성 표 1 율 재생성으로 `18:13:32 → 18:18:11 UTC` (`.2594 → .2626`).
+    expect(s.julianDate).toBeCloseTo(2460409.2626, 3);
     expect(useTourStore.getState().drift).toEqual([]);
     expect(screen.getByTestId('tour-step-title')).toHaveTextContent('일식의 순간');
     expect(screen.getByTestId('tour-progress')).toHaveTextContent('1 / 5');
@@ -182,7 +184,9 @@ describe('TourCard — 시작 · 단계 적용 (E2)', () => {
     next();
     expect(useSimStore.getState().selectedBodyId).toBe('moon');
     // #1370 — 2025-03-14 월식 `07:06:51 → 07:05:41 UTC` (`2460748.7964 → .7956`).
-    expect(useSimStore.getState().julianDate).toBeCloseTo(2460748.7956, 3);
+    // #1404 — `07:05:41 → 06:53:53 UTC` (`.7956 → .7874`).
+    // #1406 — `06:53:53 → 06:59:57 UTC` (`.7874 → .7916`).
+    expect(useSimStore.getState().julianDate).toBeCloseTo(2460748.7916, 3);
 
     next();
     expect(useSimStore.getState().timeScale).toBe(600);
@@ -368,7 +372,7 @@ describe('TourCard — 이탈 (E4)', () => {
     expect(s.selectedBodyId).toBe('earth');
     expect(s.freeFlyMode).toBe(false);
     expect(s.timeScale).toBe(0);
-    expect(s.julianDate).toBeCloseTo(2460409.2471, 3);
+    expect(s.julianDate).toBeCloseTo(2460409.2626, 3);
     expect(screen.queryByTestId('tour-drift')).toBeNull();
     expect(document.activeElement).toBe(screen.getByTestId('tour-next'));
   });

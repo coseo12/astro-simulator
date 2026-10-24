@@ -145,6 +145,12 @@ export function heliocentricAlignmentTimes(
 /**
  * 근일점 통과 시각 목록 — `[startJd, endJd)` 안. 모체 기준 궤도에서 `M(t) = M₀ + n·(t − epoch)` 가 `2πk` 가 되는 해석해
  * (`n` = `orbitMu(body, parent)` 의 평균 운동 — `meanAnomalyAt` 과 같은 식).
+ *
+ * 고정 요소 전용이다. `rates` 보유 궤도 (달 · 8행성 — #1406) 는 장면이 `elementsAt` 로 움직여 이 해석해와 어긋나므로
+ * 진입부에서 `throw` 한다 (ADR 1406 결정 C · DoD D16). 사용처는 율 없는 혜성 2종뿐이고, 율 대응은 그 사건 종류를 들일 때
+ * 설계한다.
+ *
+ * @throws 대상 궤도가 `rates` 를 가질 때.
  */
 export function perihelionTimes(
   bodiesById: ReadonlyMap<string, ChainBody>,
@@ -156,6 +162,11 @@ export function perihelionTimes(
   const parent = body?.parentId != null ? bodiesById.get(body.parentId) : undefined;
   if (!body?.orbit || !parent) return [];
   const orbit = body.orbit;
+  if (orbit.rates) {
+    throw new Error(
+      `[perihelionTimes] ${bodyId}: rates 보유 궤도는 고정 요소 해석해를 쓸 수 없다 (ADR 1406 결정 C)`,
+    );
+  }
   const mu = orbitMu(body, parent);
   // 평균 운동은 `meanAnomalyAt` 의 두 시각 차로 얻는다 — 식을 따로 쓰지 않아 장면과 어긋날 수 없다.
   const radPerDay =
@@ -189,8 +200,12 @@ const SYZYGY_MIN_SEPARATION_DAYS = SYZYGY_SEED_INTERVAL_DAYS / 2;
 
 /** 최대식 탐색 창 [일] — 삭망 시각 ± 이 값 (결정 E1). 삭망과 최대식의 차는 시 단위다 (ADR 1-A 측정 스크립트와 같은 창). */
 export const GREATEST_ECLIPSE_HALF_WINDOW_DAYS = 0.4;
-/** 최대식 황금분할 수렴 판정 [일] — `1e-6` 일 ≈ 0.09 s. */
-const GREATEST_ECLIPSE_TOLERANCE_DAYS = 1e-6;
+/**
+ * 최대식 황금분할 수렴 판정 [일] — `1e-6` 일 ≈ 0.09 s. 최종 구간 폭이 이 값보다 작고 최소점을 품으므로, 같은 최소를 찾은 두 실행의
+ * 결과 차는 이 값 미만이다. #1404 — 사전 계산 파일 drift 테스트가 식 시각을 이 허용치로 비교한다 (플랫폼 간 1 ulp 차가 마지막
+ * 황금분할 비교를 뒤집으면 결과가 한 스텝 (`~4.3e-7` 일) 갈린다 — `time-events-data.test.ts`).
+ */
+export const GREATEST_ECLIPSE_TOLERANCE_DAYS = 1e-6;
 const GOLDEN_RATIO_CONJUGATE = (Math.sqrt(5) - 1) / 2;
 /**
  * 삭망 시각 사전 필터 — 삭망 순간의 식 지표 (γ · σ) 에 이 값을 곱해도 식 한계를 넘으면 최대식 탐색을 건너뛴다. 삭망 (황경 일치)

@@ -22,14 +22,19 @@ function norm(v: readonly number[]): number {
 }
 
 describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 거리 (D2)', () => {
-  it('지구 태양 거리 == ‖orbitalStateAt(earth.orbit, jd, G·M☉).position‖ (상대 1e-12) + 표시 문자열 일치', () => {
+  it('지구 태양 거리 == ‖orbitalStateAt(elementsAt(earth.orbit, tt), tt, G·M☉).position‖ (상대 1e-12) + 표시 문자열 일치', () => {
     const earth = byId.get('earth')!;
     const sun = byId.get('sun')!;
     for (const jd of [J2000, J2000 + 100, J2000 + 9_000.5]) {
       const got = computeBodyDistances(byId, 'earth', jd).fromSunM!;
+      // #1406 — 지구 (EMB) 는 율 보유라 장면과 같은 시각 요소 (`elementsAt`) 로 기대값을 만든다.
+      const tt = clockJdToTt(jd);
       const ref = norm(
-        physics.orbitalStateAt(earth.orbit!, clockJdToTt(jd), GRAVITATIONAL_CONSTANT * sun.mass)
-          .position,
+        physics.orbitalStateAt(
+          physics.elementsAt(earth.orbit!, tt),
+          tt,
+          GRAVITATIONAL_CONSTANT * sun.mass,
+        ).position,
       );
       expect(Math.abs(got - ref) / ref).toBeLessThan(1e-12);
       expect(formatSunDistance(got)).toBe(formatSunDistance(ref));
@@ -60,10 +65,15 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
     const sun = byId.get('sun')!;
     const moon = byId.get('moon')!;
     const tt = clockJdToTt(J2000);
-    const e = physics.orbitalStateAt(earth.orbit!, tt, GRAVITATIONAL_CONSTANT * sun.mass);
-    // #1354 결정 M4 — 달은 율 · 주기 항 보유라 장면과 같은 단일 함수 `parentRelativePositionAt` 로 기대값을 만든다
-    // (그 함수의 정확도는 core `orbit-elements-at.test.ts` E1 · P1 이 DE441 로 단언). 종전 `orbitalStateAt(moon.orbit)` 은
-    // J2000 에서도 주기 9항만큼 (`5,357 km`) 다르다.
+    // #1406 — 지구 (EMB) 는 율 보유 — 장면과 같은 시각 요소.
+    const e = physics.orbitalStateAt(
+      physics.elementsAt(earth.orbit!, tt),
+      tt,
+      GRAVITATIONAL_CONSTANT * sun.mass,
+    );
+    // #1354 결정 M4 — 달은 이론 위치 (`lunarTheory`, #1404) 라 장면과 같은 단일 함수 `parentRelativePositionAt` 로 기대값을
+    // 만든다 (그 함수의 정확도는 core `orbit-elements-at.test.ts` E1 · P1 · `lunar-theory.test.ts` 가 DE441 로 단언). 종전
+    // `orbitalStateAt(moon.orbit)` 은 J2000 에서도 이론 위치와 `5,617 km` 다르다 (#1404 DoD D10).
     const m = physics.parentRelativePositionAt(moon, earth, sun, tt);
     const ref = norm([e.position[0] + m[0], e.position[1] + m[1], e.position[2] + m[2]]);
     expect(Math.abs(d.fromSunM! - ref) / ref).toBeLessThan(1e-12);
@@ -166,7 +176,7 @@ describe('#1281 computeBodyDistances — 현재 시뮬레이션 시각 기준 �
  * #1341 PR2 DoD E1 — 두 천체 거리. 독립 계산 = `physics.orbitalStateAt` 를 모체 체인마다 직접 부른 합 (장면 · 카드가 쓰는
  * `positionAt` 경로와 다른 함수). μ 는 #1305 식 (태양 직속 G·M☉ / 위성 G(M_parent + m)).
  *
- * #1354 결정 M4 — 율 보유 궤도 (달) 고리는 독립 경로가 없다 (주기 항의 다른 구현을 두지 않는다 — 함수가 둘이면 parity 가
+ * #1354 결정 M4 — 달 고리는 독립 경로가 없다 (달 이론의 다른 구현을 두지 않는다 — 함수가 둘이면 parity 가
  * 테스트에 기댄다). 그 고리만 장면과 같은 `parentRelativePositionAt` 로 만든다. 정확도는 core E1 · P1 (DE441) 이 단언한다.
  */
 describe('#1341 computeBodyPairDistance — 두 천체 물리 거리 (E1)', () => {

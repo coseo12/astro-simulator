@@ -7,8 +7,9 @@ import { parentRelativePositionAt } from './orbit-elements-at.js';
  * #1347 — 모체 체인 위치 (DoD M4 · 교차검증 합의 5). 사건 계산과 web 거리 계산이 이 함수 하나를 쓴다. 여기서는 그 함수가
  * scene Kepler 경로의 식 (부모 기준 위치의 체인 합) 과 같은 값을 내는지 본다.
  *
- * #1354 결정 M4 — 부모 기준 위치는 scene 과 같은 단일 함수 `parentRelativePositionAt` 이다 (율 보유 달은 시각 요소 + 주기 항,
- * 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 — 후자의 비트 동일은 `orbit-elements-at.test.ts` I1 이 단언한다).
+ * #1354 결정 M4 — 부모 기준 위치는 scene 과 같은 단일 함수 `parentRelativePositionAt` 이다 (달은 `lunarTheory` 이론
+ * 위치 (#1404), 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 — 후자의 비트 동일은 `orbit-elements-at.test.ts` I1 이
+ * 단언한다).
  * 여기서는 체인 합만 본다.
  */
 

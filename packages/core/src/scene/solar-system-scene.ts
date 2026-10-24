@@ -184,6 +184,10 @@ const KUIPER_BRIGHTNESS_SEED_OFFSET = 2;
  * 갱신한다. 실측 (1900 ~ 2100 · 문턱 직전까지 지연): 선 ↔ 달 평균 위치 최대 거리 — 매 프레임 갱신 `516` km · `0.5°`
  * `672` km · `1°` `881` km · `2°` `1,320` km. `672` km × 위성 배율 30 = 달 메시 반경의 `1.45 %`. 장면 동작은
  * `solar-system-scene-lunar-orbit-line.test.ts` 가 단언한다.
+ *
+ * #1406 — 8행성도 율 보유지만 `|Ω̇|` · `|ϖ̇|` 최대가 화성 ϖ `0.444°/세기` 라, 1900 ~ 2100 을 **한 방향으로 한 번 끌 때**
+ * 행성 궤도선 갱신은 최대 1회다 (2세기 변화 `≤ 0.89°` < 문턱 2배. 왕복하면 방향마다 1회씩 최대 2회). a · e · I 율은 이
+ * 판정에 들어가지 않고 다음 Ω · ϖ 갱신 때 함께 반영된다 (ADR 1406 결정 C).
  */
 export const PRECESSING_ORBIT_LINE_THRESHOLD_RAD = (0.5 * Math.PI) / 180;
 
@@ -2129,8 +2133,9 @@ export function createSolarSystemScene(
     let offset = 0;
     for (let i = 0; i < specs.length; i += 1) {
       let spec = specs[i]!;
-      // #1354 결정 V1 — 율 보유 천체 (달) 는 사양 (p · q · M₀ · epoch) 을 현재 시각 요소로 다시 만든다. 점 수는 같다
-      //   (이심률 불변 → 선분 수 불변) 라 정점 배치 · 오프셋이 그대로다.
+      // #1354 결정 V1 — 율 보유 천체 (달 · 8행성 — #1406) 는 사양 (p · q · M₀ · epoch) 을 현재 시각 요소로 다시 만든다.
+      //   점 수는 같다 — 이심률이 `HIGH_ECCENTRICITY_THRESHOLD` (0.6) 를 넘나들지 않아 선분 수가 불변이라 정점 배치 · 오프셋이
+      //   그대로다 (8행성 e 최대 수성 `0.2056`, `|ė| ≤ 0.00051/세기` — ADR 1406 결정 C 궤적 계약, 가드 없이 주석으로 둔다).
       const body = bodiesById.get(spec.id)!;
       if (hasSecularRates(body)) {
         spec = createTrailBodySpec(body, bodiesById.get(spec.parentId)!, currentJd)!;
@@ -2727,7 +2732,7 @@ export function createSolarSystemScene(
     // sun 중심 좌표라 위 루프에서 처리됨 (별도 처리 불필요).
     // #1318 — 태양 중심 `orbitLines` 도 같은 헬퍼에서 태양 로컬 좌표로 동기 (T3 floating origin 정합).
     syncOrbitLinePositions(ox, oy, oz, sceneUnitPerMeter);
-    // #1354 결정 V1 — 율 보유 천체 (달) 궤도선을 현재 시각 평균 요소로 (문턱을 넘을 때만 정점 갱신).
+    // #1354 결정 V1 — 율 보유 천체 (달 · 8행성) 궤도선을 현재 시각 평균 요소로 (문턱을 넘을 때만 정점 갱신).
     refreshPrecessingOrbitLines(ttJd);
     // #1341 결정 T3 — trail 정점도 위 mesh 루프와 같은 스냅샷 기준계로 (아래 primary follow 가 origin 을 옮기기 전 값).
     syncTrails(ox, oy, oz, sceneUnitPerMeter);
@@ -3466,7 +3471,7 @@ export function createSolarSystemScene(
       // #1305 — 위성은 μ = G(M_parent + m) (2체 상대 궤도). 태양 직속은 G·M_sun 유지. `orbitMu` SSoT —
       // Newton 초기 상태 (`buildInitialState`) · 정보 카드 거리 (`body-distance.ts`) 와 같은 식.
       // #1354 결정 M4 — 위치는 `parentRelativePositionAt` 단일 함수 (체인 위치 `resolveBodyChainPosition` 과 같은 함수).
-      //   율 보유 궤도 (달) 는 시각 요소 + 주기 항, 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 (비트 동일).
+      //   달은 `lunarTheory` 이론 위치 (#1404), 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 (비트 동일).
       const grandparent = parent.parentId == null ? null : bodiesById.get(parent.parentId);
       const p = parentRelativePositionAt(body, parent, grandparent, jd);
       buf[0] = p[0];
