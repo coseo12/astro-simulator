@@ -189,8 +189,12 @@ const SYZYGY_MIN_SEPARATION_DAYS = SYZYGY_SEED_INTERVAL_DAYS / 2;
 
 /** 최대식 탐색 창 [일] — 삭망 시각 ± 이 값 (결정 E1). 삭망과 최대식의 차는 시 단위다 (ADR 1-A 측정 스크립트와 같은 창). */
 export const GREATEST_ECLIPSE_HALF_WINDOW_DAYS = 0.4;
-/** 최대식 황금분할 수렴 판정 [일] — `1e-6` 일 ≈ 0.09 s. */
-const GREATEST_ECLIPSE_TOLERANCE_DAYS = 1e-6;
+/**
+ * 최대식 황금분할 수렴 판정 [일] — `1e-6` 일 ≈ 0.09 s. 최종 구간 폭이 이 값보다 작고 최소점을 품으므로, 같은 최소를 찾은 두 실행의
+ * 결과 차는 이 값 미만이다. #1404 — 사전 계산 파일 drift 테스트가 식 시각을 이 허용치로 비교한다 (플랫폼 간 1 ulp 차가 마지막
+ * 황금분할 비교를 뒤집으면 결과가 한 스텝 (`~4.3e-7` 일) 갈린다 — `time-events-data.test.ts`).
+ */
+export const GREATEST_ECLIPSE_TOLERANCE_DAYS = 1e-6;
 const GOLDEN_RATIO_CONJUGATE = (Math.sqrt(5) - 1) / 2;
 /**
  * 삭망 시각 사전 필터 — 삭망 순간의 식 지표 (γ · σ) 에 이 값을 곱해도 식 한계를 넘으면 최대식 탐색을 건너뛴다. 삭망 (황경 일치)

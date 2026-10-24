@@ -59,6 +59,7 @@ export {
   EVENT_KINDS,
   ABSOLUTE_FOCUS_VIEWS,
   EVENT_KIND_TOLERANCE_DAYS,
+  GREATEST_ECLIPSE_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
   eventFocusBodyId,

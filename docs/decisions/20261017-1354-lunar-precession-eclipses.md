@@ -297,7 +297,8 @@ events (`packages/core/src/events/*.test.ts`) · `p2b-1year-position.test.ts` �
 
 ## Amendment 3 — 결정 M1 · M2 를 ADR 1404 가 대체 (#1404, 2026-10-24, Accepted)
 
-- **바뀌는 결정**: M1 (달 모델 B9 — Kepler 평균 요소 + 주기 9항) · M2 의 `periodicTerms` 부분. 달 위치는 ADR [`20261023-1404`](20261023-1404-lunar-theory-meeus47.md) 결정 L1 의 이론 (Meeus 47장 전 항 + 황도 세차 회전, `moon.orbit.lunarTheory`) 이 정한다. `periodicTerms` 경로 (스키마 · 로더 변환 · `periodicArgumentsAt` · `periodicPerturbationAt`) 는 지웠다 (ADR 1404 결정 L3). 다른 위성에 주기 섭동이 필요해지면 재검토 조건 4 로 다시 설계한다.
+- **바뀌는 결정**: M1 (달 모델 B9 — Kepler 평균 요소 + 주기 9항) · M2 의 `periodicTerms` 부분. 달 위치는 ADR [`20261023-1404`](20261023-1404-lunar-theory-meeus47.md) 결정 L1 의 이론 (Meeus 47장 전 항 + 황도 세차 회전, `moon.orbit.lunarTheory`) 이 정한다. `periodicTerms` 경로 (스키마 · 로더 변환 · `periodicArgumentsAt` · `periodicPerturbationAt`) 는 지웠다 (ADR 1404 결정 L3). 다른 위성에 주기 섭동이 필요해지면 재검토 트리거 4 로 다시 설계한다.
 - **이유**: Kepler 구조에 표의 항을 139행까지 넣어도 일식 시각이 ±4 분대에서 멈춘다 (ADR 1404 §1-C). 이론으로 바꾸면 DE441 대비 위치 오차가 `14.3″` · `5.4″` · `12.2 km` 다 (같은 절).
+- **무효가 된 절**: §Concrete Prediction (「`periodicTerms` 행만 바뀐다」) 과 재검토 트리거 4 (「`periodicTerms` 인자 기준 재설계」) 는 `periodicTerms` 전제를 잃어 무효다 — 트리거 4 는 「인자 기준이 위성마다 다르다」 는 문제 제기만 남는다.
 - **불변**: M2 의 `rates` (틀 변환 `rate − p_A`) · M3 (`elementsAt`) · M4 (단일 함수 `parentRelativePositionAt`) · M5 (N-body 초기 상태 = 평균 요소) · V1 (궤도선) · 정보 카드 공전주기. 달의 기점 값 · `rates` 는 이제 평균 요소 (궤도선 · 궤적 · N-body · 공전주기) 에만 쓰인다 (ADR 1404 결정 L4).
 - **DoD 갱신**: E1 · E4 `1.0 → 0.5` h, E2 · E3 · P1 임계는 ADR 1404 §DoD D3 · D5 ~ D7. 달 `rates` 변이 판별 테스트 2건은 지우고 이론 변이 3종으로 바꿨다 (ADR 1404 결정 E5). 사건 수 일식 `455 → 453` · 월식 `458 → 457` (Amendment 2 의 수).

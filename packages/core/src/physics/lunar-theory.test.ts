@@ -107,6 +107,42 @@ describe('#1404 L1 — 계산 계약', () => {
     const jd2050 = 2_451_545.0 + 50 * 365.25;
     expect(eclipticPrecessionAnglesToJ2000(jd2050).p).toBeLessThan(0);
   });
+  /**
+   * 세차 계수 단위 단언 (PR #1407 리뷰 권고 1) — T = 1 (J2100.0, t = −1) 에서 Meeus 21장 식을 손으로 전개한 값:
+   * η = −(47.0029 − 0.06603 + 0.000598) + (−0.03302 + 0.000598) − 0.000060 = `−46.96995″`,
+   * Π = 174.876384° + (3289.4789 + 0.60622)″ + (869.8089 + 0.50491)″ + 0.03536″ = `176.0320601917°`,
+   * p = −(5029.0966 + 2.22226 − 0.000042) + (1.11113 − 0.000042) + 0.000006 = `−5030.207724″`.
+   * 계수 한 자리 오식 (예: η 의 `47.0029 → 47.0929` 은 `0.09″`, p 의 t² 항 부호 반전은 `2.22″`) 이 허용 `1e-6″` 를 넘는다.
+   */
+  it('세차 각 — T = 1 에서 η −46.96995″ · Π 176.0320601917° · p −5030.207724″ (허용 1e-6″)', () => {
+    const jd2100 = 2_451_545.0 + 36_525;
+    const a = eclipticPrecessionAnglesToJ2000(jd2100);
+    const ANGLE_TOLERANCE_ARCSEC = 1e-6;
+    expect(Math.abs(a.eta / ARCSEC - -46.96995)).toBeLessThan(ANGLE_TOLERANCE_ARCSEC);
+    expect(Math.abs(a.Pi / ARCSEC - 176.0320601916666 * 3600)).toBeLessThan(ANGLE_TOLERANCE_ARCSEC);
+    expect(Math.abs(a.p / ARCSEC - -5030.207724)).toBeLessThan(ANGLE_TOLERANCE_ARCSEC);
+  });
+
+  /**
+   * 고위도 회전 (PR #1407 리뷰 권고 2) — 회전은 두 점 사이의 각거리를 보존해야 한다. 달 (`|β| ≤ 5.3°`) 만으로는 `A` 의
+   * `sin η sin β₀` 항 부호 오류가 위치 허용 (6″) 안에 숨는다 (T ≤ 1 에서 `η ≤ 47″`). β₀ 를 키우면 그 오류가 각거리를 바꾼다.
+   */
+  it('고위도 두 점 (β₀ = +60° · −70°) 의 각거리를 T = 1 회전 뒤에도 보존한다 (1e-9 rad)', () => {
+    const jd2100 = 2_451_545.0 + 36_525;
+    const p1 = { longitude: 30 * DEG, latitude: 60 * DEG, distance: 1 };
+    const p2 = { longitude: 200 * DEG, latitude: -70 * DEG, distance: 1 };
+    const separation = (u: Vec3Double, v: Vec3Double) =>
+      Math.atan2(
+        Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]),
+        u[0] * v[0] + u[1] * v[1] + u[2] * v[2],
+      );
+    const before = separation(eclipticToCartesian(p1), eclipticToCartesian(p2));
+    const after = separation(
+      eclipticToCartesian(eclipticOfDateToJ2000(p1, jd2100)),
+      eclipticToCartesian(eclipticOfDateToJ2000(p2, jd2100)),
+    );
+    expect(Math.abs(after - before)).toBeLessThan(1e-9);
+  });
 });
 
 describe('#1404 D3 — P1 달 위치 (DE441 4시각)', () => {
