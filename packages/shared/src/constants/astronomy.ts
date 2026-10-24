@@ -32,6 +32,7 @@ export const JULIAN_CENTURY_DAYS = 36_525;
  *
  * 「날짜 평균 분점」 기준으로 표기된 경도 율 (예: Meeus *Astronomical Algorithms* 2판 47장의 달 평균 요소) 을
  * 장면 좌표 (J2000 황도 · 고정 분점) 의 율로 옮길 때 뺀다 — 로더가 `rates.frame === 'mean-equinox-of-date'` 에 적용한다.
+ * `rates.frame === 'J2000'` (8행성 — JPL SSD 표 1) 은 이미 J2000 틀이라 빼지 않는다 (#1406 결정 F′).
  * ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md` 결정 M2.
  */
 export const GENERAL_PRECESSION_DEG_PER_CENTURY = 5028.796195 / 3600;

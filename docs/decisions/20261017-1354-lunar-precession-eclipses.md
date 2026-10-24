@@ -302,3 +302,10 @@ events (`packages/core/src/events/*.test.ts`) · `p2b-1year-position.test.ts` �
 - **무효가 된 절**: §Concrete Prediction (「`periodicTerms` 행만 바뀐다」) 과 재검토 트리거 4 (「`periodicTerms` 인자 기준 재설계」) 는 `periodicTerms` 전제를 잃어 무효다 — 트리거 4 는 「인자 기준이 위성마다 다르다」 는 문제 제기만 남는다.
 - **불변**: M2 의 `rates` (틀 변환 `rate − p_A`) · M3 (`elementsAt`) · M4 (단일 함수 `parentRelativePositionAt`) · M5 (N-body 초기 상태 = 평균 요소) · V1 (궤도선) · 정보 카드 공전주기. 달의 기점 값 · `rates` 는 이제 평균 요소 (궤도선 · 궤적 · N-body · 공전주기) 에만 쓰인다 (ADR 1404 결정 L4).
 - **DoD 갱신**: E1 · E4 `1.0 → 0.5` h, E2 · E3 · P1 임계는 ADR 1404 §DoD D3 · D5 ~ D7. 달 `rates` 변이 판별 테스트 2건은 지우고 이론 변이 3종으로 바꿨다 (ADR 1404 결정 E5). 사건 수 일식 `455 → 453` · 월식 `458 → 457` (Amendment 2 의 수).
+
+## Amendment 4 — 재검토 트리거 1 이행 (#1406, 2026-10-24, Accepted)
+
+- **트리거 1 발화** — 지구 (EMB) 를 포함한 8행성에 JPL SSD 표 1 율 6종이 들어갔다 (ADR [`20261024-1406`](20261024-1406-planet-element-rates-standish.md)). E1 · E4 를 다시 쟀다.
+- **실측** (ADR 1406 Amendment 1 — macOS · Apple M1 Pro · Node 24.14.0): E1 삭망 max `0.438 → 0.0151 h`, E4 최대식 max 일식 `26.54 → 2.07` 분 · 월식 `25.88 → 1.60` 분. 「잔여 추세 `±0.4` h 가 지구 기인인지」 는 지구 기인이었다 — 행성 율만 바꿨는데 E1 이 `~30` 배 줄었다.
+- **임계** — E1 · E4 `0.5 → 0.05 h`, E2 · E3 조임 (ADR 1406 결정 E5 · DoD D3 ~ D5). 허용치 `EVENT_KIND_TOLERANCE_DAYS` 의 식 2종은 `0.3` 일 그대로다 (D5 규칙 바닥).
+- 결정 M2 의 스키마는 `frame` 판별 합집합이 됐다 (`mean-equinox-of-date` 3필드 = 달 · `J2000` 6필드 = 8행성 — ADR 1406 결정 F). 달의 율 변환은 그대로다.

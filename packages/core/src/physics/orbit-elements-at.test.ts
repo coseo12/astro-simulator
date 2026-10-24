@@ -8,10 +8,15 @@
  * 회전) 로 바뀌었다. 기대값은 그 ADR 의 DoD (D3 P1 · D5 E1 · D9 I1 · D10 I2) 로 갱신했고, 주기 항 (`periodicTerms`) 경로와
  * 그 인자 블록은 지웠다 (결정 L3). 이론 자체의 단위 테스트는 `lunar-theory.test.ts`.
  *
+ * #1406 (ADR `docs/decisions/20261024-1406-planet-element-rates-standish.md`) — 8행성 (EMB 포함) 이 JPL SSD 표 1 율 6종
+ * (`frame: 'J2000'`) 을 가진다. 「율 보유 = 달 하나」 전제를 「달 · 8행성」 으로 바꾸고, DoD D9 (J2000 불변) · D10 (율 없는
+ * 천체 불변) · D11 (스키마) 을 아래 `#1406` 블록에 둔다. E1 대역은 그 ADR 결정 E5 로 조였다.
+ *
  * 기준값은 네트워크 없이 `events/__test-utils__/lunar-reference-fixture.ts` (DE441 — 출처 · 조회 조건은 그 파일 머리말).
  */
 import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with { type: 'json' };
 import {
+  AU,
   GENERAL_PRECESSION_DEG_PER_CENTURY,
   J2000_JD,
   JULIAN_CENTURY_DAYS,
@@ -24,6 +29,7 @@ import {
 } from '../ephemeris/solar-system-loader.js';
 import { EVENT_KINDS } from '../events/event-kinds.js';
 import { computeEventsForKind } from '../events/compute-events.js';
+import { getEventKind } from '../events/event-kinds.js';
 import {
   DE441_FULL_MOON_JD,
   DE441_MOON_POSITIONS,
@@ -56,10 +62,10 @@ const JD_2100 = 2_488_069.5;
 const SAMPLE_JDS = [JD_1900, J2000_JD, JD_2026, JD_2100] as const;
 
 /**
- * DoD E1 — 삭망 시각 허용 [h]. #1404 DoD D5 — `1.0 → 0.5` h. 실측 max `0.438` h (이론 + 앱 태양, macOS · M1 Pro · Node
- * 24.14.0 — ADR 설계 실측 `0.44` h). B9 는 `0.76` h 였다 (ADR 1354 축 M).
+ * DoD E1 — 삭망 시각 허용 [h]. #1406 DoD D4 — `0.5 → 0.05` h (ADR 1406 결정 E5 — 8행성 표 1 율로 태양 축이 줄었다). #1404
+ * DoD D5 때 `1.0 → 0.5` h · 실측 `0.438` h, B9 는 `0.76` h 였다 (ADR 1354 축 M).
  */
-const E1_SYZYGY_TOLERANCE_HOURS = 0.5;
+const E1_SYZYGY_TOLERANCE_HOURS = 0.05;
 /** E1 탐색 창 [일] — 기준 시각 ±3일 안에서 모델 근을 찾는다 (이각 속도 `~12°/일` → 창 끝 `|f| ≈ 0.64 rad`, 감김 없음). */
 const SYZYGY_SEARCH_HALF_WINDOW_DAYS = 3;
 const SYZYGY_BISECTION_STEPS = 48;
@@ -78,6 +84,28 @@ type RawSystem = typeof solarSystemRaw;
 /** 원본 JSON 사본 — 테스트마다 변형해도 다른 테스트에 새지 않는다. */
 function rawCopy(): RawSystem {
   return structuredClone(solarSystemRaw);
+}
+
+/** #1406 — 율 보유 8행성 (EMB = `earth`). */
+const PLANET_IDS = [
+  'mercury',
+  'venus',
+  'earth',
+  'mars',
+  'jupiter',
+  'saturn',
+  'uranus',
+  'neptune',
+] as const;
+
+/** #1406 — 8행성의 `rates` 를 뺀 판본 (`base` — #1406 이전 데이터와 같은 행성 요소). 달은 그대로 둔다. */
+function rawWithoutPlanetRates(): RawSystem {
+  const raw = rawCopy();
+  for (const id of PLANET_IDS) {
+    const orbit = raw.bodies.find((b) => b.id === id)!.orbit as Record<string, unknown>;
+    delete orbit.rates;
+  }
+  return raw;
 }
 
 /** 달의 `rates` · `lunarTheory` 를 뺀 판본 (V0 — #1354 이전 데이터와 같은 달 요소). */
@@ -231,8 +259,13 @@ describe('#1354 M3 — elementsAt', () => {
     }
   });
 
-  it('율 보유 천체는 달 하나 (I1 전제 — 공허 통과 방지)', () => {
-    expect(full.bodies.filter((b) => b.orbit?.rates).map((b) => b.id)).toEqual(['moon']);
+  it('율 보유 천체는 달 · 8행성, 달 이론은 달 하나 (I1 · #1406 D10 전제 — 공허 통과 방지)', () => {
+    expect(
+      full.bodies
+        .filter((b) => b.orbit?.rates)
+        .map((b) => b.id)
+        .sort(),
+    ).toEqual([...PLANET_IDS, 'moon'].sort());
     expect(full.bodies.filter((b) => b.orbit?.lunarTheory).map((b) => b.id)).toEqual(['moon']);
   });
 
@@ -306,7 +339,14 @@ describe('#1354 M2 · #1404 L2 — 로더 (율 틀 변환 · 달 이론 단위 �
     expect(() => loadSolarSystem(raw)).toThrow();
   });
 
-  it('rates.frame 은 literal — 다른 틀 이름은 파싱 실패', () => {
+  it('rates.frame 은 판별 합집합 — 변환 규칙 없는 틀 이름은 파싱 실패 (#1406 D11)', () => {
+    for (const id of ['moon', 'mars']) {
+      const raw = rawCopy();
+      const orbit = raw.bodies.find((b) => b.id === id)!.orbit as { rates: { frame: string } };
+      orbit.rates.frame = 'ecliptic-of-date';
+      expect(() => loadSolarSystem(raw), id).toThrow();
+    }
+    // 달 율 (3필드) 을 J2000 틀이라 적으면 a · e · I 율이 없어 실패한다 — 틀과 필드 집합이 함께 묶인다.
     const raw = rawCopy();
     const orbit = raw.bodies.find((b) => b.id === 'moon')!.orbit as { rates: { frame: string } };
     orbit.rates.frame = 'J2000';
@@ -354,17 +394,22 @@ describe('#1354 I1 · #1404 D9 — 다른 천체 불변 (달 율 · lunarTheory 
     expect(n).toBe(35 * 4);
   });
 
-  it('달 외 천체의 위치 = positionAt(orbit, jd, orbitMu) 그대로 (단일 함수가 경로를 바꾸지 않는다)', () => {
+  it('달 외 천체의 위치 = positionAt(elementsAt(orbit, jd), jd, orbitMu) — 율 없으면 고정 요소 그대로', () => {
+    let withRates = 0;
     for (const b of others) {
       if (!b.orbit || !b.parentId) continue;
       const parent = fullById.get(b.parentId)!;
       const gp = parent.parentId == null ? null : fullById.get(parent.parentId)!;
+      if (b.orbit.rates) withRates += 1;
       for (const jd of SAMPLE_JDS) {
+        const orbit = b.orbit.rates ? elementsAt(b.orbit, jd) : b.orbit;
         expect(parentRelativePositionAt(b, parent, gp, jd)).toEqual(
-          positionAt(b.orbit, jd, orbitMu(b, parent)),
+          positionAt(orbit, jd, orbitMu(b, parent)),
         );
       }
     }
+    // #1406 — 8행성이 율 경로를 탄다 (공허 통과 방지).
+    expect(withRates).toBe(PLANET_IDS.length);
   });
 
   it('궤도선 정점 · 궤적 정점 비트 동일', () => {
@@ -551,8 +596,140 @@ describe('#1354 계약 1 — 정보 카드 달 공전주기 (항성월)', () => 
   });
 
   it('율 없는 천체는 Kepler 주기와 같다', () => {
-    const mars = fullById.get('mars')!;
-    const mu = orbitMu(mars, sun);
-    expect(siderealPeriodOf(mars.orbit!, mu)).toBe(orbitalPeriod(mars.orbit!.semiMajorAxis, mu));
+    // #1406 — 화성은 율 보유가 됐다. 율 없는 태양 직속 천체 (세레스) 로 잰다.
+    const ceres = fullById.get('ceres')!;
+    expect(ceres.orbit!.rates).toBeUndefined();
+    const mu = orbitMu(ceres, sun);
+    expect(siderealPeriodOf(ceres.orbit!, mu)).toBe(orbitalPeriod(ceres.orbit!.semiMajorAxis, mu));
+  });
+});
+
+// ── #1406 — 8행성 표 1 율 (ADR 20261024-1406) ────────────────────────────────
+
+describe('#1406 결정 E · F′ — 8행성 율 (JPL SSD 표 1, frame J2000)', () => {
+  /** 표 1 율 행 원값 [a au/Cy, e /Cy, I · L · ϖ · Ω deg/Cy] — 데이터 파일과 grep 대조되는 숫자 그대로. */
+  const TABLE1_RATES: Record<(typeof PLANET_IDS)[number], readonly number[]> = {
+    mercury: [0.00000037, 0.00001906, -0.00594749, 149472.67411175, 0.16047689, -0.12534081],
+    venus: [0.0000039, -0.00004107, -0.0007889, 58517.81538729, 0.00268329, -0.27769418],
+    earth: [0.00000562, -0.00004392, -0.01294668, 35999.37244981, 0.32327364, 0.0],
+    mars: [0.00001847, 0.00007882, -0.00813131, 19140.30268499, 0.44441088, -0.29257343],
+    jupiter: [-0.00011607, -0.00013253, -0.00183714, 3034.74612775, 0.21252668, 0.20469106],
+    saturn: [-0.0012506, -0.00050991, 0.00193609, 1222.49362201, -0.41897216, -0.28867794],
+    uranus: [-0.00196176, -0.00004397, -0.00242939, 428.48202785, 0.40805281, 0.04240589],
+    neptune: [0.00026291, 0.00005105, 0.00035372, 218.45945325, -0.32241464, -0.00508664],
+  };
+
+  it.each(PLANET_IDS)('%s — 율 = 표 원값 × 단위 (p_A 를 빼지 않는다)', (id) => {
+    const r = fullById.get(id)!.orbit!.rates!;
+    const [a, e, i, L, w, O] = TABLE1_RATES[id]!;
+    const angle = (degPerCentury: number) => (degPerCentury * DEG) / JULIAN_CENTURY_DAYS;
+    expect(r.semiMajorAxis).toBe((a! * AU) / JULIAN_CENTURY_DAYS);
+    expect(r.eccentricity).toBe(e! / JULIAN_CENTURY_DAYS);
+    expect(r.inclination).toBe(angle(i!));
+    expect(r.meanLongitude).toBe(angle(L!));
+    expect(r.longitudeOfPerihelion).toBe(angle(w!));
+    expect(r.longitudeOfAscendingNode).toBe(angle(O!));
+  });
+
+  it('달 (mean-equinox-of-date) 의 a · e · I 율은 0 — 평균 요소가 바뀌지 않는다', () => {
+    const r = moon.orbit!.rates!;
+    expect([r.semiMajorAxis, r.eccentricity, r.inclination]).toEqual([0, 0, 0]);
+    const el = elementsAt(moon.orbit!, JD_2100);
+    expect(el.semiMajorAxis).toBe(moon.orbit!.semiMajorAxis);
+    expect(el.eccentricity).toBe(moon.orbit!.eccentricity);
+    expect(el.inclination).toBe(moon.orbit!.inclination);
+  });
+
+  const RATE_FIELDS = [
+    'semiMajorAxisAuPerCentury',
+    'eccentricityPerCentury',
+    'inclinationDegPerCentury',
+    'meanLongitudeDegPerCentury',
+    'longitudeOfPerihelionDegPerCentury',
+    'longitudeOfAscendingNodeDegPerCentury',
+  ] as const;
+
+  it.each(RATE_FIELDS)('D11 — frame J2000 에서 %s 가 빠지면 파싱 실패', (field) => {
+    const raw = rawCopy();
+    const rates = (raw.bodies.find((b) => b.id === 'mars')!.orbit as Record<string, unknown>)
+      .rates as Record<string, unknown>;
+    expect(rates[field]).toBeTypeOf('number');
+    delete rates[field];
+    expect(() => loadSolarSystem(raw)).toThrow();
+  });
+
+  it('elementsAt — a · e · I 가 율 × Δt 만큼 바뀐다 (2100-01-01, 8행성)', () => {
+    for (const id of PLANET_IDS) {
+      const o = fullById.get(id)!.orbit!;
+      const dt = JD_2100 - o.epoch;
+      const el = elementsAt(o, JD_2100);
+      expect(el.semiMajorAxis, id).toBe(o.semiMajorAxis + o.rates!.semiMajorAxis * dt);
+      expect(el.eccentricity, id).toBe(o.eccentricity + o.rates!.eccentricity * dt);
+      expect(el.inclination, id).toBe(o.inclination + o.rates!.inclination * dt);
+      expect(el.eccentricity, id).not.toBe(o.eccentricity);
+    }
+  });
+
+  it('정보 카드 공전주기 = 2π / L̇ — 우라노스 84.018 년 · 해왕성 164.790 년 (Kepler 84.059 · 164.890 년)', () => {
+    const years = (id: string) => {
+      const b = fullById.get(id)!;
+      return siderealPeriodOf(b.orbit!, orbitMu(b, sun)) / SECONDS_PER_DAY / 365.25;
+    };
+    expect(years('uranus').toFixed(3)).toBe('84.018');
+    expect(years('neptune').toFixed(3)).toBe('164.790');
+  });
+});
+
+describe('#1406 D9 · D10 — 행성 율 유 ↔ 무 (base)', () => {
+  const base = loadSolarSystem(rawWithoutPlanetRates());
+  const baseById = byIdOf(base);
+
+  it('양성 대조군 — base 는 행성 율이 없고, 2100 에서 목성 위치가 다르다', () => {
+    expect(base.bodies.filter((b) => b.orbit?.rates).map((b) => b.id)).toEqual(['moon']);
+    const a = resolveBodyChainPosition(fullById, 'jupiter', JD_2100)!.world;
+    const c = resolveBodyChainPosition(baseById, 'jupiter', JD_2100)!.world;
+    expect(dist(a, c)).toBeGreaterThan(1e6 * KM);
+  });
+
+  it('D9 — J2000 에서 8행성 체인 위치 · N-body 초기 상태가 비트 동일', () => {
+    for (const id of PLANET_IDS) {
+      expect(resolveBodyChainPosition(fullById, id, J2000_JD), id).toEqual(
+        resolveBodyChainPosition(baseById, id, J2000_JD),
+      );
+    }
+    const a = buildInitialState(full, J2000_JD);
+    const c = buildInitialState(base, J2000_JD);
+    expect(a.ids).toEqual(c.ids);
+    expect(Array.from(a.positions)).toEqual(Array.from(c.positions));
+    expect(Array.from(a.velocities)).toEqual(Array.from(c.velocities));
+  });
+
+  it('D10 — 율 없는 천체의 일심 위치 · 위성의 모체 기준 위치가 비트 동일 (4시각)', () => {
+    let heliocentric = 0;
+    let satellites = 0;
+    for (const b of full.bodies) {
+      if (!b.orbit || !b.parentId || b.orbit.rates) continue;
+      for (const jd of SAMPLE_JDS) {
+        const a = resolveBodyChainPosition(fullById, b.id, jd)!;
+        const c = resolveBodyChainPosition(baseById, b.id, jd)!;
+        if (b.parentId === 'sun') expect(a.world, `${b.id} @ ${jd}`).toEqual(c.world);
+        else expect(a.local, `${b.id} @ ${jd}`).toEqual(c.local);
+      }
+      if (b.parentId === 'sun') heliocentric += 1;
+      else satellites += 1;
+    }
+    // 공허 통과 방지 — 왜소행성 · 혜성 · 소행성과 위성이 둘 다 표본에 있다.
+    expect(heliocentric).toBeGreaterThan(0);
+    expect(satellites).toBeGreaterThan(0);
+  });
+
+  it('D10 — 혜성 근일점 2종 사건 시각 비트 동일 (1900 ~ 2100)', () => {
+    for (const id of ['halley-perihelion', 'swift-tuttle-perihelion'] as const) {
+      const kind = getEventKind(id);
+      const a = computeEventsForKind(fullById, kind, JD_1900, JD_2100).map((e) => e.julianDate);
+      const c = computeEventsForKind(baseById, kind, JD_1900, JD_2100).map((e) => e.julianDate);
+      expect(a.length, id).toBeGreaterThan(0);
+      expect(a, id).toEqual(c);
+    }
   });
 });

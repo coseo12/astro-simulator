@@ -13,7 +13,8 @@
  * ## 숨은 상수 금지 (volt #69)
  *
  * 목성 · 해왕성의 `a` · `λ(epoch)` · `n` 은 이 모듈에 리터럴로 두지 않는다. `solar-system.json` → 로더 →
- * `orbitMu` 경로(`beltPlanetsFromSystem`) 로 **입력**받는다. 공명 위치(커크우드 간극 · 힐다 · 플루티노 장반경)도
+ * `beltPlanetsFromSystem` 로 **입력**받는다 (`n` 은 율 보유면 평균경도 율, 없으면 `orbitMu` 의 Kepler `n` — #1406 결정 C-2).
+ * 공명 위치(커크우드 간극 · 힐다 · 플루티노 장반경)도
  * 결정 4 표의 숫자를 옮겨 적지 않고 행성 `a` 와 공명비에서 Kepler 제3법칙으로 도출한다 (표 값과의 일치는 단위 테스트).
  *
  * ## ADR 표 표기의 해석
@@ -78,7 +79,10 @@ export interface ResonancePlanet {
   semiMajorAxisAU: number;
   /** `epoch` 시점의 평균경도 λ = Ω + ω + M [rad]. */
   meanLongitudeAtEpoch: number;
-  /** 평균운동 [rad/day] — 장면 Kepler 경로(`positionAt(orbit, jd, orbitMu(body, sun))`) 와 같은 값. */
+  /**
+   * 평균경도의 율 [rad/day] — 장면이 행성을 움직이는 율과 같은 값. 율 보유 궤도 (#1406 — 8행성) 는 `rates.meanLongitude`
+   * (장면 `λ(t) = Ω + ω + M` 이 `elementsAt` 식상 정확히 `λ₀ + L̇·Δt`), 없으면 Kepler `√(μ/a³)`.
+   */
   meanMotion: number;
 }
 
@@ -215,7 +219,11 @@ function wrapPi(x: number): number {
 
 /**
  * 로더 경로에서 공명 기준 행성을 읽는다 — `solar-system.json` → `getSolarSystem()` → 이 함수.
- * 평균운동은 장면이 행성을 움직이는 식(`positionAt(orbit, jd, orbitMu(body, sun))`) 과 같은 μ 로 계산한다.
+ *
+ * 평균운동은 장면이 행성을 움직이는 율이다 (#1406 결정 C-2). 율 보유 궤도면 `rates.meanLongitude` — 장면의 평균경도가
+ * `λ₀ + L̇·Δt` 라 공명각의 시간미분이 0 이 된다. Kepler `√(μ/a³)` 를 쓰면 1900 ~ 2100 에서 목성 위상이 최대 `1.36°`
+ * 어긋난다 (ADR 1406 §1-J). 율이 없으면 장면 경로 `positionAt(orbit, jd, orbitMu(body, sun))` 와 같은 Kepler `n` 이다.
+ * 장반경 `a₀` 는 기점 값 그대로 쓴다 (공명 장반경은 위치 분포만 정한다).
  */
 export function beltPlanetsFromSystem(system: LoadedSolarSystem): BeltPlanets {
   const byId = new Map(system.bodies.map((b) => [b.id, b]));
@@ -231,7 +239,9 @@ export function beltPlanetsFromSystem(system: LoadedSolarSystem): BeltPlanets {
         meanLongitudeAtEpoch: wrapPi(
           o.longitudeOfAscendingNode + o.argumentOfPeriapsis + o.meanAnomalyAtEpoch,
         ),
-        meanMotion: meanMotionRadPerDay(o.semiMajorAxis, orbitMu(body, sun)),
+        meanMotion: o.rates
+          ? o.rates.meanLongitude
+          : meanMotionRadPerDay(o.semiMajorAxis, orbitMu(body, sun)),
       },
       epoch: o.epoch,
     };
