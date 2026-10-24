@@ -1,8 +1,8 @@
 # ADR 20261024-1406 — 8행성 (EMB 포함) 궤도 요소에 Standish 표 1 의 율 6종을 넣는다
 
-- **상태**: Provisional — cross-validate 결과 통합 전 (CLAUDE.md §ADR Status 워크플로). 사용자 결정 (Q 표) 대기
+- **상태**: Accepted (cross-validate 2026-10-24) — 사용자 결정 (2026-10-24): Q1 ~ Q7 전부 권고안
 - **날짜**: 2026-10-24
-- **결정자**: 사용자 (Q 표 — 대기) · 설계 architect (이슈 [#1406](https://github.com/coseo12/astro-simulator/issues/1406), 사용자 착수 결정 2026-10-24)
+- **결정자**: 사용자 (2026-10-24 — Q 표 전부 권고안, 메인 오케스트레이터 경유) · 설계 architect (이슈 [#1406](https://github.com/coseo12/astro-simulator/issues/1406), 사용자 착수 결정 2026-10-24)
 - **관련**:
   - [ADR 20261023-1404](20261023-1404-lunar-theory-meeus47.md) — §1-D 태양 축 실측 · §1-H along / cross · 결정 S (이 축을 #1406 으로 분리) · 재검토 조건 1 (「#1406 이 들어오면 D1 · D2 · D5 · D7 을 다시 재고 임계를 Amendment」) · Amendment 1
   - [ADR 20261017-1354](20261017-1354-lunar-precession-eclipses.md) — 스키마 M2 (`rates`) · 결정 M3 (`elementsAt`) · M4 (위치 단일 함수) · M5 (N-body 초기 상태) · V1 (궤도선 · 궤적 갱신) · 재검토 트리거 1 (「지구 (EMB) 요소에 율 · 섭동을 넣으면 → E1 · E4 재측정 후 허용치 Amendment」)
@@ -220,6 +220,35 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
   - `verify-fps-baseline` 의 `?t=2446479.5`: 목성 `726.5″` · 그 밖 `≤ 242.4″`.
   - 브라우저 가드 시각은 J2000 에서 `81 ~ 265` 일 떨어져 있어 이동이 작다. fps 가드 시각은 J2000 `−5,065` 일이라 크다 (fps 측정이다). 영향 판정은 PR1 CI 실발화로 한다 (#1370 · #1404 선례).
 
+#### 1-J. cross-validate 반영 실측 (2026-10-24) [실측 · 정적 판독]
+
+§실측과 같은 환경 · 같은 변이판 (scratch worktree, develop `31726761`) 이다. 일회성 스크립트는 측정 후 삭제했다.
+
+- **N-body 초기 속도 ↔ 장면 운동** — `orbitalStateAt(elementsAt(o, t), t, μ).velocity` 와 장면 위치 `positionAt(elementsAt(o, t′), t′, μ)` 의 중앙차분 (`h = 0.01` 일) 을 1900 ~ 2100 50일 간격으로 비교했다.
+  - `base`: max `0.011 m/s` (수성 · 수치 미분 바닥).
+  - `t1`: 수성 `0.191` · 금성 `0.577` · 지구 `0.414` · 화성 `0.909` · 목성 `6.505` · 토성 `3.437` · 우라노스 `4.684` · 해왕성 `3.710 m/s`. 상대값 max `722 ppm` (우라노스).
+  - 목성은 장면 평균경도 율 `L̇ = 3034.7461°/세기` 와 Kepler `n = √(μ/a³)` (`orbitMu` = G·M☉) `3033.3862°/세기` 의 차가 `448 ppm` 이다 [계산]. 그래서 목성 차 `490 ppm` 의 대부분은 「율의 시간미분항」 이 아니라 「Kepler 속도의 크기가 장면 평균운동과 다른 몫」 이다.
+- **`syncTrails` 사양 재구성** (Node, 2e5 프레임 × 5 의 최솟값): 프레임당 달 1개 `0.104 µs` → 달 + 8행성 `3.021 µs`.
+  - 할당 [정적 판독]: 천체당 프레임마다 `elementsAt` 의 새 요소 객체 1 · `createTrailBodySpec` 의 사양 객체 1 · `p` · `q` 배열 2 = 객체 4개다. 9개 천체면 프레임당 36개다. 정점 버퍼는 재생성하지 않는다 (점 수 불변 — 결정 C 궤적 계약).
+  - fps 영향은 PR1 CI fps 셀로 판정한다.
+- **`elementsAt` 우회 호출처 전수** — `git grep -n -E "(positionAt|orbitalStateAt|meanAnomalyAt)\(" -- packages apps scripts` (dist 제외, 테스트 포함) 의 매칭 줄을 전부 읽었다.
+  - **율 보유 천체의 고정 요소를 쓰는 비-테스트 경로 1건 — `scene/belt-population.ts` `beltPlanetsFromSystem`**. 띠 공명군 (트로이 `n = n_J` · 힐다 `1.5 n_J` · 플루티노 `(2/3) n_N`) 의 기준 평균운동을 목성 · 해왕성 고정 요소의 Kepler `n` 으로 읽는다. 행성에 율이 들어가면 장면 목성 · 해왕성과 위상이 어긋난다.
+    - 1900 ~ 2100 평균경도 차 max: 목성 `1.3599°` · 해왕성 `0.1383°`.
+    - 트로이 경도 분포 σ 는 `12°` (`TROJAN_LONGITUDE_SIGMA`) 다.
+    - → 결정 C-2.
+  - `compute-events.ts` `perihelionTimes` — 혜성 전용 (율 없음). → 결정 C 의 fail-fast.
+  - `physics/state-vector.ts` · `physics/kepler.ts` 내부 호출 · `scene/asteroid-belt.ts` (띠 입자 요소) · `scene/comet-tail.ts` (혜성 요소) · `nbody-engine.ts` (이미 `elementsAt` 경유) — 율 보유 천체가 아니거나 이미 `elementsAt` 를 거친다.
+  - **테스트** — 고정 요소를 직접 넘기는 곳은 두 부류다.
+    - (i) 「장면과 같은 식」 을 주장하는 곳: `body-distance.test.ts` (지구, §1-H 실패 2건) · `belt-population.test.ts:180` (「장면의 목성 전파식과 대조」 — 변이에서는 통과했지만 C-2 후 기준이 바뀐다) · `orbit-elements-at.test.ts:357` (§1-H 실패).
+    - (ii) Kepler 함수 자체를 고정 입력으로 시험하는 곳 — 장면과의 동치를 주장하지 않는다: `jpl-validation` · `kepler.test` · `p2b-1year-position` · `newton-vs-kepler` · `nbody-engine.test` · `orbital-plane-inclination` · `trail-sampling.test` · `asteroid-belt-scale-contract` · `belt-particles.test` · `comet-tail.test` · `compute-events.test:56` (혜성) · `solar-system-scene-lunar-orbit-line.test.ts:229` (달 V0). 변이에서 전부 통과했다.
+- **선형 율의 범위** [계산 — 표 1 기점 + 율]:
+  - 1900 · 2100 의 e: 수성 `0.205617` · `0.205655` · 금성 `0.006818` · `0.006736` · 지구 `0.016755` · `0.016667` · 화성 `0.093315` · `0.093473` · 목성 `0.048519` · `0.048254` · 토성 `0.054372` · `0.053352` · 우라노스 `0.047301` · `0.047213` · 해왕성 `0.008539` · `0.008642`.
+  - `e < 0` 이 되는 가장 가까운 시각: 토성 서기 `12563` · 해왕성 서기 `−14828` · 금성 서기 `18500`. `e ≥ 1` 과 `a ≤ 0` 은 서기 `−180,000 ~ +760,000` 밖이다 (가장 가까운 것: `e = 1` 토성 서기 `−183550`, `a = 0` 토성 서기 `764568`).
+- **UTC 자정 경계 사건** — 1,506건 (`t1`) 의 장면 시계 시각과 가장 가까운 UTC 자정의 거리.
+  - `±1 s` 안 `0` 건 · `±10 s` `0` 건 · `±60 s` `1` 건. 가장 가까운 것은 `saturn-opposition:2098-03-17` (`46.652 s`) 다.
+  - `base` 1,507건은 `±60 s` `2` 건이고, 최근접은 `lunar-eclipse:1953-01-29` (`20.387 s`) 다.
+  - 그래서 1 ulp 급 플랫폼 차 (ADR 1404 의 `4.3e-7` 일 = `0.037 s`) 로 사건 id 의 날짜가 갈리는 사건은 없다.
+
 ---
 
 ## 후보 비교
@@ -261,7 +290,7 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ---
 
-## 결정 (Provisional — Q 표 권고안 기준)
+## 결정 (사용자 결정 2026-10-24 — 전부 권고안)
 
 ### 데이터 · 스키마
 
@@ -274,9 +303,15 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
    - 다른 `frame` 값은 파싱 실패다 (현 `z.literal` 의 「변환 규칙 없는 틀을 조용히 받지 않는다」 를 유지).
    - 값은 표 숫자 그대로 싣는다. 이심률 율의 표 단위 표기 「rad/Cy」 는 무차원이다 — `$comment` 에 원 표기를 남긴다.
 3. **F′ — 로드 타입**: `LoadedOrbitalRates` 에 `semiMajorAxis` [m/일] · `eccentricity` [/일] · `inclination` [rad/일] 을 **필수** 로 더한다. 달 (`mean-equinox-of-date`) 은 로더가 `0` 을 넣는다.
+   - **단위 변환** (cross-validate 반영). 상수는 `@astro-simulator/shared` 의 `AU` (`149_597_870_700` m) · `JULIAN_CENTURY_DAYS` (`36_525` 일 — 율리우스 세기) 와 로더의 `DEG = π / 180` 이다.
+     - `semiMajorAxis = semiMajorAxisAuPerCentury × AU / JULIAN_CENTURY_DAYS` [m/일]
+     - `eccentricity = eccentricityPerCentury / JULIAN_CENTURY_DAYS` [/일]
+     - `inclination · meanLongitude · longitudeOfPerihelion · longitudeOfAscendingNode = (…DegPerCentury) × DEG / JULIAN_CENTURY_DAYS` [rad/일] — `frame: 'J2000'` 은 `p_A` 를 빼지 않는다.
+     - `frame: 'mean-equinox-of-date'` 의 각 율은 현행 `rateToSceneFrame` 그대로다 (`(… − GENERAL_PRECESSION_DEG_PER_CENTURY) × DEG / JULIAN_CENTURY_DAYS`).
    - `x + 0 · Δt = x` 라 달의 평균 요소 (궤도선 · 궤적 · N-body) 는 비트 동일이다 [정적 판독 — IEEE 754 유한값].
    - 선택 필드 분기를 두지 않으려는 결정이다.
 4. **E — `elementsAt`** 이 `a(t) = a₀ + ȧ·Δt` · `e(t)` · `I(t)` 를 더한다 (현 Ω · ω · M 식은 그대로). `meanMotionOf` · `siderealPeriodOf` 의 식은 그대로다 (`L̇ − ϖ̇` · `2π / L̇`).
+   - **범위 전제** (cross-validate 반영 — JSDoc 에 적는다): 율의 검증 범위는 스크러버 1900 ~ 2100 이다 (§1-A). 선형 율이라 범위 밖에서는 e · a 가 물리 범위를 벗어날 수 있다. 계산상 `e < 0` 이 되는 가장 가까운 시각은 토성 서기 `12563` 이고, `e ≥ 1` · `a ≤ 0` 은 서기 `−180,000 ~ +760,000` 밖이다 (§1-J). 클램핑 · 런타임 검사는 두지 않는다 (공개 API 인자 `jd` 를 그대로 받는다 — 현행과 같다).
 5. **왜소행성 · 소천체 · 위성은 고정 요소를 유지한다.** 이 출처에 행 자체가 없다 (세레스 · 명왕성 · 하우메아 · 마케마케 · 에리스 · 혜성 · 소행성). 위성은 모체 기준 상대 궤도라 모체 율과 독립이다.
    - 영향: 이 천체들의 사건은 혜성 근일점 2종뿐이고 (§1-E 불변), 정보 카드 · 궤도선은 현행 그대로다.
 6. **EMB → 지구 중심 분리는 하지 않는다** (Q5 (a)). 실측 기여:
@@ -294,18 +329,25 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
    - **궤도선 갱신 판정** — 문턱 판정은 Ω · ϖ 만 본다. a · e · I 율은 갱신을 일으키지 않는다.
      - 1900 ~ 2100 전 범위 (2세기) 의 변화 최대는 `|Δa|` 우라노스 `0.0039 AU` · `|Δe|` 토성 `0.0010` · `|ΔI|` EMB `0.026°` 다 [계산: 표 1 율 × 2세기].
      - 다음 Ω · ϖ 갱신 때 함께 반영된다. 이 판정은 그대로 둔다.
-   - `perihelionTimes` (`compute-events.ts`) 는 `meanAnomalyAt` 의 Kepler `n` 을 쓴다 — 율 보유 천체에 쓰면 고정 요소로 계산한다. 사용처가 혜성 2종 (율 없음) 뿐이라 이번에 바꾸지 않고, JSDoc 에 「율 없는 궤도 전제」 를 적는다.
+   - `perihelionTimes` (`compute-events.ts`) 는 `meanAnomalyAt` 의 Kepler `n` 을 쓴다 — 율 보유 천체에 쓰면 고정 요소로 계산한다. 사용처는 혜성 2종 (율 없음) 뿐이다.
+     - **진입부에 fail-fast 단언을 넣는다** (cross-validate 반영): `rates` 보유 궤도면 `throw`. 신규 가드 스크립트가 아니라 코드 내 단언이다. 행성 근일점 사건이 추가될 때 조용히 고정 요소로 계산하는 것을 막는다.
+     - 율 대응 (`elementsAt` 기반 근일점) 은 그 사건 종류를 들일 때 설계한다.
+   - **N-body 초기 속도는 의도된 근사다** (cross-validate 반영 — `nbody-engine.ts` 주석 1줄). `orbitalStateAt(elementsAt(t))` 는 시각 `t` 요소의 Kepler 속도이고, 요소율의 시간미분항과 `L̇ ≠ √(μ/a³)` 차를 넣지 않는다. 장면 위치의 수치 미분과의 차는 max `6.505 m/s` (목성) · 상대 `722 ppm` (우라노스) 다 (§1-J). 위치는 같은 요소라 전환 순간 점프는 0 이다.
+8. **C-2 — 띠 공명군의 기준 평균운동 = 장면 행성의 평균경도 율** (Q2 (a) 의 귀결 — cross-validate 우회 호출처 전수에서 발견, §1-J).
+   - `beltPlanetsFromSystem` 의 목성 · 해왕성 `meanMotion` 을, 율 보유 궤도면 `rates.meanLongitude` [rad/일] 로 읽는다. 장면의 `λ(t) = Ω + ω + M` 은 `elementsAt` 식상 정확히 `λ₀ + L̇·Δt` 라, 공명각의 시간미분이 다시 0 이 된다. 율이 없으면 현행 Kepler `n` 그대로다.
+   - 공명 장반경 (커크우드 · 힐다 · 플루티노) 은 행성 `a₀` 와 공명비의 Kepler 제3법칙 그대로다 (위치 분포만 정한다).
+   - 하지 않으면 1900 ~ 2100 에서 트로이 무리 중심이 목성에서 최대 `1.36°` 벗어난다 (σ `12°` 의 `11 %`). 힐다 공명각의 어긋남은 그 3배다 [계산: 공명각 `φ = 3λ_J − 2λ − ϖ` 에서 `|φ̇| = 3|L̇ − n_K|`].
 
 ### 사건 · 기대값
 
-8. **E1 — 사건 파일 재생성** (ADR 1370 §결정 R 절차): 같은 PR 에서 core 빌드 후 `pnpm --filter @astro-simulator/web generate:time-events`. PR 본문에 §1-E 형식의 변화 표를 남긴다.
-9. **E2 — 건수 · id**: `EXPECTED_COUNTS` 의 `solar-eclipse` 를 `453 → 452` 로 바꾼다 (다른 종류 불변). §1-E 의 id 변경을 수용한다 (참조처는 유지 — §1-E).
-10. **E3 — 외부 기준 fixture 재기록** (ADR 1347 Amendment 1 과 같은 절차): `recordedErrorDays` 29행을 `t1` 값으로 다시 잰다. 혜성 2행은 불변이다. 기준값 (`referenceJd`) 은 다시 조회하지 않는다 — 기준은 바뀌지 않았고 모델만 바뀌었다.
-11. **E4 — 허용치 · 배지** (Q6 (a)): `EVENT_KIND_TOLERANCE_DAYS` 를 D5 규칙 (`ceil(max × 10)/10 + 0.2`) 으로 다시 낸다.
+9. **E1 — 사건 파일 재생성** (ADR 1370 §결정 R 절차): 같은 PR 에서 core 빌드 후 `pnpm --filter @astro-simulator/web generate:time-events`. PR 본문에 §1-E 형식의 변화 표를 남긴다.
+10. **E2 — 건수 · id**: `EXPECTED_COUNTS` 의 `solar-eclipse` 를 `453 → 452` 로 바꾼다 (다른 종류 불변). §1-E 의 id 변경을 수용한다 (참조처는 유지 — §1-E).
+11. **E3 — 외부 기준 fixture 재기록** (ADR 1347 Amendment 1 과 같은 절차): `recordedErrorDays` 29행을 `t1` 값으로 다시 잰다. 혜성 2행은 불변이다. 기준값 (`referenceJd`) 은 다시 조회하지 않는다 — 기준은 바뀌지 않았고 모델만 바뀌었다.
+12. **E4 — 허용치 · 배지** (Q6 (a)): `EVENT_KIND_TOLERANCE_DAYS` 를 D5 규칙 (`ceil(max × 10)/10 + 0.2`) 으로 다시 낸다.
     - 행성 4종: 화성 충 `0.7 → 0.3` · 금성 내합 `0.7 → 0.3` · 목성 충 `1.5 → 0.3` · 토성 충 `0.4` (불변, max `0.185`).
     - 식 · 혜성은 불변이다 (식 max `2.07` 분 = `0.0014` 일 → `0.3`).
     - UI 배지가 「±0.7일」 · 「±1.5일」 → 「±0.3일」 로 바뀐다 (사용자에게 보이는 변화).
-12. **E5 — 식 테스트 임계** (ADR 1354 재검토 트리거 1 · ADR 1404 재검토 조건 1 이행, Q6 (a)) — 실측 + 여유로 둔다. E1 · E4 는 현행 (`base`) 이 FAIL 하는 값이다 (E2 · E3 의 판별은 DoD D5 열):
+13. **E5 — 식 테스트 임계** (ADR 1354 재검토 트리거 1 · ADR 1404 재검토 조건 1 이행, Q6 (a)) — 실측 + 여유로 둔다. E1 · E4 는 현행 (`base`) 이 FAIL 하는 값이다 (E2 · E3 의 판별은 DoD D5 열):
     - E1 삭망 `0.5 → 0.05 h` (`t1` S1′ `0.02 h` · `base` `0.44 h`).
     - E4 최대식 `0.5 → 0.05 h` (`t1` `2.07` 분 = `0.035 h` · `base` `26.54` 분).
     - E2 일식 적중 `≥ 450` · 오탐 `≤ 2`, 월식 적중 `≥ 455` · 오탐 `≤ 2` (`t1` `452 · 0` / `457 · 0`).
@@ -314,7 +356,7 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ### 범위
 
-13. **S — 계약 재조정** (Q4 (a), 사용자 합의 필요): 이슈 초안의 「충 · 내합 악화 표본 0 건」 은 표 1 로 충족되지 않는다 (§1-D — 악화 4, 폭 ≤ `0.047` 일). 그래서 기준을 「29표본 최대 `|오차|` ≤ `0.25` 일 · 악화 4건 기록」 으로 바꾼다. 재조정 사실은 코드 주석 (fixture 머리) · PR 본문 · CHANGELOG Notes 세 곳에 남긴다 (CLAUDE.md 스프린트 계약 7항).
+14. **S — 계약 재조정** (Q4 (a), 사용자 합의 2026-10-24): 이슈 초안의 「충 · 내합 악화 표본 0 건」 은 표 1 로 충족되지 않는다 (§1-D — 악화 4, 폭 ≤ `0.047` 일). 그래서 기준을 「29표본 최대 `|오차|` ≤ `0.25` 일 · 악화 4건 기록」 으로 바꾼다. 재조정 사실은 코드 주석 (fixture 머리) · PR 본문 · CHANGELOG Notes 세 곳에 남긴다 (CLAUDE.md 스프린트 계약 7항).
 
 ### PR 분할 (Q7)
 
@@ -323,9 +365,9 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ---
 
-## 사용자 결정 (Q 표 — 대기)
+## 사용자 결정 (Q 표 — 2026-10-24 전부 권고안)
 
-| Q | 질문 | 선택지 | 권고 | 근거 |
+| Q | 질문 | 선택지 | 권고 = 결정 | 근거 |
 | --- | --- | --- | --- | --- |
 | Q1 | 율 모델 | **(a) 표 1 율 6종** / (b) 표 2a + 2b / (c) 표 1 의 L · ϖ · Ω 만 / (d) VSOP87 축약 | **(a)** | 식 · 충 · 계절 (DE441 대비) 에서 (b) (c) 보다 낫다. 위치는 24칸 중 (b) 가 더 작은 칸이 수성 3 · 목성 1 (`≤ 13″` 차) 뿐이고, 2050 – 2100 (표 1 유효 범위 밖) 에서도 대체로 낫다. J2000 비트 동일. (d) 의 남은 개선 상한은 4구간 일식 max `1.53 → 0.90` 분 · 충 `0.185 → 0.005` 일인데 배지는 D5 규칙상 `±0.3` 일 바닥이다 |
 | Q2 | 소비처 | **(a) `elementsAt` 경로 전부** (궤도선 · 궤적 · N-body · 정보 카드 포함) / (b) 위치만 | **(a)** | 장면 · web 코드 변경 0. (b) 는 행성이 궤도선에서 벗어나고 N-body 전환 순간 행성이 튄다 |
@@ -337,7 +379,7 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ---
 
-## 완료 기준 (DoD — 측정 가능, Q 표 권고안 기준)
+## 완료 기준 (DoD — 측정 가능, 사용자 결정 2026-10-24 기준)
 
 수치의 측정 환경은 §실측과 같다. PR1 의 dev 는 D1 · D2 · D7 을 같은 방식의 일회성 스크립트로 재고 PR 본문에 적는다 (스크립트는 커밋하지 않는다). 나머지는 단위 테스트다.
 
@@ -357,6 +399,8 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 | D12 | **사건 파일** — 재생성 후 drift 통과 · `EXPECTED_COUNTS` 일식 `452` (다른 종류 불변) · 투어 id 2개 유지 · PR 본문에 §1-E 형식 변화 표 | §1-E |
 | D13 | **비용** — 신규 가드 없음. PR1 CI 의 기존 fps 가드 · bench 통과. PR 본문에 위치 1회 비용 (설계 실측 `0.272 → 0.508 µs`) 을 적는다 | CI |
 | D14 | **실브라우저** (실 Chrome 1회) — 콘솔 에러 0 · 「2024-04-08 개기일식」 선택 시 store 시각 `18:18:11 UTC` (현행 `18:13:32`) · 일식 투어 2단계에서 달 그림자가 지구 위에 보인다 · 우라노스 정보 카드 공전주기 「84.018 년」 (현행 「84.059 년」) · 사건 패널 화성 충 배지 「±0.3일」 | 실 Chrome |
+| D15 | **띠 공명군 위상** (결정 C-2) — 트로이 `meanMotion` = 장면 목성 `L̇`, 100년 뒤 `λ − λ_J` 변화 ≤ `0.01°` (기존 `belt-population.test.ts` 단언의 목성 λ 를 `elementsAt` 로 계산) | 변이판 (C-2 없음) 은 목성 평균경도 차 `1.36°` / 세기 → FAIL |
+| D16 | **`perihelionTimes` fail-fast** — 율 보유 궤도 (예: 화성) 를 넘기면 `throw`, 혜성 2종 사건 시각은 비트 동일 | 단위 |
 
 ---
 
@@ -375,20 +419,22 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 변이 실측 (§1-H) 과 정적 판독 (develop `31726761`) 에 근거한다. ADR 1404 Amendment 1 의 반증 (grep 술어가 한국어 「주기 항」 을 세지 않았다) 을 반영해 주석 술어를 넓혔다. 술어는 `git grep -n -E "율 보유|율 없는|rates|달 외|달 하나|달만|고정 요소|√\(μ/a³\)|평균 운동|이심률 불변|J2000 고정값|Standish|mean-equinox-of-date" -- packages/core/src packages/shared/src apps/web/src` 이고, 매칭 줄을 읽어 거짓이 되는 것만 골랐다.
 
-- **소스 코드 변경 3파일**:
+- **소스 코드 변경 5파일** (cross-validate 반영으로 3 → 5):
   - `packages/core/src/ephemeris/solar-system-loader.ts` — 스키마 판별 합집합 · 변환 · `LoadedOrbitalRates` 3필드.
-  - `packages/core/src/physics/orbit-elements-at.ts` — `elementsAt` a · e · I.
+  - `packages/core/src/physics/orbit-elements-at.ts` — `elementsAt` a · e · I · 범위 전제 JSDoc.
   - `packages/core/src/events/event-kinds.ts` — 허용치 값 · 근거 주석 (결정 E4).
-- **소스 주석만 변경 (예측 8파일)**:
+  - `packages/core/src/events/compute-events.ts` — `perihelionTimes` fail-fast (결정 C).
+  - `packages/core/src/scene/belt-population.ts` — 공명 기준 평균운동 (결정 C-2) · 머리 · `read` 주석 (「장면 Kepler 경로와 같은 값」).
+- **소스 주석만 변경 (예측 7파일)**:
   - `packages/core/src/scene/solar-system-scene.ts` — 「율 보유 천체 (달)」 · 문턱 주석 · `syncTrails` 「이심률 불변」.
-  - `packages/core/src/scene/trail-sampling.ts` · `packages/core/src/scene/orbit-sampling.ts` · `packages/core/src/physics/nbody-engine.ts` — 「(달)」.
-  - `packages/core/src/events/compute-events.ts` — `perihelionTimes` 「율 없는 궤도 전제」.
+  - `packages/core/src/scene/trail-sampling.ts` · `packages/core/src/scene/orbit-sampling.ts` — 「(달)」.
+  - `packages/core/src/physics/nbody-engine.ts` — 「(달)」 · 초기 속도 근사 1줄 (결정 C).
   - `apps/web/src/lib/body-info.ts` — #1305 「카드 주기와 최대 0.05 % (목성) 다르다」 · #1354 「그 밖은 Kepler 식 그대로」.
   - `apps/web/src/lib/tours/eclipse-tour.ts` — 「삭 정밀도는 #1354 범위 (±0.76 h)」. 이미 #1404 로 stale 이다.
   - `packages/shared/src/constants/astronomy.ts` — `GENERAL_PRECESSION_DEG_PER_CENTURY` 「로더가 `mean-equinox-of-date` 에 적용」 에 `J2000` 무변환을 덧붙인다.
-- **장면 · web 소스의 코드 변경 0 줄.**
+- **장면 렌더 경로 (`solar-system-scene.ts` · `trail-sampling.ts` · `orbit-sampling.ts`) · web 소스의 코드 변경 0 줄.**
 - **데이터 2파일**: `packages/shared/data/solar-system.json` (8행성 `rates` · `$comment` 출처) · `apps/web/public/data/events/time-events.json` (재생성).
-- **테스트 — 갱신 7파일** (변이에서 실패한 테스트 6파일분 — `external-reference.test.ts` 의 실패는 fixture 파일에서 고친다 — + 임계 1파일):
+- **테스트 — 갱신 9파일** (변이에서 실패한 테스트 6파일분 — `external-reference.test.ts` 의 실패는 fixture 파일에서 고친다 — + 임계 1 + cross-validate 반영 2):
   - `packages/core/src/events/__test-utils__/external-reference-fixture.ts` — 29행 재기록 · 머리 주석.
   - `packages/core/src/physics/orbit-elements-at.test.ts` — 4건 + D9 · D10 · D11.
   - `packages/core/src/scene/solar-system-scene-lunar-orbit-line.test.ts` — 1건.
@@ -396,6 +442,9 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
   - `apps/web/src/lib/body-distance.test.ts` — 2건.
   - `apps/web/src/lib/time-events-data.test.ts` — `EXPECTED_COUNTS`.
   - `apps/web/src/components/layout/tour-card.test.tsx` — 사건 시각 상수.
+  - `packages/core/src/scene/belt-population.test.ts` — 목성 λ 를 `elementsAt` 로 (D15).
+  - `packages/core/src/events/compute-events.test.ts` — fail-fast (D16).
+  - 고정 요소를 Kepler 함수의 입력으로 주는 테스트 (§1-J (ii) 12파일) 중 `compute-events.test.ts` (D16 추가) · `solar-system-scene-lunar-orbit-line.test.ts` (§1-H 실패) 는 다른 이유로 바뀐다. 나머지 10파일은 변경 0 을 예측한다.
   - `packages/core/src/events/external-reference.test.ts` 는 단언 · 주석만 (표본값은 fixture) — 변경 0 을 예측한다.
 - **문서**: ADR 1404 Amendment 2 (재검토 조건 1 이행 — D1 · D2 · D5 · D7 실측 · 임계) · ADR 1347 Amendment 3 (허용치 · `recordedErrorDays`) · ADR 1354 Amendment 4 (트리거 1 이행 포인터) · 이 ADR Amendment 1 (예측 판정) · CHANGELOG `[Unreleased]`.
 - **반증 조건** — PR1 에서 위 밖의 소스 파일이 바뀌거나, 위 테스트 밖이 실패하면 PR 본문에 반증으로 적고 이 ADR 을 Amendment 한다. 주석만 바뀐 파일도 「예측 밖」 으로 센다.
@@ -405,7 +454,8 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 1. 스크러버 범위가 1900 ~ 2100 밖으로 넓어지면 → 표 1 (1800 – 2050 적합) 외삽을 다시 잰다. 이 ADR 은 1900 – 2100 만 DE441 로 쟀다. 표 2a + 2b 는 3000 BC – 3000 AD 에 맞춘 표라 그때의 후보다.
 2. 충 · 내합 배지를 `±0.3` 일 아래로 내리거나, 토성 충 악화 (§1-D) 가 사용자 관측으로 문제가 되면 → 축 R (d) (VSOP87 급) 을 다시 연다.
 3. 위치 모델이 J2000 고정 좌표계에서 「그 날의 좌표계」 로 바뀌면 → 계절 `8.0 ~ 8.4 h` 몫 (§1-G) 이 함께 바뀐다. 율의 틀 (`J2000`) 변환을 다시 정한다.
-4. PR1 CI 에서 비-식 사건 시각이 플랫폼 간 갈리면 (§1-I) → drift 테스트의 비트 비교 전제를 실측으로 다시 정한다 (ADR 1404 Amendment 1 선례).
+4. PR1 CI 에서 비-식 사건 시각이 플랫폼 간 갈리면 (§1-I) → drift 테스트의 비트 비교 전제를 실측으로 다시 정한다 (ADR 1404 Amendment 1 선례). 사전 스캔으로는 UTC 자정 `±1 s` 안 사건이 `0` 건이라 (최근접 `46.652 s` — §1-J), 1 ulp 급 차로 사건 id 날짜가 갈리지는 않는다. 갈린다면 시각 값의 비트 차다.
+5. **사건 id 의 날짜 의존성** (cross-validate 반영) — id 가 UTC 날짜를 담아 (`<kind>:<YYYY-MM-DD>`), 위치 모델이 바뀔 때마다 자정을 넘는 사건의 id 가 대거 바뀐다 (이번 목성 충 183건 중 112건 — §1-E). 사건 id 를 URL · 북마크 · 외부 참조에 쓰게 되면 (현재 URL 키에 사건 id 없음 — ADR 1404 PR1 qa) → 날짜와 분리한 id (순번 · 근사 기점 등) 를 설계한다. 이번에는 비-범위다.
 
 ---
 
@@ -416,7 +466,9 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 - J2000 고정 좌표계 → 날짜 좌표계 전환 — 계절 `8.0 ~ 8.4 h` 몫 (§1-G).
 - 광행차 · 광시간 (겉보기 위치) — ADR 1404 §1-B 의 `+0.55 ~ +0.58` 분 축.
 - 장면의 지구 방향 근사 (ERA · J2000 고정 극 · 지심 위도) — ADR 1404 §1-B 바닥.
-- `perihelionTimes` 의 율 대응 (사용처가 율 없는 혜성뿐 — 결정 C 의 JSDoc 만).
+- `perihelionTimes` 의 율 대응 (사용처가 율 없는 혜성뿐 — 결정 C 의 fail-fast 만).
+- 사건 id 의 날짜 분리 (재검토 조건 5).
+- 띠 공명군 외 띠 입자 (주 띠 · 고전대) 의 평균운동 — 행성 율과 무관한 `√(μ/a³)` 그대로다.
 - 궤도선 갱신 판정에 a · e · I 추가 (결정 C).
 - 신규 가드 스크립트 · CI 단계 (사용자 방침).
 
@@ -424,7 +476,9 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ## 구현 인계 (PR1)
 
-- **시작 지점**: 로더 스키마 (`frame` 판별 합집합 · 6필드 · `LoadedOrbitalRates` 3필드) → `elementsAt` → 단위 테스트 D9 · D10 · D11 → 데이터 8행성 → 테스트 기대값 (§1-H 실패 목록) → core 빌드 → `generate:time-events` → `EXPECTED_COUNTS` · `tour-card` 상수 → fixture 재기록 → 허용치 · 식 임계 → ADR Amendment.
+- **시작 지점**: 로더 스키마 (`frame` 판별 합집합 · 6필드 · `LoadedOrbitalRates` 3필드 · 결정 F′ 변환식) → `elementsAt` (범위 전제 JSDoc) → 단위 테스트 D9 · D10 · D11 → 데이터 8행성 → `perihelionTimes` fail-fast (D16) → 띠 공명 기준 (C-2 · D15) → 테스트 기대값 (§1-H 실패 목록) → core 빌드 → `generate:time-events` → `EXPECTED_COUNTS` · `tour-card` 상수 → fixture 재기록 → 허용치 · 식 임계 → ADR Amendment.
+- **계약 재조정 3곳 기록** (결정 14 · CLAUDE.md 스프린트 계약 7항): `external-reference-fixture.ts` 머리 주석 (악화 4건 표본 · 폭) · PR 본문 (결정 근거) · CHANGELOG Notes.
+- **PR1 위험**: §1-I 의 x64 결정성 (재검토 조건 4) · 궤적 프레임 비용 `0.104 → 3.021 µs` (§1-J — CI fps 셀로 판정).
 - **계수 대조**: 데이터 `$comment` · 코드 주석에는 1차 출처 (JPL SSD 「Approximate Positions of the Planets」 표 1, 조회 날짜, 원 출전 Standish · Williams 1992) 만 적는다. 리뷰가 표의 16행 (기점 8 + 율 8) 과 데이터를 diff 로 대조한다. 기점 값은 이미 데이터와 같다.
 - **기대값 갱신 근거 표** (#1349 · #1370 · #1404 절차): PR 본문에 §1-D (29표본 전 행) · §1-E (사건) · §1-F (식) 형식의 전후 표를 남긴다.
 - **고정 시각 CI 브라우저 가드** — §1-I 의 이동량은 작다 (가드 시각에서 지구 `≤ 5.2″`). 영향 판정은 PR1 CI 실발화로 한다.
@@ -434,11 +488,41 @@ ADR 1404 §1-D 는 「지구만 율을 넣으면 충 · 내합이 악화된다�
 
 ## 교차검증 반영 사항
 
-**미수행 — 메인 오케스트레이터 몫.** cross-validate 결과를 통합한 뒤 상태를 Accepted 로 바꾼다.
+agy 1회 (2026-10-24, 메인 오케스트레이터 실행 — outcome `applied` · exit 0 · `plan_bypass` false, `.claude/logs/cross-validate-architecture-20261024-164716-outcome.json`). 6기준 판정은 아래와 같다.
+
+- 구조 「우수」 · 결정 타당성 「매우 우수」 · 인터페이스 「양호 — 암묵 계약 보완 필요」 · 확장성 「결합도 · 성능 점검 필요」 · 보안 「우수」 · 누락 「2건 확인 필요」.
+- 결론은 Accepted 전 보완 3건 (단위 변환 수식 · `syncTrails` 비용 · 우회 호출처 전수) 이다.
+
+아래는 메인 재분석 판정을 거쳐 architect 가 실측 · 통합한 결과다.
+
+### 합의 (본문에 반영)
+
+1. **단위 변환 수식 명시** → 결정 F′ (`AU` · `JULIAN_CENTURY_DAYS` · `DEG` — 프로젝트 SSoT 이름).
+2. **N-body 초기 속도 = 의도된 근사** → 결정 C. 무시하는 크기를 실측했다 (§1-J — max `6.505 m/s` · `722 ppm`). 외부 모델은 「율이 극히 작아 무시할 수준」 이라고 봤다. 실측해 보니 차의 대부분은 율의 미분항이 아니라 `L̇ ≠ √(μ/a³)` 몫이다 (목성 `448 / 490 ppm`).
+3. **`perihelionTimes` 런타임 단언** → 결정 C fail-fast · DoD D16. 원안 「JSDoc 만」 을 바꿨다.
+4. **사건 id 날짜 의존성** → 재검토 조건 5 (비-범위).
+5. **`elementsAt` 범위 전제** → 결정 E. 「극단 시각에서 `e < 0` · `e ≥ 1`」 을 서술로 두지 않고 도달 시각을 계산했다 (§1-J).
+6. **결정 타당성** — 표 1 선택 · 8행성 일괄 · EMB 분리 기각을 외부 모델도 같은 근거로 지지했다.
+
+### 이견 수용
+
+- **`syncTrails` 9배 확장의 비용** — 원안은 「대상이 1개에서 9개가 된다」 고만 적고 재지 않았다. 실측: 프레임당 `0.104 → 3.021 µs`, 객체 36개 할당 (§1-J). 외부 모델이 제안한 「각도 문턱 기반 갱신」 최적화는 지금 도입하지 않는다 — 판정은 PR1 CI fps 셀이다 (사용자 방침: 신규 장치는 실회귀 시에만).
+- **우회 호출처 전수** — 원안의 grep 술어는 `elementsAt` · `hasSecularRates` 호출처만 셌다. 외부 모델 지적대로 `positionAt` · `orbitalStateAt` · `meanAnomalyAt` 직접 호출을 전수해 보니, **변이 테스트가 통과시킨 결합 1건** (`belt-population.ts` 공명 기준) 이 나왔다 → 결정 C-2 · D15 · Concrete Prediction 코드 3 → 5파일 · 테스트 7 → 9파일.
+
+### Claude 재분석으로 기각 · 보류한 외부 모델 제안
+
+- **「자정 경계 사건이 OS/아키텍처 libm 차로 1 ms 갈리면 사건 날짜 id 가 달라질 가능성」 — 사전 스캔으로 해당 0건 확인, 처방 불요.** 1,506건 중 UTC 자정 `±1 s` 안 사건은 `0` 건이고, 최근접은 `46.652 s` 다 (§1-J). 비트 동일성 판정 자체는 PR1 CI 실발화로 둔다 (재검토 조건 4).
+- **「`syncTrails` 를 궤도선처럼 각도 문턱 기반 갱신으로 최적화」 — 보류.** 실측 `3.021 µs`/프레임이고, fps 판정은 PR1 CI 셀이다.
+- **「`e`, `a` 클램핑/가드」 — 기각.** 도달 시각이 스크러버 범위에서 `10,000` 년 이상 떨어져 있다 (§1-J). 범위 전제만 JSDoc 에 적는다.
+
+### 고유 발견 (후속 분리)
+
+- 없음. 띠 공명군 결합 (C-2) 은 이 ADR 의 소비처 결정 (Q2 (a)) 의 귀결이라 PR1 범위로 넣었다.
 
 ### 호출 전 Claude 편향 셀프 체크 (architect)
 
 - **낙관적 일정** — Concrete Prediction 은 변이 실측 (§1-H) 과 넓힌 grep 술어로만 적었다. 주석 파일 8개는 grep 매칭 줄을 읽어 고른 것이다. 술어가 못 잡는 서술은 반증 조건으로 남겼다. **cross-validate 질문 제안**: 「8행성이 율 보유가 되면 거짓이 되는 주석 · 테스트 전제가 위 목록 밖에 있는가」.
 - **결합 간과** — 율이 흐르는 경로를 `elementsAt` · `hasSecularRates` 호출처 grep 으로 셌다 (축 C). 고정 시각 브라우저 가드는 이동량 실측까지만 했다. **미통과 축**: 플랫폼 결정성 (x64) 은 재지 못했다 (§1-I). **cross-validate 질문 제안**: 「비-식 사건의 비트 비교가 x64 에서 갈릴 경로가 있는가」.
+  - **사후 판정 (cross-validate 후)**: 이 축은 실제로 미통과였다. 우회 호출처 (`positionAt` 등 직접 호출) 를 세지 않아 띠 공명군 결합 (결정 C-2) 을 놓쳤다. 변이 테스트도 이 결합을 잡지 못했다 — `belt-population.test.ts` 가 장면이 아니라 고정 요소의 Kepler 식을 「장면의 목성 전파식」 으로 대조하기 때문이다.
 - **폐기 프레이밍** — 표 2a+2b · L · ϖ · Ω 만 · VSOP87 을 수치로 기각했다. VSOP87 은 DE441 상한으로만 쟀으므로 과소평가 방향의 오류는 없다. 통과.
 - **순수주의** — EMB → 지구 분리 · 왜소행성 율을 비범위로 둔 근거는 실측 기여 (결정 6) 와 출처 부재 (결정 5) 다. 이슈 초안의 「악화 0」 은 지키지 못해 계약 재조정 (Q4) 으로 사용자에게 올렸다.
