@@ -464,3 +464,12 @@ agy 1회 (2026-10-23, 메인 오케스트레이터 실행 — outcome `applied` 
 - **결합 간과** — 달 위치를 읽는 경로를 호출처 grep 으로 셌다 (§1-F). CI 브라우저 가드 8종은 정적 확인까지만 했다 (구현 인계). 실발화 판정은 PR1 이다.
 - **폐기 프레이밍** — B28 · KALL · ELP 를 수치로 기각했다. ELP 는 DE441 달 (완벽한 달) 로 상한만 쟀으므로, 과소평가 방향의 오류는 없다. 통과.
 - **순수주의** — 광행차 · 지구 방향 근사를 비범위로 둔 근거는 크기 (`≤ 0.58` 분 · `≤ 33 km`) 다. Q2 (a) 는 범위 보수 쪽이고, §1-H 가 그 대가 (2024 cross-track 반폭 밖) 를 수치로 드러냈다. 결정은 사용자 몫으로 남겼다 (2026-10-24 (a)).
+
+---
+
+## Amendment 1 — Concrete Prediction 판정 (PR1, 2026-10-24)
+
+- **소스 8파일 — 일치**. 예측한 8파일 (신규 `lunar-theory.ts` + 기존 7) 이 그대로 바뀌었다. 장면 · web 소스의 **코드** 변경은 0 줄이다.
+- **반증 (주석만)** — 예측 밖 소스 3파일이 **주석만** 바뀌었다: `packages/core/src/scene/solar-system-scene.ts` · `packages/core/src/scene/orbit-sampling.ts` · `apps/web/src/lib/body-distance.ts`. 세 주석이 달 위치를 「시각 요소 + 주기 항」 으로 설명하고 있어, 결정 L3 뒤에는 거짓이 된다 (주석 계약 drift). 정적 판독의 grep 술어 (`git grep -i periodic`) 가 한국어 「주기 항」 을 세지 않아 예측에서 빠졌다.
+- **테스트 — 예측 5파일 일치 + 주석만 4파일**: `body-chain.test.ts` · `solar-system-scene-lunar-orbit-line.test.ts` · `body-distance.test.ts` · `body-info-card.test.tsx` 의 주석이 같은 이유로 바뀌었다. 단언 · 기대값은 바뀌지 않았다.
+- **결정 불변** — 위 차이는 서술 갱신이고, 결정 L1 ~ L5 · E1 ~ E5 는 그대로다.

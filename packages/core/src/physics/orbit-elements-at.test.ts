@@ -4,6 +4,10 @@
  * DoD E1 (삭망 대역) · P1 (달 위치) · I1 (다른 천체 불변) · I2 (J2000 달 · N-body 초기 상태) · V1 (궤도선) + §교차검증
  * 구현 계약 3건 (카드 공전주기 수치 · N-body 「율 반영 · 주기 항 미적용」 의 J2000 이외 시각 단언 · 로더 거부).
  *
+ * #1404 (ADR `docs/decisions/20261023-1404-lunar-theory-meeus47.md`) — 달 위치가 `lunarTheory` (Meeus 47 전 항 + 황도 세차
+ * 회전) 로 바뀌었다. 기대값은 그 ADR 의 DoD (D3 P1 · D5 E1 · D9 I1 · D10 I2) 로 갱신했고, 주기 항 (`periodicTerms`) 경로와
+ * 그 인자 블록은 지웠다 (결정 L3). 이론 자체의 단위 테스트는 `lunar-theory.test.ts`.
+ *
  * 기준값은 네트워크 없이 `events/__test-utils__/lunar-reference-fixture.ts` (DE441 — 출처 · 조회 조건은 그 파일 머리말).
  */
 import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with { type: 'json' };
@@ -35,7 +39,6 @@ import {
   elementsAt,
   meanMotionOf,
   parentRelativePositionAt,
-  periodicArgumentsAt,
   siderealPeriodOf,
 } from './orbit-elements-at.js';
 import { orbitalStateAt } from './state-vector.js';
@@ -52,16 +55,23 @@ const JD_2026 = 2_461_330.5;
 const JD_2100 = 2_488_069.5;
 const SAMPLE_JDS = [JD_1900, J2000_JD, JD_2026, JD_2100] as const;
 
-/** DoD E1 — 삭망 시각 허용 [h]. B9 실측 max `0.76` h (ADR 축 M). */
-const E1_SYZYGY_TOLERANCE_HOURS = 1.0;
+/**
+ * DoD E1 — 삭망 시각 허용 [h]. #1404 DoD D5 — `1.0 → 0.5` h. 실측 max `0.438` h (이론 + 앱 태양, macOS · M1 Pro · Node
+ * 24.14.0 — ADR 설계 실측 `0.44` h). B9 는 `0.76` h 였다 (ADR 1354 축 M).
+ */
+const E1_SYZYGY_TOLERANCE_HOURS = 0.5;
 /** E1 탐색 창 [일] — 기준 시각 ±3일 안에서 모델 근을 찾는다 (이각 속도 `~12°/일` → 창 끝 `|f| ≈ 0.64 rad`, 감김 없음). */
 const SYZYGY_SEARCH_HALF_WINDOW_DAYS = 3;
 const SYZYGY_BISECTION_STEPS = 48;
 
-/** DoD P1 허용 — `|Δλ| ≤ 0.2°` · `|Δβ| ≤ 0.1°` · `|Δr| ≤ 1,000 km`. */
-const P1_LONGITUDE_TOLERANCE_DEG = 0.2;
-const P1_LATITUDE_TOLERANCE_DEG = 0.1;
-const P1_DISTANCE_TOLERANCE_KM = 1000;
+/**
+ * DoD P1 허용 — #1404 DoD D3 `|Δλ| ≤ 6″` · `|Δβ| ≤ 6″` · `|Δr| ≤ 10 km` (B9 때 `0.2°` · `0.1°` · `1,000 km`). 체인 위치
+ * (`resolveBodyChainPosition` — 장면과 같은 함수) 로 잰다. 이론 함수 직접 · 변이 판별력은 `lunar-theory.test.ts`.
+ */
+const ARCSEC_PER_DEG = 3600;
+const P1_LONGITUDE_TOLERANCE_DEG = 6 / ARCSEC_PER_DEG;
+const P1_LATITUDE_TOLERANCE_DEG = 6 / ARCSEC_PER_DEG;
+const P1_DISTANCE_TOLERANCE_KM = 10;
 
 type RawSystem = typeof solarSystemRaw;
 
@@ -70,13 +80,13 @@ function rawCopy(): RawSystem {
   return structuredClone(solarSystemRaw);
 }
 
-/** 달의 `rates` · `periodicTerms` 를 뺀 판본 (V0 — #1354 이전 데이터와 같은 달 요소). */
+/** 달의 `rates` · `lunarTheory` 를 뺀 판본 (V0 — #1354 이전 데이터와 같은 달 요소). */
 function rawWithoutLunarModel(): RawSystem {
   const raw = rawCopy();
   const moon = raw.bodies.find((b) => b.id === 'moon')!;
   const orbit = moon.orbit as Record<string, unknown>;
   delete orbit.rates;
-  delete orbit.periodicTerms;
+  delete orbit.lunarTheory;
   return raw;
 }
 
@@ -184,7 +194,7 @@ describe('#1354 E1 — 삭망 시각 (DE441 717개, 1901 ~ 1910 · 2021 ~ 2030 �
 
 describe('#1354 P1 — 달 위치 (DE441, 4시각)', () => {
   it.each(DE441_MOON_POSITIONS.map((s) => [s.label, s] as const))(
-    '%s — |Δλ| ≤ 0.2° · |Δβ| ≤ 0.1° · |Δr| ≤ 1,000 km',
+    '%s — |Δλ| ≤ 6″ · |Δβ| ≤ 6″ · |Δr| ≤ 10 km',
     (_label, sample) => {
       const local = resolveBodyChainPosition(fullById, 'moon', sample.julianDate)!.local!;
       const [lam, bet, r] = eclipticOf(local);
@@ -223,7 +233,7 @@ describe('#1354 M3 — elementsAt', () => {
 
   it('율 보유 천체는 달 하나 (I1 전제 — 공허 통과 방지)', () => {
     expect(full.bodies.filter((b) => b.orbit?.rates).map((b) => b.id)).toEqual(['moon']);
-    expect(full.bodies.filter((b) => b.orbit?.periodicTerms).map((b) => b.id)).toEqual(['moon']);
+    expect(full.bodies.filter((b) => b.orbit?.lunarTheory).map((b) => b.id)).toEqual(['moon']);
   });
 
   it('J2000 (Δt = 0) 에서 각 요소 값이 데이터 요소와 같다 — epoch 만 같은 값으로 다시 쓴다', () => {
@@ -254,7 +264,7 @@ describe('#1354 M3 — elementsAt', () => {
   });
 });
 
-describe('#1354 M2 — 로더 (율 틀 변환 · 주기 항 단위 · 거부)', () => {
+describe('#1354 M2 · #1404 L2 — 로더 (율 틀 변환 · 달 이론 단위 · 거부)', () => {
   it('율 = (Meeus 원값 − p_A) [도/세기] → rad/일', () => {
     const rates = moon.orbit!.rates!;
     const toScene = (degPerCentury: number) =>
@@ -267,14 +277,33 @@ describe('#1354 M2 — 로더 (율 틀 변환 · 주기 항 단위 · 거부)', 
     expect(TWO_PI / Math.abs(rates.longitudeOfAscendingNode) / 365.25).toBeCloseTo(18.6, 1);
   });
 
-  it('주기 항 9행 — 경도 · 위도는 rad, 거리는 m', () => {
-    const terms = moon.orbit!.periodicTerms!;
-    expect(terms).toHaveLength(9);
-    expect(terms.filter((t) => t.component === 'longitude')).toHaveLength(4);
-    expect(terms.filter((t) => t.component === 'latitude')).toHaveLength(3);
-    expect(terms.filter((t) => t.component === 'distance')).toHaveLength(2);
-    expect(terms[0]!.amplitude).toBe(1.274027 * DEG);
-    expect(terms.find((t) => t.component === 'distance')!.amplitude).toBe(-3699.111 * KM);
+  it('달 이론 — 표 47.A 60행 · 47.B 60행 · 부가항 9행, 진폭은 원 단위 (1e-6 ° · 1e-3 km) → rad · m', () => {
+    const theory = moon.orbit!.lunarTheory!;
+    expect(theory.longitudeDistanceTerms).toHaveLength(60);
+    expect(theory.latitudeTerms).toHaveLength(60);
+    expect(theory.additiveTerms).toHaveLength(9);
+    expect(theory.additiveTerms.filter((t) => t.component === 'longitude')).toHaveLength(3);
+    expect(theory.additiveTerms.filter((t) => t.component === 'latitude')).toHaveLength(6);
+    // 첫 행 [0, 0, 1, 0, 6288774, −20905355] — 원 표 숫자와 grep 대조된다 (결정 L2).
+    const first = theory.longitudeDistanceTerms[0]!;
+    expect([first.D, first.M, first.Mp, first.F]).toEqual([0, 0, 1, 0]);
+    expect(first.longitude).toBe(6288774 * (1e-6 * DEG));
+    expect(first.distance).toBe(-20905355);
+    expect(theory.latitudeTerms[0]!.latitude).toBe(5128122 * (1e-6 * DEG));
+    expect(theory.meanDistance).toBe(385000.56 * KM);
+    // 부가항 인자는 [키, 계수] 목록 — L′ − F (경도 1962).
+    expect(theory.additiveTerms[1]!.argument).toEqual([
+      ['F', -1],
+      ['Lp', 1],
+    ]);
+  });
+
+  it('부가항 인자 키는 enum — 다른 키는 파싱 실패 (strict)', () => {
+    const raw = rawCopy();
+    const theory = (raw.bodies.find((b) => b.id === 'moon')!.orbit as Record<string, unknown>)
+      .lunarTheory as { additiveTerms: Array<{ argument: Record<string, number> }> };
+    theory.additiveTerms[0]!.argument = { Omega: 1 };
+    expect(() => loadSolarSystem(raw)).toThrow();
   });
 
   it('rates.frame 은 literal — 다른 틀 이름은 파싱 실패', () => {
@@ -284,32 +313,32 @@ describe('#1354 M2 — 로더 (율 틀 변환 · 주기 항 단위 · 거부)', 
     expect(() => loadSolarSystem(raw)).toThrow();
   });
 
-  /** 달의 주기 항을 다른 천체에 옮겨 단 판본. */
-  function rawWithTermsOn(id: string): RawSystem {
+  /** 달 이론을 다른 천체에 옮겨 단 판본. */
+  function rawWithTheoryOn(id: string): RawSystem {
     const raw = rawCopy();
-    const terms = (raw.bodies.find((b) => b.id === 'moon')!.orbit as { periodicTerms: unknown })
-      .periodicTerms;
+    const theory = (raw.bodies.find((b) => b.id === 'moon')!.orbit as Record<string, unknown>)
+      .lunarTheory;
     const target = raw.bodies.find((b) => b.id === id)!;
-    (target.orbit as Record<string, unknown>).periodicTerms = structuredClone(terms);
+    (target.orbit as Record<string, unknown>).lunarTheory = structuredClone(theory);
     return raw;
   }
 
   it.each(['earth', 'jupiter', 'pluto', 'halley', 'ceres'])(
-    '계약 3 — 「모체가 태양을 도는 위성」 이 아닌 %s 에 periodicTerms 가 있으면 거부',
+    '계약 3 — 「모체가 태양을 도는 위성」 이 아닌 %s 에 lunarTheory 가 있으면 거부',
     (id) => {
-      expect(() => loadSolarSystem(rawWithTermsOn(id))).toThrow(/periodicTerms/);
+      expect(() => loadSolarSystem(rawWithTheoryOn(id))).toThrow(/lunarTheory/);
     },
   );
 
-  it('결정 M2 의 인자 규칙 — 모체가 태양을 도는 다른 위성 (포보스 · 카론) 은 받는다 (거부 경계 고정)', () => {
+  it('결정 L2 (ADR 1354 M2 규칙을 옮김) — 모체가 태양을 도는 다른 위성 (포보스 · 카론) 은 받는다 (거부 경계 고정)', () => {
     // 인자 D · M 은 모체 (화성 · 명왕성) 요소로 정의된다 — 규칙은 천체 이름이 아니라 체인 구조다 (ADR 결정 M2).
     for (const id of ['phobos', 'charon']) {
-      expect(() => loadSolarSystem(rawWithTermsOn(id))).not.toThrow();
+      expect(() => loadSolarSystem(rawWithTheoryOn(id))).not.toThrow();
     }
   });
 });
 
-describe('#1354 I1 — 다른 천체 불변 (달 율 · 주기 항 유 ↔ 무, 같은 jd)', () => {
+describe('#1354 I1 · #1404 D9 — 다른 천체 불변 (달 율 · lunarTheory 유 ↔ 무, 같은 jd)', () => {
   const others = full.bodies.filter((b) => b.id !== 'moon');
 
   it('체인 world 위치 (Kepler 장면과 같은 함수) 비트 동일 — 35 천체 × 4시각', () => {
@@ -394,15 +423,15 @@ function stateOf(
 const dist = (a: readonly number[], b: readonly number[]) =>
   Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
 
-describe('#1354 I2 — J2000 달 · N-body 초기 상태 (결정 M5)', () => {
-  it('J2000 달 local 이 V0 대비 5,357 km 바뀐다 (Q-M (b) — 주기 9항, 기록값)', () => {
+describe('#1354 I2 · #1404 D10 — J2000 달 · N-body 초기 상태 (결정 M5 · L4)', () => {
+  it('J2000 달 local 이 V0 대비 5,617 km 바뀐다 (#1404 이론 위치, 기록값)', () => {
     const a = resolveBodyChainPosition(fullById, 'moon', J2000_JD)!.local!;
     const c = resolveBodyChainPosition(v0ById, 'moon', J2000_JD)!.local!;
-    // ADR 영향 범위 실측 `5,357 km` — 정수 km 반올림으로 고정 (주기 항 · 인자 결함이면 바뀐다).
-    expect(Math.round(dist(a, c) / KM)).toBe(5357);
+    // ADR 1404 DoD D10 — B9 `5,357 km` → 이론 `5,617 km`. 정수 km 반올림으로 고정 (이론 · 데이터 결함이면 바뀐다).
+    expect(Math.round(dist(a, c) / KM)).toBe(5617);
   });
 
-  it('J2000 N-body 초기 상태는 V0 와 비트 동일 (율 × 0 · 주기 항 미적용)', () => {
+  it('J2000 N-body 초기 상태는 V0 와 비트 동일 (율 × 0 · 달 이론 미적용)', () => {
     const a = buildInitialState(full, J2000_JD);
     const c = buildInitialState(v0, J2000_JD);
     expect(a.ids).toEqual(c.ids);
@@ -418,7 +447,7 @@ describe('#1354 I2 — J2000 달 · N-body 초기 상태 (결정 M5)', () => {
   const NBODY_JDS = [2_433_282.5 /* 1950-01-01 */, JD_2026, 2_486_394.5 /* 2095-06-01 */];
 
   it.each(NBODY_JDS)(
-    '계약 2 — JD %d 의 달 초기 상태 = elementsAt (율 반영) 상태 벡터 · 주기 항 미적용',
+    '계약 2 — JD %d 의 달 초기 상태 = elementsAt (율 반영) 상태 벡터 · 달 이론 미적용',
     (jd) => {
       const s = buildInitialState(full, jd);
       const m = stateOf(s, 'moon');
@@ -433,7 +462,7 @@ describe('#1354 I2 — J2000 달 · N-body 초기 상태 (결정 M5)', () => {
       // 율 반영 — 고정 요소 상태와 다르다 (승교점 · 근지점 · 평균경도가 돌았다).
       const fixed = orbitalStateAt(moon.orbit!, jd, moonMu);
       expect(dist(rel.p, fixed.position)).toBeGreaterThan(10_000 * KM);
-      // 주기 항 미적용 — 장면 위치 (주기 항 포함) 와 다르다.
+      // 달 이론 미적용 — 장면 위치 (이론) 와 다르다 (결정 L4 — 엔진 전환 시 이 차이만큼 튀는 것은 의도된 동작).
       const scene = parentRelativePositionAt(moon, earth, sun, jd);
       expect(dist(rel.p, scene)).toBeGreaterThan(1_000 * KM);
     },
@@ -525,57 +554,5 @@ describe('#1354 계약 1 — 정보 카드 달 공전주기 (항성월)', () => 
     const mars = fullById.get('mars')!;
     const mu = orbitMu(mars, sun);
     expect(siderealPeriodOf(mars.orbit!, mu)).toBe(orbitalPeriod(mars.orbit!.semiMajorAxis, mu));
-  });
-});
-
-/**
- * PR #1356 리뷰 권고 2 — 주기 항 인자 (D · M · M′ · F) 를 Meeus 47장 다항식 (식 47.2 – 47.5, PyMeeus `Moon.py` 재현값) 과
- * 대조한다. B9 9행은 D 계수가 0 · 2 뿐이라 `L☉ = L_지구 + π` 의 `+π` 가 빠져도 위치가 같다 (`2(D+π) ≡ 2D`) — 위치 테스트로는
- * 못 잡고, D 계수가 홀수인 항 (예: 시차부등 `[1,0,0,0]`) 을 넣는 순간 (ADR §Concrete Prediction B9 → B28) 드러난다.
- */
-describe('#1354 주기 항 인자 = Meeus 다항식 (리뷰 권고 2)', () => {
-  /** Meeus 다항식 [도] — T = J2000 기준 율리우스 세기. */
-  function meeusArgumentsDeg(jd: number) {
-    const T = (jd - J2000_JD) / JULIAN_CENTURY_DAYS;
-    return {
-      D:
-        297.8501921 +
-        445267.1114034 * T -
-        0.0018819 * T ** 2 +
-        T ** 3 / 545868 -
-        T ** 4 / 113065000,
-      M: 357.5291092 + 35999.0502909 * T - 0.0001536 * T ** 2 + T ** 3 / 24490000,
-      Mp:
-        134.9633964 + 477198.8675055 * T + 0.0087414 * T ** 2 + T ** 3 / 69699 - T ** 4 / 14712000,
-      F:
-        93.272095 + 483202.0175233 * T - 0.0036539 * T ** 2 - T ** 3 / 3526000 + T ** 4 / 863310000,
-    };
-  }
-
-  /**
-   * 허용 차 [도]. 실측 (모델 − Meeus, D / M / M′ / F): J2000 `+0.005 / −0.002 / +0.137 / −0.032` · 2100-01-01
-   * `+0.201 / +0.127 / +0.128 / −0.028` · 1900-01-01 `−0.187 / −0.131 / +0.128 / −0.028` (PR #1356 리뷰 probe 와 J2000 은
-   * 같고, 2100 은 `0.01°` 안에서 같다). 최댓값 `0.201°` (2100 D — 1900 과 부호가 반대인 시간 비례 차. 원인 단정은 하지 않는다 — ADR 축 M 「잔여의 추세」) 위에
-   * 여유를 두어 `0.3°` 로 둔다. M′ 의 `~0.13°` 는 기점 반올림 (Q-D2 (a) — 기점 값 유지) 이다. `+π` 누락은 D 를 `180°`
-   * 옮기므로 이 대역보다 세 자릿수 크다.
-   */
-  const ARGUMENT_TOLERANCE_DEG = 0.3;
-
-  it.each([
-    ['J2000', J2000_JD],
-    ['2100-01-01', JD_2100],
-  ] as const)('%s — |모델 − Meeus| ≤ 0.3° (D · M · M′ · F)', (_label, jd) => {
-    const args = periodicArgumentsAt(
-      elementsAt(moon.orbit!, jd),
-      moonMu,
-      earth.orbit!,
-      orbitMu(earth, sun),
-      jd,
-    );
-    const ref = meeusArgumentsDeg(jd);
-    for (const key of ['D', 'M', 'Mp', 'F'] as const) {
-      const diffDeg = wrapAngle(args[key] - ref[key] * DEG) / DEG;
-      expect(Math.abs(diffDeg), key).toBeLessThanOrEqual(ARGUMENT_TOLERANCE_DEG);
-    }
   });
 });

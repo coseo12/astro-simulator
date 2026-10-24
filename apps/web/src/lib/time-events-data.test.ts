@@ -34,7 +34,10 @@ import { SCRUBBER_MAX_JD, SCRUBBER_MIN_JD } from './time-scrubber';
 const DATA_PATH = resolve(__dirname, '../../public/data/events/time-events.json');
 const RANGE = { startJd: SCRUBBER_MIN_JD, endJd: SCRUBBER_MAX_JD };
 
-/** 종류별 사건 수 — 구 런타임 (develop `53aa8dc2`) 실측과 같다. 파일 재생성으로 이 수가 바뀌면 의도한 모델 변경인지 확인할 것. */
+/**
+ * 종류별 사건 수 — 구 런타임 (develop `53aa8dc2`) 실측에서 출발했다. 파일 재생성으로 이 수가 바뀌면 의도한 모델 변경인지 확인할 것.
+ * #1404 (달 이론 — ADR `20261023-1404` 결정 E2) 로 일식 `455 → 453` · 월식 `458 → 457` (다른 종류 불변).
+ */
 const EXPECTED_COUNTS: Readonly<Record<string, number>> = {
   'mars-opposition': 94,
   'venus-inferior-conjunction': 125,
@@ -42,8 +45,8 @@ const EXPECTED_COUNTS: Readonly<Record<string, number>> = {
   'saturn-opposition': 193,
   'halley-perihelion': 1,
   'swift-tuttle-perihelion': 1,
-  'solar-eclipse': 455,
-  'lunar-eclipse': 458,
+  'solar-eclipse': 453,
+  'lunar-eclipse': 457,
 };
 
 function computeAll(): AstroEvent[] {
@@ -80,7 +83,7 @@ describe('#1377 사전 계산 파일', () => {
     ).toEqual(computed);
   });
 
-  it('종류별 사건 수 — 구 런타임과 같다 (일식 455 · 월식 458 …)', () => {
+  it('종류별 사건 수 — 기록값과 같다 (일식 453 · 월식 457 …)', () => {
     const counts: Record<string, number> = {};
     for (const e of computed) counts[e.kind] = (counts[e.kind] ?? 0) + 1;
     expect(counts).toEqual(EXPECTED_COUNTS);

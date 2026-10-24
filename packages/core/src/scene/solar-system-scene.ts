@@ -3466,7 +3466,7 @@ export function createSolarSystemScene(
       // #1305 — 위성은 μ = G(M_parent + m) (2체 상대 궤도). 태양 직속은 G·M_sun 유지. `orbitMu` SSoT —
       // Newton 초기 상태 (`buildInitialState`) · 정보 카드 거리 (`body-distance.ts`) 와 같은 식.
       // #1354 결정 M4 — 위치는 `parentRelativePositionAt` 단일 함수 (체인 위치 `resolveBodyChainPosition` 과 같은 함수).
-      //   율 보유 궤도 (달) 는 시각 요소 + 주기 항, 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 (비트 동일).
+      //   달은 `lunarTheory` 이론 위치 (#1404), 그 밖은 `positionAt(orbit, jd, orbitMu)` 그대로 (비트 동일).
       const grandparent = parent.parentId == null ? null : bodiesById.get(parent.parentId);
       const p = parentRelativePositionAt(body, parent, grandparent, jd);
       buf[0] = p[0];

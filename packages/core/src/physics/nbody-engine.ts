@@ -105,8 +105,8 @@ export function buildInitialState(system: LoadedSolarSystem, julianDate: number)
     const parentV = worldVel.get(parent.id)!;
     // #1305 — scene Kepler 경로와 같은 μ (위성 G(M+m) / 태양 직속 G·M). 모체 반동은 비-범위.
     // #1354 결정 M5 — 율 보유 궤도 (달) 는 시각 요소 (`elementsAt` — 세차 · 평균경도 율 반영) 의 상태 벡터를 쓴다.
-    //   주기 항 (`periodicTerms`) 은 넣지 않는다 — 섭동은 적분이 만든다. 율 없는 궤도는 같은 객체라 비트 동일, J2000 에서는
-    //   달도 비트 동일 (율 × 0).
+    //   달 이론 위치 (`lunarTheory`, #1404) 는 쓰지 않는다 — 섭동은 적분이 만든다 (ADR 1404 결정 L4). 율 없는 궤도는
+    //   같은 객체라 비트 동일, J2000 에서는 달도 비트 동일 (율 × 0).
     const { position, velocity } = orbitalStateAt(
       elementsAt(body.orbit, julianDate),
       julianDate,

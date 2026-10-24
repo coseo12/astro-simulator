@@ -21,13 +21,19 @@ export {
   elementsAt,
   meanMotionOf,
   parentRelativePositionAt,
-  periodicArgumentsAt,
-  periodicPerturbationAt,
   siderealPeriodOf,
   type OrbitPositionBody,
-  type PeriodicArguments,
-  type PeriodicPerturbation,
 } from './orbit-elements-at.js';
+export {
+  eclipticOfDateToJ2000,
+  eclipticPrecessionAnglesToJ2000,
+  lunarArgumentsAt,
+  lunarEclipticOfDate,
+  lunarTheoryPositionAt,
+  type EclipticPrecessionAngles,
+  type LunarArguments,
+  type LunarEclipticPosition,
+} from './lunar-theory.js';
 export {
   NBodyEngine,
   buildInitialState,

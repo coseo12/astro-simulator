@@ -43,18 +43,56 @@ const OrbitalRatesRawSchema = z.object({
   longitudeOfPerihelionDegPerCentury: z.number(),
 });
 
+/** #1404 — 달 이론 인자 이름 (Meeus 47장 기호: L′ 평균경도 · D 이각 · M 태양 평균근점이각 · M′ 달 평균근점이각 · F 위도 인수 · A1 ~ A3 부가 인자). */
+export const LUNAR_ARGUMENT_KEYS = ['D', 'M', 'Mp', 'F', 'Lp', 'A1', 'A2', 'A3'] as const;
+export type LunarArgumentKey = (typeof LUNAR_ARGUMENT_KEYS)[number];
+
+/** 다항식 계수 `[c₀, c₁, …]` (T 오름차순). */
+const PolynomialRawSchema = z.array(z.number()).min(1);
+const IntSchema = z.number().int();
+
 /**
- * #1354 결정 M2 — 주기 섭동 항 1행. 인자 `D·D + M·M + Mp·M′ + F·F` (Meeus 47장 정의 — D 이각 · M 모체의 평균근점이각 ·
- * M′ 위성의 평균근점이각 · F 위도 인수). 경도 · 위도 항은 `amplitude · sin(인자)` [도], 거리 항은 `amplitude · cos(인자)`
- * [km]. 인자 정의가 「모체가 태양을 도는 위성」 에서만 성립하므로 그 밖의 천체에 이 필드가 있으면 로더가 거부한다.
+ * #1404 결정 L2 — 달 위치 이론 (Meeus 47장 전 항). 표는 원형 4원소 인자 `[D, M, M′, F]` 그대로 둔다 (출처 표와 행 단위
+ * 대조). 진폭은 원 단위 (경도 · 위도 `1e-6 °`, 거리 `1e-3 km`) 이고, 다항식은 도 단위다 (`mod 360` 이 도 단위라서).
+ * 부가항만 넓은 기저 (`argument` 의 키는 {@link LUNAR_ARGUMENT_KEYS} 만 — strict 객체라 다른 키는 파싱 실패) 를 쓴다.
+ * 행 수 (60 · 60 · 9) 는 스키마로 고정하지 않는다 (단위 테스트가 센다). ADR `docs/decisions/20261023-1404-lunar-theory-meeus47.md`.
  */
-const PeriodicTermRawSchema = z.object({
-  component: z.enum(['longitude', 'latitude', 'distance']),
-  D: z.number().int(),
-  M: z.number().int(),
-  Mp: z.number().int(),
-  F: z.number().int(),
-  amplitude: z.number(),
+const LunarTheoryRawSchema = z.object({
+  frame: z.literal('mean-equinox-of-date'),
+  meanArgumentsDeg: z.object({
+    D: PolynomialRawSchema,
+    M: PolynomialRawSchema,
+    Mp: PolynomialRawSchema,
+    F: PolynomialRawSchema,
+    Lp: PolynomialRawSchema,
+    A1: PolynomialRawSchema,
+    A2: PolynomialRawSchema,
+    A3: PolynomialRawSchema,
+  }),
+  eccentricityFactor: PolynomialRawSchema,
+  meanDistanceKm: z.number().positive(),
+  longitudeDistanceTerms: z
+    .array(z.tuple([IntSchema, IntSchema, IntSchema, IntSchema, z.number(), z.number()]))
+    .min(1),
+  latitudeTerms: z.array(z.tuple([IntSchema, IntSchema, IntSchema, IntSchema, z.number()])).min(1),
+  additiveTerms: z.array(
+    z.object({
+      component: z.enum(['longitude', 'latitude']),
+      argument: z
+        .strictObject({
+          D: IntSchema.optional(),
+          M: IntSchema.optional(),
+          Mp: IntSchema.optional(),
+          F: IntSchema.optional(),
+          Lp: IntSchema.optional(),
+          A1: IntSchema.optional(),
+          A2: IntSchema.optional(),
+          A3: IntSchema.optional(),
+        })
+        .refine((a) => Object.keys(a).length > 0, { message: '부가항 인자가 비었다' }),
+      amplitude: z.number(),
+    }),
+  ),
 });
 
 /**
@@ -68,7 +106,7 @@ const OrbitalElementsRawSchema = z.object({
   longitudeOfPerihelionDeg: z.number(),
   meanLongitudeDeg: z.number(),
   rates: OrbitalRatesRawSchema.optional(),
-  periodicTerms: z.array(PeriodicTermRawSchema).min(1).optional(),
+  lunarTheory: LunarTheoryRawSchema.optional(),
 });
 
 /**
@@ -277,8 +315,11 @@ export interface LoadedOrbitalElements {
    * 없으면 고정 요소 (현행 경로 그대로).
    */
   rates?: LoadedOrbitalRates;
-  /** #1354 — 주기 섭동 항 (경도 · 위도 = rad, 거리 = m). 「모체가 태양을 도는 위성」 만 가진다 (로더 검사). */
-  periodicTerms?: ReadonlyArray<LoadedPeriodicTerm>;
+  /**
+   * #1404 — 달 위치 이론 (결정 L1). 있으면 위치는 이 이론이 정하고 (`physics/lunar-theory.ts`), 위 요소 · `rates` 는 평균 요소
+   * (궤도선 · 궤적 · N-body 초기 상태 · 공전주기) 에만 쓰인다 (결정 L4). 「모체가 태양을 도는 위성」 만 가진다 (로더 검사).
+   */
+  lunarTheory?: LoadedLunarTheory;
 }
 
 /** #1354 결정 M2 — 로더가 J2000 고정 분점 틀로 옮긴 율 [rad/일]. */
@@ -291,15 +332,46 @@ export interface LoadedOrbitalRates {
   longitudeOfPerihelion: number;
 }
 
-/** #1354 결정 M2 — 주기 섭동 항 1행 (SI). */
-export interface LoadedPeriodicTerm {
-  component: 'longitude' | 'latitude' | 'distance';
+/** #1404 — 표 47.A 1행 (진폭 SI). */
+export interface LoadedLunarLongitudeDistanceTerm {
   D: number;
   M: number;
   Mp: number;
   F: number;
-  /** 경도 · 위도 = rad, 거리 = m. */
+  /** Σl 진폭 [rad] (`sin`). */
+  longitude: number;
+  /** Σr 진폭 [m] (`cos`). */
+  distance: number;
+}
+
+/** #1404 — 표 47.B 1행 (진폭 SI). */
+export interface LoadedLunarLatitudeTerm {
+  D: number;
+  M: number;
+  Mp: number;
+  F: number;
+  /** Σb 진폭 [rad] (`sin`). */
+  latitude: number;
+}
+
+/** #1404 — 부가항 1행. 인자 = Σ 계수 × 인자 (키는 {@link LUNAR_ARGUMENT_KEYS}). */
+export interface LoadedLunarAdditiveTerm {
+  component: 'longitude' | 'latitude';
+  argument: ReadonlyArray<readonly [LunarArgumentKey, number]>;
+  /** [rad] (`sin`). */
   amplitude: number;
+}
+
+/** #1404 결정 L2 — 로드한 달 이론. 다항식은 도 그대로 (T 오름차순), 진폭 · 거리는 SI. */
+export interface LoadedLunarTheory {
+  meanArgumentsDeg: Readonly<Record<LunarArgumentKey, ReadonlyArray<number>>>;
+  /** `E = 1 − 0.002516 T − 0.0000074 T²` 의 계수. */
+  eccentricityFactor: ReadonlyArray<number>;
+  /** Δ 의 상수항 [m]. */
+  meanDistance: number;
+  longitudeDistanceTerms: ReadonlyArray<LoadedLunarLongitudeDistanceTerm>;
+  latitudeTerms: ReadonlyArray<LoadedLunarLatitudeTerm>;
+  additiveTerms: ReadonlyArray<LoadedLunarAdditiveTerm>;
 }
 
 /**
@@ -392,22 +464,29 @@ function normalizeAngle(rad: number): number {
   return a;
 }
 
-/** 율 1개 — 문헌 원값 [도/세기, 날짜 평균 분점] → 장면 좌표 [rad/일, J2000 고정 분점]. */
+/**
+ * 율 1개 — 문헌 원값 [도/세기, 날짜 평균 분점] → 장면 좌표 [rad/일, J2000 고정 분점]. 평균 요소 (궤도선 · 궤적) 의 율이다.
+ * 달 이론 위치의 날짜 → J2000 회전은 Meeus 21장의 `p` (선형항 `5029.0966″` — `physics/lunar-theory.ts`) 를 쓴다.
+ * 출처가 다른 두 값이라 합치지 않는다 (ADR 20261023-1404 결정 L2).
+ */
 function rateToSceneFrame(degPerCenturyOfDate: number): number {
   return ((degPerCenturyOfDate - GENERAL_PRECESSION_DEG_PER_CENTURY) * DEG) / JULIAN_CENTURY_DAYS;
 }
 
-/** 거리 항 진폭 [km] → [m]. */
+/** km → m. */
 const METERS_PER_KM = 1000;
+/** 달 이론 진폭 단위 — 경도 · 위도 `1e-6 °` · 거리 `1e-3 km` (Meeus 표 원 단위). */
+const LUNAR_ANGLE_UNIT_RAD = 1e-6 * DEG;
+const LUNAR_DISTANCE_UNIT_M = 1e-3 * METERS_PER_KM;
 
 /**
- * #1354 결정 M2 — 주기 항 인자 (D · M · M′ · F) 는 「모체가 계 뿌리 (태양) 를 도는 위성」 에서만 정의된다. 그 밖의 천체에
- * `periodicTerms` 가 있으면 거부한다 — 인자를 만들 모체 요소가 없거나 의미가 달라 조용히 틀린 위치가 된다.
+ * #1404 결정 L2 (ADR 1354 M2 의 규칙을 옮김) — 달 이론의 인자 (D · M …) 는 「모체가 계 뿌리 (태양) 를 도는 위성」 에서만 뜻이
+ * 있다. 그 밖의 천체에 `lunarTheory` 가 있으면 거부한다 — 조용히 틀린 위치가 되지 않게.
  */
-function assertPeriodicTermsHost(bodies: ReadonlyArray<z.infer<typeof CelestialBodyRawSchema>>) {
+function assertLunarTheoryHost(bodies: ReadonlyArray<z.infer<typeof CelestialBodyRawSchema>>) {
   const byId = new Map(bodies.map((b) => [b.id, b] as const));
   for (const b of bodies) {
-    if (!b.orbit?.periodicTerms) continue;
+    if (!b.orbit?.lunarTheory) continue;
     const parent = b.parentId === null ? undefined : byId.get(b.parentId);
     const grandparent =
       parent?.parentId === null || parent?.parentId === undefined
@@ -417,10 +496,42 @@ function assertPeriodicTermsHost(bodies: ReadonlyArray<z.infer<typeof CelestialB
       parent?.orbit !== undefined && grandparent !== undefined && grandparent.parentId === null;
     if (!isSatelliteOfRootOrbiter) {
       throw new Error(
-        `[solar-system] ${b.id}: periodicTerms 는 「모체가 태양을 도는 위성」 에만 둘 수 있다 (모체 ${b.parentId ?? '없음'})`,
+        `[solar-system] ${b.id}: lunarTheory 는 「모체가 태양을 도는 위성」 에만 둘 수 있다 (모체 ${b.parentId ?? '없음'})`,
       );
     }
   }
+}
+
+/** #1404 결정 L2 — 원 단위 → SI (다항식은 도 그대로). */
+function toLoadedLunarTheory(raw: z.infer<typeof LunarTheoryRawSchema>): LoadedLunarTheory {
+  return {
+    meanArgumentsDeg: { ...raw.meanArgumentsDeg },
+    eccentricityFactor: [...raw.eccentricityFactor],
+    meanDistance: raw.meanDistanceKm * METERS_PER_KM,
+    longitudeDistanceTerms: raw.longitudeDistanceTerms.map(([D, M, Mp, F, l, r]) => ({
+      D,
+      M,
+      Mp,
+      F,
+      longitude: l * LUNAR_ANGLE_UNIT_RAD,
+      distance: r * LUNAR_DISTANCE_UNIT_M,
+    })),
+    latitudeTerms: raw.latitudeTerms.map(([D, M, Mp, F, bAmp]) => ({
+      D,
+      M,
+      Mp,
+      F,
+      latitude: bAmp * LUNAR_ANGLE_UNIT_RAD,
+    })),
+    additiveTerms: raw.additiveTerms.map((t) => ({
+      component: t.component,
+      argument: LUNAR_ARGUMENT_KEYS.flatMap((key) => {
+        const c = t.argument[key];
+        return c === undefined ? [] : [[key, c] as const];
+      }),
+      amplitude: t.amplitude * LUNAR_ANGLE_UNIT_RAD,
+    })),
+  };
 }
 
 /**
@@ -431,7 +542,7 @@ function assertPeriodicTermsHost(bodies: ReadonlyArray<z.infer<typeof CelestialB
  */
 export function loadSolarSystem(raw: unknown = solarSystemRaw): LoadedSolarSystem {
   const parsed = SolarSystemRawSchema.parse(raw);
-  assertPeriodicTermsHost(parsed.bodies);
+  assertLunarTheoryHost(parsed.bodies);
   const epoch = parsed.epoch;
 
   const bodies: LoadedCelestialBody[] = parsed.bodies.map((b) => {
@@ -500,17 +611,8 @@ export function loadSolarSystem(raw: unknown = solarSystemRaw): LoadedSolarSyste
         longitudeOfPerihelion: rateToSceneFrame(rates.longitudeOfPerihelionDegPerCentury),
       };
     }
-    const terms = b.orbit.periodicTerms;
-    if (terms) {
-      base.orbit.periodicTerms = terms.map((t) => ({
-        component: t.component,
-        D: t.D,
-        M: t.M,
-        Mp: t.Mp,
-        F: t.F,
-        amplitude: t.component === 'distance' ? t.amplitude * METERS_PER_KM : t.amplitude * DEG,
-      }));
-    }
+    const theory = b.orbit.lunarTheory;
+    if (theory) base.orbit.lunarTheory = toLoadedLunarTheory(theory);
 
     return base;
   });
