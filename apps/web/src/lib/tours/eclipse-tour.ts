@@ -3,8 +3,8 @@ import type { TourDef } from './types';
 /**
  * 2024-03-10 삭 (일식 한 달 전) [JD, UT (= 장면 시계 — #1370 이후 위치는 장면이 TT 로 바꿔 계산한다)]. 출처: USNO Astronomical Applications Dept., 「Phases of the
  * Moon 2024」 — New Moon 2024 Mar 10 09:00 UT → JD 2460379.875. 사건 파일 (`time-events.json`) 에는 식이 아닌 삭이 없어
- * 이 한 값만 상수로 둔다 (ADR `20261021-1390` §Visual Fidelity 1 — 하드코딩 1개 + 출처). 장면 위치 모델의 삭 정밀도는 #1354
- * 범위 (±0.76 h) 라 단계 장면 (그림자가 지구를 비껴감) 에는 영향이 없다.
+ * 이 한 값만 상수로 둔다 (ADR `20261021-1390` §Visual Fidelity 1 — 하드코딩 1개 + 출처). 장면 위치 모델의 삭 정밀도는 DE441 대비
+ * `0.05 h` 대역 안 (#1406 DoD D4 — core `eclipse-events.test.ts` E1) 이라 단계 장면 (그림자가 지구를 비껴감) 에는 영향이 없다.
  */
 export const NEW_MOON_2024_03_10_JD = 2460379.875;
 

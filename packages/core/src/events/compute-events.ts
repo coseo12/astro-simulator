@@ -145,6 +145,12 @@ export function heliocentricAlignmentTimes(
 /**
  * 근일점 통과 시각 목록 — `[startJd, endJd)` 안. 모체 기준 궤도에서 `M(t) = M₀ + n·(t − epoch)` 가 `2πk` 가 되는 해석해
  * (`n` = `orbitMu(body, parent)` 의 평균 운동 — `meanAnomalyAt` 과 같은 식).
+ *
+ * 고정 요소 전용이다. `rates` 보유 궤도 (달 · 8행성 — #1406) 는 장면이 `elementsAt` 로 움직여 이 해석해와 어긋나므로
+ * 진입부에서 `throw` 한다 (ADR 1406 결정 C · DoD D16). 사용처는 율 없는 혜성 2종뿐이고, 율 대응은 그 사건 종류를 들일 때
+ * 설계한다.
+ *
+ * @throws 대상 궤도가 `rates` 를 가질 때.
  */
 export function perihelionTimes(
   bodiesById: ReadonlyMap<string, ChainBody>,
@@ -156,6 +162,11 @@ export function perihelionTimes(
   const parent = body?.parentId != null ? bodiesById.get(body.parentId) : undefined;
   if (!body?.orbit || !parent) return [];
   const orbit = body.orbit;
+  if (orbit.rates) {
+    throw new Error(
+      `[perihelionTimes] ${bodyId}: rates 보유 궤도는 고정 요소 해석해를 쓸 수 없다 (ADR 1406 결정 C)`,
+    );
+  }
   const mu = orbitMu(body, parent);
   // 평균 운동은 `meanAnomalyAt` 의 두 시각 차로 얻는다 — 식을 따로 쓰지 않아 장면과 어긋날 수 없다.
   const radPerDay =

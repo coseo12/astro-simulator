@@ -182,15 +182,17 @@ export const EVENT_KINDS: readonly EventKindDef[] = [
  * 종류별 허용 오차 [일] — 모델 사건 시각과 외부 기준값 (JPL Horizons) 의 차 상한 (결정 D5). UI 배지 「±N일」 과 단위 테스트
  * (DoD M3 (i)) 가 **이 상수 하나**를 쓴다.
  *
- * 값 = #1349 (태양 GM IAU 교정) 머지 후 develop 에서 다시 잰 표본 최대 `|오차|` 를 0.1일 올림 + 0.2일. 표본 · 기준값 ·
- * 조회 조건은 `__test-utils__/external-reference-fixture.ts`, 표본별 측정값은 같은 파일의 `recordedErrorDays`. ADR 1-A 의 값은 교정 전 μ
+ * 값 = 표본 최대 `|오차|` 를 0.1일 올림 + 0.2일. 충 · 내합 4종은 #1406 (8행성 표 1 율, ADR `20261024-1406` 결정 E4) 구현에서,
+ * 혜성 2종은 #1349 (태양 GM IAU 교정) 머지 후 develop 에서 잰 값이다. 표본 · 기준값 · 조회 조건은
+ * `__test-utils__/external-reference-fixture.ts`, 표본별 측정값은 같은 파일의 `recordedErrorDays`. ADR 1-A 의 값은 교정 전 μ
  * 기준이라 쓰지 않는다 (ADR 재검토 트리거 1).
  */
 export const EVENT_KIND_TOLERANCE_DAYS: Readonly<Record<EventKindId, number>> = {
-  // 표본 최대 |오차| (일): 화성 0.403 · 금성 0.487 · 목성 1.263 · 토성 0.147 · 핼리 7.838 · 스위프트-터틀 0.316
-  'mars-opposition': 0.7,
-  'venus-inferior-conjunction': 0.7,
-  'jupiter-opposition': 1.5,
+  // 표본 최대 |오차| (일): 화성 0.031 · 금성 0.008 · 목성 0.088 · 토성 0.185 (#1406 — 이전 0.403 · 0.487 · 1.263 · 0.147) ·
+  // 핼리 7.838 · 스위프트-터틀 0.316
+  'mars-opposition': 0.3,
+  'venus-inferior-conjunction': 0.3,
+  'jupiter-opposition': 0.3,
   'saturn-opposition': 0.4,
   'halley-perihelion': 8.1,
   'swift-tuttle-perihelion': 0.6,

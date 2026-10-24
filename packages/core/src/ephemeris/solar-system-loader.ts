@@ -31,17 +31,37 @@ export const MAX_ARCS = 4;
 export const MAX_DENSITY_POINTS = 16;
 
 /**
- * #1354 결정 M2 — 궤도 요소의 시간 변화 율 (optional). 값은 출처 문헌 숫자 그대로 [도/율리우스 세기] 이고, `frame` 이
- * 그 숫자의 경도 기준을 밝힌다. 로더가 장면 좌표 (J2000 고정 분점) 율로 옮긴다 — `rate − p_A`
- * (`GENERAL_PRECESSION_DEG_PER_CENTURY`). `frame` 은 `z.literal` 이라 다른 값은 파싱 실패다 (변환 규칙이 없는 틀을
- * 조용히 받지 않는다). ADR `docs/decisions/20261017-1354-lunar-precession-eclipses.md`.
+ * #1354 결정 M2 · #1406 결정 F — 궤도 요소의 시간 변화 율 (optional). 값은 출처 문헌 숫자 그대로 [/율리우스 세기] 이고,
+ * `frame` 이 그 숫자의 경도 기준을 밝힌다 (판별 합집합). 로더가 장면 좌표 (J2000 고정 분점) 율로 옮긴다.
+ *
+ * - `mean-equinox-of-date` (달 — Meeus 47장): 경도 율 3개. 로더가 `rate − p_A` (`GENERAL_PRECESSION_DEG_PER_CENTURY`) 로 옮긴다.
+ * - `J2000` (8행성 — JPL SSD 「Approximate Positions of the Planets」 표 1): 6개 **전부 필수**. 이미 J2000 고정 분점 틀이라
+ *   로더는 단위만 바꾼다.
+ *
+ * 다른 `frame` 값은 파싱 실패다 (변환 규칙이 없는 틀을 조용히 받지 않는다). ADR
+ * `docs/decisions/20261017-1354-lunar-precession-eclipses.md` · `docs/decisions/20261024-1406-planet-element-rates-standish.md`.
  */
-const OrbitalRatesRawSchema = z.object({
+const MeanEquinoxOfDateRatesRawSchema = z.object({
   frame: z.literal('mean-equinox-of-date'),
   meanLongitudeDegPerCentury: z.number(),
   longitudeOfAscendingNodeDegPerCentury: z.number(),
   longitudeOfPerihelionDegPerCentury: z.number(),
 });
+const J2000RatesRawSchema = z.object({
+  frame: z.literal('J2000'),
+  semiMajorAxisAuPerCentury: z.number(),
+  /** 표 1 의 단위 표기는 「rad/Cy」 지만 이심률은 무차원이다 — 값 = 이심률/세기. */
+  eccentricityPerCentury: z.number(),
+  inclinationDegPerCentury: z.number(),
+  meanLongitudeDegPerCentury: z.number(),
+  longitudeOfPerihelionDegPerCentury: z.number(),
+  longitudeOfAscendingNodeDegPerCentury: z.number(),
+});
+const OrbitalRatesRawSchema = z.discriminatedUnion('frame', [
+  MeanEquinoxOfDateRatesRawSchema,
+  J2000RatesRawSchema,
+]);
+type OrbitalRatesRaw = z.infer<typeof OrbitalRatesRawSchema>;
 
 /** #1404 — 달 이론 인자 이름 (Meeus 47장 기호: L′ 평균경도 · D 이각 · M 태양 평균근점이각 · M′ 달 평균근점이각 · F 위도 인수 · A1 ~ A3 부가 인자). */
 export const LUNAR_ARGUMENT_KEYS = ['D', 'M', 'Mp', 'F', 'Lp', 'A1', 'A2', 'A3'] as const;
@@ -310,9 +330,9 @@ export interface LoadedOrbitalElements {
   meanAnomalyAtEpoch: number; // rad
   epoch: number; // JD
   /**
-   * #1354 — 시간 변화 율 (장면 좌표 = J2000 고정 분점, rad/일). 있으면 이 요소는 `elementsAt` 로 시각 요소를 만들어 쓴다
+   * #1354 · #1406 — 시간 변화 율 (장면 좌표 = J2000 고정 분점, /일). 있으면 이 요소는 `elementsAt` 로 시각 요소를 만들어 쓴다
    * (`physics/orbit-elements-at.ts`) — 평균근점이각 율이 `√(μ/a³)` 대신 `meanLongitude − longitudeOfPerihelion` 이다.
-   * 없으면 고정 요소 (현행 경로 그대로).
+   * 보유 천체는 달 · 8행성 (EMB 포함) 이다. 없으면 고정 요소 (현행 경로 그대로).
    */
   rates?: LoadedOrbitalRates;
   /**
@@ -322,8 +342,14 @@ export interface LoadedOrbitalElements {
   lunarTheory?: LoadedLunarTheory;
 }
 
-/** #1354 결정 M2 — 로더가 J2000 고정 분점 틀로 옮긴 율 [rad/일]. */
+/** #1354 결정 M2 · #1406 결정 F′ — 로더가 J2000 고정 분점 틀로 옮긴 율 (SI 길이 · rad, /일). */
 export interface LoadedOrbitalRates {
+  /** 장반경 a 의 율 [m/일]. 달 (`mean-equinox-of-date`) 은 `0`. */
+  semiMajorAxis: number;
+  /** 이심률 e 의 율 [/일]. 달은 `0`. */
+  eccentricity: number;
+  /** 경사 I 의 율 [rad/일]. 달은 `0`. */
+  inclination: number;
   /** 평균경도 L 의 율. */
   meanLongitude: number;
   /** 승교점 경도 Ω 의 율. */
@@ -473,6 +499,36 @@ function rateToSceneFrame(degPerCenturyOfDate: number): number {
   return ((degPerCenturyOfDate - GENERAL_PRECESSION_DEG_PER_CENTURY) * DEG) / JULIAN_CENTURY_DAYS;
 }
 
+/** 각 율 1개 — 이미 J2000 고정 분점 틀인 문헌 원값 [도/세기] → [rad/일]. `p_A` 를 빼지 않는다 (#1406 결정 F′). */
+function j2000AngleRate(degPerCentury: number): number {
+  return (degPerCentury * DEG) / JULIAN_CENTURY_DAYS;
+}
+
+/**
+ * 원 율 → 로드 율 (#1406 결정 F′). 달 (`mean-equinox-of-date`) 은 a · e · I 율을 `0` 으로 채운다 — `x + 0·Δt = x` 라 달의
+ * 평균 요소는 율 3필드 도입 전과 비트 동일하다. 선택 필드 분기를 두지 않으려는 결정이다.
+ */
+function toLoadedOrbitalRates(rates: OrbitalRatesRaw): LoadedOrbitalRates {
+  if (rates.frame === 'mean-equinox-of-date') {
+    return {
+      semiMajorAxis: 0,
+      eccentricity: 0,
+      inclination: 0,
+      meanLongitude: rateToSceneFrame(rates.meanLongitudeDegPerCentury),
+      longitudeOfAscendingNode: rateToSceneFrame(rates.longitudeOfAscendingNodeDegPerCentury),
+      longitudeOfPerihelion: rateToSceneFrame(rates.longitudeOfPerihelionDegPerCentury),
+    };
+  }
+  return {
+    semiMajorAxis: (rates.semiMajorAxisAuPerCentury * AU) / JULIAN_CENTURY_DAYS,
+    eccentricity: rates.eccentricityPerCentury / JULIAN_CENTURY_DAYS,
+    inclination: j2000AngleRate(rates.inclinationDegPerCentury),
+    meanLongitude: j2000AngleRate(rates.meanLongitudeDegPerCentury),
+    longitudeOfAscendingNode: j2000AngleRate(rates.longitudeOfAscendingNodeDegPerCentury),
+    longitudeOfPerihelion: j2000AngleRate(rates.longitudeOfPerihelionDegPerCentury),
+  };
+}
+
 /** km → m. */
 const METERS_PER_KM = 1000;
 /** 달 이론 진폭 단위 — 경도 · 위도 `1e-6 °` · 거리 `1e-3 km` (Meeus 표 원 단위). */
@@ -604,13 +660,7 @@ export function loadSolarSystem(raw: unknown = solarSystemRaw): LoadedSolarSyste
       epoch,
     };
     const rates = b.orbit.rates;
-    if (rates) {
-      base.orbit.rates = {
-        meanLongitude: rateToSceneFrame(rates.meanLongitudeDegPerCentury),
-        longitudeOfAscendingNode: rateToSceneFrame(rates.longitudeOfAscendingNodeDegPerCentury),
-        longitudeOfPerihelion: rateToSceneFrame(rates.longitudeOfPerihelionDegPerCentury),
-      };
-    }
+    if (rates) base.orbit.rates = toLoadedOrbitalRates(rates);
     const theory = b.orbit.lunarTheory;
     if (theory) base.orbit.lunarTheory = toLoadedLunarTheory(theory);
 

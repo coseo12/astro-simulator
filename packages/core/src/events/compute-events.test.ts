@@ -7,6 +7,7 @@ import {
   computeEventsForKind,
   heliocentricLongitudeDifference,
   isSameSideBracket,
+  perihelionTimes,
   type AstroEvent,
   type EventBody,
 } from './compute-events.js';
@@ -245,5 +246,27 @@ describe('#1370 — 청크 경계 왕복 (경계에 사건을 둔 이음 == 전 
     chunked.forEach((e, i) => {
       expect(Math.abs(e.julianDate - whole[i]!.julianDate)).toBeLessThan(ROOT_MATCH_DAYS);
     });
+  });
+});
+
+/**
+ * #1406 DoD D16 — `perihelionTimes` 는 고정 요소 해석해다. 율 보유 궤도 (8행성 · 달) 를 넘기면 장면 (`elementsAt`) 과 어긋난
+ * 시각을 조용히 내는 대신 `throw` 한다 (ADR 20261024-1406 결정 C). 혜성 2종 (율 없음) 은 그대로 계산된다 — 시각의 비트
+ * 동일 (행성 율 유 ↔ 무) 은 `orbit-elements-at.test.ts` D10.
+ */
+describe('#1406 D16 — perihelionTimes fail-fast', () => {
+  it.each(['mars', 'jupiter', 'earth', 'moon'])('율 보유 %s 는 throw', (id) => {
+    expect(bodiesById.get(id)!.orbit!.rates).toBeDefined();
+    expect(() => perihelionTimes(bodiesById, id, START_JD, END_JD)).toThrow(/rates 보유/);
+  });
+
+  it('율 보유 천체를 근일점 사건 종류로 계산해도 throw (computeEventsForKind 경유)', () => {
+    const kind = { ...getEventKind('halley-perihelion'), subjectId: 'mars' };
+    expect(() => computeEventsForKind(bodiesById, kind, START_JD, END_JD)).toThrow(/rates 보유/);
+  });
+
+  it.each(['halley', 'swift-tuttle'])('율 없는 혜성 %s 는 계산된다', (id) => {
+    expect(bodiesById.get(id)!.orbit!.rates).toBeUndefined();
+    expect(perihelionTimes(bodiesById, id, START_JD, END_JD).length).toBeGreaterThan(0);
   });
 });

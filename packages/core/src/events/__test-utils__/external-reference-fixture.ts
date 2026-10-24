@@ -22,10 +22,19 @@ import type { EventKindId } from '../event-kinds.js';
  *
  * ## `recordedErrorDays`
  *
- * `모델 − 기준` (일) — #1349 (태양 GM IAU 교정) 머지 후 develop `76ed1d71` 에서 잰 값. DoD M3 (ii) 는 표본마다
- * `|오차 − recordedErrorDays| ≤ 0.2` 일을 요구한다. #1370 이후 비교는 모델 사건 시각 (장면 시계) 을 `clockJdToTt` 로 TT 로 옮긴 뒤
- * 한다 (TT ≈ TDB, 차 `< 2 ms` — ADR `20261023-1370` Q4). 기록값은 ΔT 적용 전에 잰 값이다. 그때 모델은 장면 시계 JD 를 TT 자리에
- * 그대로 넣었으므로, 기록값도 같은 TT ↔ TDB 척도의 오차다.
+ * `모델 − 기준` (일). DoD M3 (ii) 는 표본마다 `|오차 − recordedErrorDays| ≤ 0.2` 일을 요구한다. 비교는 모델 사건 시각 (장면
+ * 시계) 을 `clockJdToTt` 로 TT 로 옮긴 뒤 한다 (TT ≈ TDB, 차 `< 2 ms` — ADR `20261023-1370` Q4).
+ *
+ * - 혜성 2행 — #1349 (태양 GM IAU 교정) 머지 후 develop `76ed1d71` 에서 잰 값 그대로다 (율 없는 궤도라 #1406 과 무관).
+ * - 충 · 내합 29행 — **#1406 (8행성 표 1 율, ADR `20261024-1406`) 구현에서 다시 잰 값** (ADR 1347 Amendment 1 과 같은 절차 —
+ *   기준값 `referenceJd` 는 다시 조회하지 않았다. 기준은 그대로고 모델만 바뀌었다). 측정: macOS · Apple M1 Pro · Node 24.14.0 ·
+ *   vitest, 이 PR 의 데이터. 29표본 최대 `|오차|` `1.263 → 0.185` 일 (ADR §1-D 표에 옮겨 둔 11표본의 `t1` 값과 소수 3자리까지 같다).
+ *
+ * ⚠️ **계약 재조정 (ADR 1406 결정 S · 사용자 합의 2026-10-24 — PR 본문 · CHANGELOG Notes 동시 기록).** 이슈 초안의 「충 · 내합
+ * 악화 표본 0 건」 은 표 1 율로 충족되지 않는다. 기준을 「29표본 최대 `|오차|` ≤ `0.25` 일 · 악화 4건 기록」 으로 바꿨다.
+ * 악화 4건 (`|오차|` 가 #1406 이전 기록값보다 커진 표본, 일): 목성 2000 `+0.043 → +0.055` · 토성 1905 `+0.139 → +0.185` ·
+ * 토성 2050 `−0.074 → −0.118` · 토성 2095 `−0.106 → −0.153`. 폭 최대 `0.047` 일. 토성의 `0.15` 일은 일심 상대 황경 `~520″`
+ * 로, 표 1 이 밝힌 토성 공칭 오차 `600″` 안이다 (ADR §1-D). 이 4건은 회귀가 아니라 의도된 결과다.
  */
 export interface ExternalReferenceSample {
   kind: EventKindId;
@@ -41,175 +50,175 @@ export const EXTERNAL_REFERENCE_SAMPLES: readonly ExternalReferenceSample[] = [
     kind: 'mars-opposition',
     year: 1909,
     referenceJd: 2418573.91879,
-    recordedErrorDays: 0.403,
+    recordedErrorDays: 0.031,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 1924,
     referenceJd: 2424021.20552,
-    recordedErrorDays: 0.311,
+    recordedErrorDays: -0.008,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 1956,
     referenceJd: 2435727.41101,
-    recordedErrorDays: 0.201,
+    recordedErrorDays: 0.02,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 1971,
     referenceJd: 2441173.78244,
-    recordedErrorDays: 0.118,
+    recordedErrorDays: -0.001,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2003,
     referenceJd: 2452880.24482,
-    recordedErrorDays: -0.014,
+    recordedErrorDays: 0.001,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2018,
     referenceJd: 2458326.71318,
-    recordedErrorDays: -0.071,
+    recordedErrorDays: 0.006,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2020,
     referenceJd: 2459136.47209,
-    recordedErrorDays: -0.079,
+    recordedErrorDays: 0.003,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2035,
     referenceJd: 2464586.31415,
-    recordedErrorDays: -0.12,
+    recordedErrorDays: 0.03,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2050,
     referenceJd: 2470032.82292,
-    recordedErrorDays: -0.222,
+    recordedErrorDays: -0.009,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'mars-opposition',
     year: 2099,
     referenceJd: 2487994.83435,
-    recordedErrorDays: -0.374,
+    recordedErrorDays: 0.02,
     source: 'mar099 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 1906,
     referenceJd: 2417544.71686,
-    recordedErrorDays: -0.473,
+    recordedErrorDays: -0.002,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 1950,
     referenceJd: 2433312.77383,
-    recordedErrorDays: -0.248,
+    recordedErrorDays: 0.004,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 2004,
     referenceJd: 2453164.85981,
-    recordedErrorDays: 0.025,
+    recordedErrorDays: 0.005,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 2012,
     referenceJd: 2456084.54447,
-    recordedErrorDays: 0.061,
+    recordedErrorDays: 0.005,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 2020,
     referenceJd: 2459004.23524,
-    recordedErrorDays: 0.09,
+    recordedErrorDays: -0.002,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 2050,
     referenceJd: 2470096.33192,
-    recordedErrorDays: 0.245,
+    recordedErrorDays: -0.001,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'venus-inferior-conjunction',
     year: 2097,
     referenceJd: 2487033.97962,
-    recordedErrorDays: 0.487,
+    recordedErrorDays: 0.008,
     source: 'DE441 · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 1905,
     referenceJd: 2417173.85851,
-    recordedErrorDays: 1.171,
+    recordedErrorDays: -0.088,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 1950,
     referenceJd: 2433519.79319,
-    recordedErrorDays: 0.695,
+    recordedErrorDays: -0.015,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 2000,
     referenceJd: 2451876.58493,
-    recordedErrorDays: 0.043,
+    recordedErrorDays: 0.055,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 2023,
     referenceJd: 2460251.70299,
-    recordedErrorDays: -0.406,
+    recordedErrorDays: -0.075,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 2050,
     referenceJd: 2469825.74083,
-    recordedErrorDays: -0.536,
+    recordedErrorDays: 0.071,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'jupiter-opposition',
     year: 2095,
     referenceJd: 2486579.48188,
-    recordedErrorDays: -1.263,
+    recordedErrorDays: 0.007,
     source: 'jup365_merged · 지구 DE441',
   },
   {
     kind: 'saturn-opposition',
     year: 1905,
     referenceJd: 2417080.85005,
-    recordedErrorDays: 0.139,
+    recordedErrorDays: 0.185,
     source: 'sat441l · 지구 DE441',
   },
   {
     kind: 'saturn-opposition',
     year: 1950,
     referenceJd: 2433347.69218,
-    recordedErrorDays: -0.037,
+    recordedErrorDays: 0.009,
     source: 'sat441l · 지구 DE441',
   },
   {
@@ -223,21 +232,21 @@ export const EXTERNAL_REFERENCE_SAMPLES: readonly ExternalReferenceSample[] = [
     kind: 'saturn-opposition',
     year: 2023,
     referenceJd: 2460183.84443,
-    recordedErrorDays: 0.09,
+    recordedErrorDays: 0.079,
     source: 'sat441l · 지구 DE441',
   },
   {
     kind: 'saturn-opposition',
     year: 2050,
     referenceJd: 2470015.93808,
-    recordedErrorDays: -0.074,
+    recordedErrorDays: -0.118,
     source: 'sat441l · 지구 DE441',
   },
   {
     kind: 'saturn-opposition',
     year: 2095,
     referenceJd: 2486280.2005,
-    recordedErrorDays: -0.106,
+    recordedErrorDays: -0.153,
     source: 'sat441l · 지구 DE441',
   },
   {

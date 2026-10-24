@@ -76,7 +76,7 @@ export function trailSegmentsFor(eccentricity: number): number {
 /**
  * 궤도 보유 천체 1개의 사양. 모체가 없거나 궤도가 없으면 `null`.
  *
- * #1354 결정 V1 — `julianDate` 의 시각 요소 (`elementsAt`) 로 만든다. `rates` 보유 천체 (달) 는 요소가 시간에 따라 돌므로
+ * #1354 결정 V1 — `julianDate` 의 시각 요소 (`elementsAt`) 로 만든다. `rates` 보유 천체 (달 · 8행성) 는 요소가 시간에 따라 돌므로
  * 호출자 (scene `syncTrails`) 가 프레임마다 현재 시각으로 다시 만든다 ({@link hasSecularRates}). `rates` 없는 천체는 시각과
  * 무관하게 같은 사양이다. 생략하면 데이터 epoch.
  */

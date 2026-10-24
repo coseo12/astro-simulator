@@ -14,8 +14,8 @@ import { lunarTheoryPositionAt } from './lunar-theory.js';
  * 정보 카드 · 거리 자 · 사건) 가 **같은 함수** `parentRelativePositionAt` 을 부른다 — 함수가 둘이면 parity 가 테스트에
  * 기대고, 하나면 구조로 보장된다 (ADR 1347 §교차검증 합의 5 와 같은 원리).
  *
- * `rates` 도 `lunarTheory` 도 없는 궤도 (현재 달 외 전 천체) 는 `positionAt(orbit, jd, orbitMu(body, parent))` 그대로다 —
- * `elementsAt` 가 같은 객체를 돌려주므로 비트 동일 (ADR 1404 DoD D9).
+ * `rates` 도 `lunarTheory` 도 없는 궤도 (달 · 8행성 외 전 천체 — #1406) 는 `positionAt(orbit, jd, orbitMu(body, parent))`
+ * 그대로다 — `elementsAt` 가 같은 객체를 돌려주므로 비트 동일 (ADR 1404 DoD D9 · ADR 1406 DoD D10).
  */
 
 const SECONDS_PER_DAY = 86_400;
@@ -23,8 +23,9 @@ const SECONDS_PER_DAY = 86_400;
 /**
  * 시각 `jd` 의 궤도 요소 — 결정 M3.
  *
- * `rates` 가 있으면 epoch 를 `jd` 로 옮긴 요소를 만든다 (Δt = jd − epoch, rad/일):
- * `Ω(t) = Ω₀ + Ω̇·Δt` · `ω(t) = ω₀ + (ϖ̇ − Ω̇)·Δt` · `M(t) = M₀ + (L̇ − ϖ̇)·Δt`.
+ * `rates` 가 있으면 epoch 를 `jd` 로 옮긴 요소를 만든다 (Δt = jd − epoch, /일):
+ * `Ω(t) = Ω₀ + Ω̇·Δt` · `ω(t) = ω₀ + (ϖ̇ − Ω̇)·Δt` · `M(t) = M₀ + (L̇ − ϖ̇)·Δt`,
+ * 그리고 #1406 결정 E 의 `a(t) = a₀ + ȧ·Δt` · `e(t) = e₀ + ė·Δt` · `I(t) = I₀ + İ·Δt` (달은 세 율이 `0` 이라 기점 값 그대로).
  * 평균근점이각 율이 `√(μ/a³)` 대신 데이터 율 `L̇ − ϖ̇` 이다 — 「Ω̇ · ϖ̇ 만 더하고 M 율은 Kepler n」 이면 평균경도가
  * 1년에 `40°` 앞서 간다 (ADR 축 M 후보 A1). 반환 요소의 epoch 가 `jd` 라 `positionAt(elementsAt(o, jd), jd, μ)` 의
  * Kepler 항 `n·(jd − epoch)` 은 0 이다 — μ 는 위치에 들어가지 않는다.
@@ -32,6 +33,10 @@ const SECONDS_PER_DAY = 86_400;
  * `rates` 가 없으면 **같은 객체**를 돌려준다 (비트 동일). Δt = 0 (J2000) 에서도 더하는 값이 정확히 0 이라 요소 값은 같다.
  *
  * ⚠️ `rates` 보유 궤도를 `positionAt(orbit, jd, μ)` 에 직접 넣으면 고정 요소 (현행 V0) 위치가 나온다 — 반드시 이 함수를 거친다.
+ *
+ * **범위 전제** (ADR 1406 결정 E): 율의 검증 범위는 스크러버 1900 ~ 2100 이다 (8행성 율 = JPL SSD 표 1, DE441 대비 실측).
+ * 율이 선형이라 범위 밖에서는 e · a 가 물리 범위를 벗어날 수 있다 — 계산상 `e < 0` 이 되는 가장 가까운 시각은 토성 서기
+ * `12563` 이고, `e ≥ 1` · `a ≤ 0` 은 서기 `−180,000 ~ +760,000` 밖이다. 클램핑 · 런타임 검사는 두지 않는다.
  */
 export function elementsAt(
   orbit: LoadedOrbitalElements,
@@ -45,6 +50,9 @@ export function elementsAt(
   const dMeanLongitude = rates.meanLongitude * dt;
   return {
     ...orbit,
+    semiMajorAxis: orbit.semiMajorAxis + rates.semiMajorAxis * dt,
+    eccentricity: orbit.eccentricity + rates.eccentricity * dt,
+    inclination: orbit.inclination + rates.inclination * dt,
     longitudeOfAscendingNode: orbit.longitudeOfAscendingNode + dNode,
     argumentOfPeriapsis: orbit.argumentOfPeriapsis + (dPerihelion - dNode),
     meanAnomalyAtEpoch: orbit.meanAnomalyAtEpoch + (dMeanLongitude - dPerihelion),

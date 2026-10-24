@@ -171,20 +171,26 @@ describe('#1354 V1 — 달 궤도선 정점 갱신 (장면)', () => {
     names.forEach((n, i) => expect(positionsOf(f, n), n).toEqual(before[i]));
   });
 
-  it('궤적 — 달 사양을 현재 시각 요소로 다시 만든다 (율 없는 천체 사양은 로드 사양 그대로)', () => {
+  it('궤적 — 율 보유 천체 (달 · 8행성) 사양을 현재 시각 요소로 다시 만든다 (율 없는 천체 사양은 로드 사양 그대로)', () => {
     const f = makeScene();
     const jd = J2000 + 7_000;
     f.handles.updateAt(jd);
     const loadSpecs = f.handles.getTrailBodySpecs().map((s) => ({ ...s }));
     f.handles.setTrailsVisible(true);
     const specs = f.handles.getTrailBodySpecs();
-    const moonSpec = specs.find((s) => s.id === 'moon')!;
-    // #1370 — 궤적 사양 epoch 는 장면 위치 시각 (TT).
-    expect(moonSpec.epoch).toBe(clockJdToTt(jd));
-    const el = elementsAt(moon.orbit!, clockJdToTt(jd));
-    expect(moonSpec.meanAnomalyAtEpoch).toBe(el.meanAnomalyAtEpoch);
+    // #1406 — 율 보유는 달 · 8행성 (EMB = earth). 각 사양이 그 시각 요소를 쓴다.
+    const rated = system.bodies.filter((b) => b.orbit?.rates);
+    expect(rated).toHaveLength(9);
+    for (const b of rated) {
+      const spec = specs.find((s) => s.id === b.id)!;
+      // #1370 — 궤적 사양 epoch 는 장면 위치 시각 (TT).
+      expect(spec.epoch, b.id).toBe(clockJdToTt(jd));
+      const el = elementsAt(b.orbit!, clockJdToTt(jd));
+      expect(spec.meanAnomalyAtEpoch, b.id).toBe(el.meanAnomalyAtEpoch);
+    }
+    const ratedIds = new Set(rated.map((b) => b.id));
     for (const s of specs)
-      if (s.id !== 'moon') expect(s).toEqual(loadSpecs.find((x) => x.id === s.id));
+      if (!ratedIds.has(s.id)) expect(s).toEqual(loadSpecs.find((x) => x.id === s.id));
   });
 });
 

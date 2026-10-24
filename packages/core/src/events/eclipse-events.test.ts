@@ -13,6 +13,10 @@
  * 바뀌어 임계를 조였다. 달 `rates` 변이 (세차 부호 반전 · 틀 미변환) 는 더 이상 달 위치를 바꾸지 않아 (위치는 이론, 율은 평균
  * 요소만) 그 판별력 테스트 2건을 지웠다 — 이론 변이 판별력은 `physics/lunar-theory.test.ts` (D3).
  * 실측 환경 (아래 「실측」 전부): macOS · Apple M1 Pro · Node 24.14.0 · vitest, 이 PR 의 구현 · 데이터.
+ *
+ * #1406 (ADR `docs/decisions/20261024-1406-planet-element-rates-standish.md` 결정 E5 — ADR 1354 재검토 트리거 1 · ADR 1404
+ * 재검토 조건 1 이행) — 8행성 (EMB 포함) 이 표 1 율을 가져 태양 축 오차가 줄었다. E1 · E2 · E3 · E4 임계를 다시 쟀다. 실측은
+ * 위와 같은 환경 · 이 PR 의 구현 · 데이터다. 판별력 — 행성 율을 뺀 판본 (#1406 이전 태양) 은 새 E1 · E4 를 넘는다 (아래 E4 블록).
  */
 import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
@@ -61,31 +65,36 @@ const DEG = Math.PI / 180;
 const MATCH_WINDOW_DAYS = 3;
 
 /**
- * DoD E2 — 적중 하한 · 오탐 상한. #1404 DoD D6 — 일식 `≥ 449` · `≤ 4`, 월식 `≥ 454` · `≤ 3` (B9 때 448 · 8 / 453 · 6).
- * 실측: 일식 적중 451/452 · 오탐 2 (사건 453), 월식 적중 456/457 · 오탐 1 (사건 457) — ADR 1404 §1-E 설계 실측과 같은 수다.
+ * DoD E2 — 적중 하한 · 오탐 상한. #1406 DoD D5 — 일식 `≥ 450` · `≤ 2`, 월식 `≥ 455` · `≤ 2` (#1404 때 449 · 4 / 454 · 3,
+ * B9 때 448 · 8 / 453 · 6). 실측: 일식 적중 452/452 · 오탐 0 (사건 452), 월식 적중 457/457 · 오탐 0 (사건 457) — ADR 1406
+ * §1-F 설계 실측과 같은 수다. #1406 이전 (행성 율 없음) 은 일식 451 · 2 / 월식 456 · 1.
  */
 const E2 = {
-  'solar-eclipse': { minHits: 449, maxFalse: 4 },
-  'lunar-eclipse': { minHits: 454, maxFalse: 3 },
+  'solar-eclipse': { minHits: 450, maxFalse: 2 },
+  'lunar-eclipse': { minHits: 455, maxFalse: 2 },
 } as const;
 
 /**
- * DoD E3 — 종류 일치 하한 (적중 중, 혼성 = 개기 또는 금환이면 일치). #1404 DoD D6 — 일식 `≥ 443` · 월식 `≥ 442` (B9 때 438 ·
- * 430). 실측 일식 446 · 월식 445. 결함판: `lunarTheory` 를 뺀 판본 (A3 — 아래 판별력 테스트) · 본영 반경 부호 반전 (#1354 변이).
+ * DoD E3 — 종류 일치 하한 (적중 중, 혼성 = 개기 또는 금환이면 일치). #1406 DoD D5 — 일식 `≥ 446` · 월식 `≥ 452` (#1404 때
+ * 443 · 442, B9 때 438 · 430). 실측 일식 449 · 월식 455 (#1406 이전 446 · 445 — 월식이 새 하한 아래). 결함판: `lunarTheory` 를
+ * 뺀 판본 (A3 — 아래 판별력 테스트) · 본영 반경 부호 반전 (#1354 변이).
  */
-const E3 = { 'solar-eclipse': 443, 'lunar-eclipse': 442 } as const;
+const E3 = { 'solar-eclipse': 446, 'lunar-eclipse': 452 } as const;
 
 /**
- * DoD E4 — 적중마다 `|t* − NASA TD|` 상한 [h]. #1404 DoD D7 — `1.0 → 0.5` h. 실측 일식 `−0.398 ~ +0.442` · 월식
- * `−0.422 ~ +0.431` h (max `26.54` · `25.88` 분 — ADR 1404 §1-E 와 같다). 남는 오차의 대부분은 태양 축이다 (#1406).
+ * DoD E4 — 적중마다 `|t* − NASA TD|` 상한 [h]. #1406 DoD D3 — `0.5 → 0.05` h (#1404 DoD D7 때 `1.0 → 0.5` h). 실측 max
+ * 일식 `2.07` · 월식 `1.60` 분 (`0.0344` · `0.0266` h — ADR 1406 §1-F 와 같다). #1406 이전 (행성 율 없음) 은 `26.54` · `25.88` 분.
  */
-const E4_MAX_HOURS = 0.5;
+const E4_MAX_HOURS = 0.05;
 
 /** 완전성 — 삭망 인접 간격 상한 [일] (실제 `29.27 ~ 29.83` 일). 범위 양 끝 여백에도 같은 상한을 건다. */
 const MAX_SYZYGY_GAP_DAYS = 29.9;
 
-/** DoD E1 — 삭망 시각 허용 [h] (`orbit-elements-at.test.ts` 와 같은 대역). #1404 DoD D5 — `1.0 → 0.5` h. */
-const E1_SYZYGY_TOLERANCE_HOURS = 0.5;
+/**
+ * DoD E1 — 삭망 시각 허용 [h] (`orbit-elements-at.test.ts` 와 같은 대역). #1406 DoD D4 — `0.5 → 0.05` h (#1404 DoD D5 때
+ * `1.0 → 0.5` h).
+ */
+const E1_SYZYGY_TOLERANCE_HOURS = 0.05;
 
 /** 최대식 정합 — 사건 시각 ± 이 값에서 식 지표가 사건 시각보다 작지 않아야 한다 [일] (1분). */
 const GREATEST_ECLIPSE_PROBE_DAYS = 1 / MINUTES_PER_DAY;
@@ -176,7 +185,7 @@ describe('#1354 E1 — 사건 경로의 삭망 근 (DE441 717개)', () => {
         worst = Math.max(worst, nearest * HOURS_PER_DAY);
       }
     }
-    // #1404 실측 max `0.438` h (`orbit-elements-at.test.ts` 헬퍼와 같은 값 — 같은 위치 함수). B9 때 `−0.756 ~ +0.688` h.
+    // #1406 실측 max `0.0151` h (#1404 때 `0.438` h, B9 때 `−0.756 ~ +0.688` h).
     expect(worst).toBeLessThanOrEqual(E1_SYZYGY_TOLERANCE_HOURS);
   });
 
@@ -300,6 +309,38 @@ describe('#1354 E4 — 최대식 시각 · 허용 오차', () => {
       );
     },
   );
+});
+
+describe('#1406 판별력 — 행성 율을 뺀 판본 (#1406 이전 태양) 은 새 E1 · E4 를 넘는다', () => {
+  const PLANET_IDS = [
+    'mercury',
+    'venus',
+    'earth',
+    'mars',
+    'jupiter',
+    'saturn',
+    'uranus',
+    'neptune',
+  ];
+  const raw: RawSystem = structuredClone(solarSystemRaw);
+  for (const id of PLANET_IDS) {
+    delete (raw.bodies.find((b) => b.id === id)!.orbit as Record<string, unknown>).rates;
+  }
+  const baseById = byIdOf(loadSolarSystem(raw).bodies);
+
+  it.each(ECLIPSE_KINDS)('%s — E4 (실측 max 일식 26.54 · 월식 25.88 분)', (kind) => {
+    const m = matchAgainstNasa(eclipsesOf(baseById, kind), kind);
+    expect(Math.max(...m.errorsHours.map(Math.abs))).toBeGreaterThan(E4_MAX_HOURS);
+  });
+
+  it('E1 — 삭 (DE441 삭 358개)', () => {
+    const roots = syzygyTimes(baseById, 'moon', 'new', START_JD, END_JD);
+    let worst = 0;
+    for (const ref of DE441_NEW_MOON_JD) {
+      worst = Math.max(worst, Math.min(...roots.map((t) => Math.abs(t - ref))) * HOURS_PER_DAY);
+    }
+    expect(worst).toBeGreaterThan(E1_SYZYGY_TOLERANCE_HOURS);
+  });
 });
 
 describe('#1354 최대식 정합 · 사전 필터', () => {

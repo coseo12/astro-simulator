@@ -474,3 +474,18 @@ agy 1회 (2026-10-23, 메인 오케스트레이터 실행 — outcome `applied` 
 - **테스트 — 예측 5파일 일치 + 주석만 4파일**: `body-chain.test.ts` · `solar-system-scene-lunar-orbit-line.test.ts` · `body-distance.test.ts` · `body-info-card.test.tsx` 의 주석이 같은 이유로 바뀌었다. 단언 · 기대값은 바뀌지 않았다.
 - **반증 (export 1개)** — `packages/core/src/events/compute-events.ts` 의 `GREATEST_ECLIPSE_TOLERANCE_DAYS` 를 export 했다 (값 `1e-6` 일 불변, core 루트 named export 추가). PR1 CI 에서 월식 `2085-06-08` 의 최대식 시각이 플랫폼 간 `4.3e-7` 일 갈려 사건 파일 drift 테스트가 실패했고, 그 테스트가 식 시각을 이 수렴 허용치로 비교하도록 바꿨기 때문이다 (`apps/web/src/lib/time-events-data.test.ts` 주석). 「식 시각은 플랫폼 간 비트 동일」 이라는 drift 테스트의 전제가 이 모델에서 깨졌다 — 결정 E1 (재생성 절차) 은 그대로다.
 - **결정 불변** — 위 차이는 서술 갱신이고, 결정 L1 ~ L5 · E1 ~ E5 는 그대로다.
+
+## Amendment 2 — 재검토 조건 1 이행: #1406 후 D1 · D2 · D5 · D7 재측정 · 임계 (2026-10-24, Accepted)
+
+#1406 (8행성 표 1 율 — ADR [`20261024-1406`](20261024-1406-planet-element-rates-standish.md)) 이 들어와 태양 축이 바뀌었다. 재검토 조건 1 에 따라 다시 쟀다. 측정 환경 · 방법은 ADR 1406 Amendment 1 (macOS · Apple M1 Pro · Node 24.14.0 · vitest, 같은 「장면 규약 교점」 정의).
+
+| # | 이 ADR 의 임계 | #1406 후 실측 | 새 임계 (ADR 1406 DoD) |
+| --- | --- | --- | --- |
+| D1 | `\|t* − TD\|` ≤ `4.5` 분 | 2017 `0.74` · 2024 `0.86` 분 (§1-D S1′ 와 같다) | ≤ `1.5` 분 (ADR 1406 D1) |
+| D2 | 교점 ↔ NASA ≤ `140 km` | 교점 `18.0` · `38.6 km`, 최근접 `14.1` · `0.5 km` (2024 cross `−120.7 → +0.5 km` — 경로 반폭 밖 → 안) | 교점 ≤ `60 km` · 최근접 ≤ 반폭 (ADR 1406 D2) |
+| D5 | E1 ≤ `0.5 h` | `0.0151 h` | ≤ `0.05 h` (ADR 1406 D4) |
+| D7 | E4 ≤ `0.5 h` | 일식 `2.07` · 월식 `1.60` 분 | ≤ `0.05 h` (ADR 1406 D3) |
+
+- D6 (E2 · E3) 도 함께 조였다 — 일식 적중 `≥ 450` · 오탐 `≤ 2` · 종류 `≥ 446`, 월식 `≥ 455` · `≤ 2` · `≥ 452` (ADR 1406 D5).
+- 테스트 상수는 `eclipse-events.test.ts` (`E1_SYZYGY_TOLERANCE_HOURS` · `E2` · `E3` · `E4_MAX_HOURS`) 와 `orbit-elements-at.test.ts` (`E1_SYZYGY_TOLERANCE_HOURS`) 다. P1 (D3 — 달 위치) 은 태양 축과 무관해 그대로다.
+- 결정 L1 ~ L5 · E1 ~ E5 는 그대로다. 결정 S 의 「#1406 전까지 남는 한계」 (2024 중심선이 반폭 밖) 는 #1406 으로 해소됐다.
