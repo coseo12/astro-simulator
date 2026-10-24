@@ -1,14 +1,15 @@
 # ADR 20261023-1404 — 달 위치를 Meeus 47장 전 항 직접 계산 + 황도 세차 회전으로 바꾼다 (B9 대체). 태양 축은 분리한다
 
-- **상태**: Provisional — cross-validate 와 사용자 결정 (Q1 ~ Q5) 대기
+- **상태**: Accepted (cross-validate 2026-10-23) — 사용자 결정 (2026-10-24): Q1 ~ Q5 전부 권고안
 - **날짜**: 2026-10-23
-- **결정자**: 설계 architect (이슈 [#1404](https://github.com/coseo12/astro-simulator/issues/1404) · 사용자 선택 2026-10-23). 최종 결정은 사용자 (Q 표)
+- **결정자**: 사용자 (2026-10-24 — Q 표 전부 권고안, 메인 오케스트레이터 경유) · 설계 architect (이슈 [#1404](https://github.com/coseo12/astro-simulator/issues/1404) · 사용자 선택 2026-10-23)
 - **관련**:
   - [ADR 20261017-1354](20261017-1354-lunar-precession-eclipses.md) — 달 모델 B9 (결정 M1 · M2 · M4), 데이터 배치 축 D, 사건 판정 E1 · E2, 재검토 트리거 1 (「지구 (EMB) 요소에 율 · 섭동을 넣으면」)
   - [ADR 20261023-1370](20261023-1370-delta-t-dynamical-time.md) — 물리 함수 시각 인자 = TT, 진입점 3곳, 사건 파일 재생성 절차 (§결정 R)
   - [ADR 20261016-1347](20261016-1347-event-markers.md) Amendment 2 — `time-events.json` 사전 계산 · drift 테스트
   - [ADR 20261018-1360](20261018-1360-moon-phase-eclipse-shadows.md) §1-D · §기준값 — NASA 최대식 지점 · 경로 폭
   - #1349 (태양 GM 교정 — 위치 모델 변경 시 근거 표 절차) · #1377 (사건 계산 비용이 fps 회귀를 만든 이력)
+  - #1406 — 후속: EMB · 8행성 궤도요소 변화율 (Q2 (a) 로 분리한 태양 축)
   - [`principles.md`](../architecture/principles.md) §1 Visual Fidelity
 - **용어**: t* = 사건 시각 (일식 γ 최소 · 월식 그림자 중심 이각 최소, ADR 1354 E1). 「장면 규약 교점」 = 위치 TT · 자전 ERA(시계) · J2000 고정 극 · 지심 위도 · 구 반경 `6378.137 km` 로 그림자 축이 지표에 닿는 점 (ADR 1370 §1-D 와 같은 방법). [Tier](../glossary.md#tier-t1--t2--t3)
 
@@ -20,7 +21,7 @@
 
 v0.105.1 (#1370) 이 시각척도 축을 고친 뒤에도 2024-04-08 일식의 앱 t* 는 NASA 최대식보다 약 21분 이르고, t* 의 그림자 중심은 NASA 최대식 지점에서 2017 `314 km` · 2024 `535 km` 떨어져 있다 (이슈 본문 · ADR 1370 §1-D). 이슈는 이 차이의 주원인을 달 모델 (B9) 로 보고 항 수 확장을 제안했다.
 
-설계의 첫 질문은 「21분이 실제로 어디서 오는가」 다. 축별로 나눈 결과 **달이 대부분이지만 태양 (EMB Kepler 고정 요소) 도 큰 축**이고, 태양 축은 스크러버 범위 양 끝에서 달 축보다 크다 (§1-B · §1-D). 그래서 이 ADR 은 달 모델을 정하고, 태양 축의 범위는 Q2 로 사용자에게 올린다.
+설계의 첫 질문은 「21분이 실제로 어디서 오는가」 다. 축별로 나눈 결과 **달이 대부분이지만 태양 (EMB Kepler 고정 요소) 도 큰 축**이고, 태양 축은 스크러버 범위 양 끝에서 달 축보다 크다 (§1-B · §1-D). 그래서 이 ADR 은 달 모델을 정하고, 태양 축은 사용자 결정 (Q2 (a)) 으로 후속 이슈 #1406 에 넘긴다.
 
 ### 실측 (2026-10-23, architect)
 
@@ -31,8 +32,8 @@ v0.105.1 (#1370) 이 시각척도 축을 고친 뒤에도 2024-04-08 일식의 �
 - **DE441 벡터** — JPL Horizons API, `COMMAND='301'` (달) · `'10'` (태양), `CENTER='500@399'`, `REF_PLANE='ECLIPTIC'` · `REF_SYSTEM='J2000'` · `VEC_CORR='NONE'` (기하), `OUT_UNITS='KM-S'`, `STEP_SIZE='2 h'`, 4개 구간 (`1901-01-01 ~ 1911-01-02` · `2011 ~ 2021` · `2021 ~ 2031` · `2091-01-01 ~ 2100-01-02`), 응답 헤더 `{source: DE441}`. 6점 Lagrange 보간. 겉보기 위치는 같은 조건에 `VEC_CORR='LT+S'` · `STEP_SIZE='5 m'` 로 2017-08-21 · 2024-04-08 의 `12:00 ~ 23:59` TDB 만 받았다.
 - **NASA 식 목록** — 저장소 fixture `packages/core/src/events/__test-utils__/nasa-eclipse-fixture.ts` (일식 452 · 월식 457, 최대식 TD). 4개 구간 안 표본은 일식 90 · 월식 90 이다.
 - **NASA 최대식 지점 · 시각** — 2017-08-21 `36°58.0′N 87°40.3′W` · `18:26:40.3 TD`, 2024-04-08 `25°17.5′N 104°07.2′W` · `18:18:29 TD` (ADR 1360 §기준값 · ADR 1370 §기준값과 같은 값). 중심식 경로 폭 `114.7 km` · `197.5 km` (ADR 1360).
-- **Meeus 47장** — J. Meeus, *Astronomical Algorithms* 2판 (1998) 47장 식 47.1 ~ 47.5 · 표 47.A (경도 · 거리 60행) · 표 47.B (위도 60행) · 부가항 (A1 · A2 · A3 · L′ 계열). 원서는 직접 열람하지 못했다 — **PyMeeus `pymeeus/Moon.py`** (GitHub `architest/pymeeus` master, LGPL v3) 의 표를 파싱해 썼다 (ADR 1354 와 같은 대조 출처). 파싱 결과 표 47.A `60` 행 · 47.B `60` 행이고, 진폭 상위에서 B9 를 다시 뽑으면 `solar-system.json` 의 9행과 같다. 구현이 Meeus 예제 47.a (JDE `2448724.5` → λ `133.162655°` · β `−3.229126°` · Δ `368409.7 km`) 를 인쇄 자리수까지 재현한다.
-- **황도 세차 (날짜 황도 → J2000 황도)** — Meeus 21장 식 21.5 · 21.6 (η · Π · p 다항식). 계수는 PyMeeus `Coordinates.precession_ecliptical` 과 같다 (같은 날 대조).
+- **Meeus 47장 (주 출처)** — J. Meeus, *Astronomical Algorithms* 2판 (1998) 47장 식 47.1 ~ 47.5 · 표 47.A (경도 · 거리 60행) · 표 47.B (위도 60행) · 부가항 (A1 · A2 · A3 · L′ 계열). 원서는 직접 열람하지 못했다. 설계 측정에서는 **대조 · 검증 도구** PyMeeus `pymeeus/Moon.py` (GitHub `architest/pymeeus` master, LGPL v3) 의 표 숫자를 읽어 썼다 (ADR 1354 와 같은 대조 출처). 저장소에 들어가는 것은 표의 수치 (사실 데이터) 뿐이고, 변수명 · 구조는 자체 스키마다 (결정 L2). 파싱 결과 표 47.A `60` 행 · 47.B `60` 행이고, 진폭 상위에서 B9 를 다시 뽑으면 `solar-system.json` 의 9행과 같다. 구현이 Meeus 예제 47.a (JDE `2448724.5` → λ `133.162655°` · β `−3.229126°` · Δ `368409.7 km`) 를 인쇄 자리수까지 재현한다.
+- **황도 세차 (날짜 황도 → J2000 황도)** — 주 출처 Meeus 21장 (황도 좌표 세차 — η · Π · p 다항식과 구면 변환식). 계수는 대조 도구 PyMeeus `Coordinates.precession_ecliptical` 과 같다 (같은 날 대조).
 - **EMB 율 (태양 축 측정용)** — JPL SSD 「Approximate Positions of the Planets」 표 1 (1800 – 2050, `ssd.jpl.nasa.gov/planets/approx_pos.html`). 표의 기점 값이 `solar-system.json` 의 8개 행성 궤도 요소와 같다 (현 데이터의 출처가 이 표다).
 
 #### 1-A. 방법 검증 [실측]
@@ -156,6 +157,36 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 - 통과한 것: 장면 ↔ 체인 parity (`solar-system-scene-physical-phase` 등 scene 계열 전부), 궤도선 · 궤적 (`solar-system-scene-lunar-orbit-line` · `-trails`), `body-distance.test.ts`, `time-events.test.tsx` (종류명 — 2017-08-21 개기 · 2023-10-14 금환 · 2022-10-25 부분 · 2025-03-14 개기월식 · 2023-10-28 부분월식 · 2024-03-25 반영월식), `tours-content` · `plan-tour-step`, NASA E4 · DE441 E1 · JPL 외부 기준.
 - 이 변이는 `periodicTerms` 경로를 남긴 채 분기만 넣었다. 결정 L3 (경로 제거) 가 더하는 변경은 §Concrete Prediction 에 정적 판독으로 따로 적는다.
 
+#### 1-H. t* 그림자 중심 오차의 along-track · cross-track 분해 [실측 — cross-validate 반영]
+
+cross-validate 는 「DIRECT + 앱 태양의 `123 km` 는 대부분 경로 진행 방향 (시각 차) 이고 경로 자체는 거의 맞다」 고 보았다. 측정 없는 추정이라 다시 쟀다.
+
+- **환경 · 방법**: §실측과 같은 환경 (Node 24.14.0 · M1 Pro · develop `09df2bc6` core dist · DE441 4구간 표 + 2017 · 2024 겉보기 표, 일회성 스크립트 — 측정 후 삭제).
+- **분해 축**: NASA 최대식 지점의 국소 접평면 (동 · 북, 반경 `6371 km`) 위에서 「모델 t* 교점 − NASA 지점」 벡터를 둘로 나눴다.
+  - along = 경로 진행 방향 단위벡터 성분. 단위벡터는 같은 모델의 t* ± 30 s 장면 규약 교점 차로 만든다.
+  - cross = 그 직교 성분 (진행 방향 왼쪽 +).
+- **보조 지표**: 「모델 경로 최근접」 = t* ± 60 분 (1 s 간격) 교점 중 NASA 지점에 가장 가까운 거리. 모델 중심선이 NASA 지점에서 얼마나 떨어져 지나가는지를 보여 준다.
+
+| 일식 | 달 · 태양 | t* 교점 ↔ NASA | along | cross | 모델 경로 최근접 (그 시각 − t*) | 진행 방위 · 지표 속도 |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| 2017-08-21 | B9 · 앱 (현행) | 313.1 km | −236.7 | −203.3 | 207.0 km (+6.08 분) | 118.5° · 0.642 km/s |
+| | **DIRECT · 앱** | **66.6 km** | **+66.1** | **−6.9** | **7.1 km** (−1.70 분) | 118.3° · 0.644 km/s |
+| | DE441 · 앱 | 67.0 km | +66.5 | −8.0 | 8.3 km (−1.72 분) | 118.3° · 0.643 km/s |
+| | DIRECT · S1′ | 18.0 km | −11.3 | −14.0 | 14.1 km (+0.28 분) | 118.3° · 0.647 km/s |
+| | DE441 겉보기 | 14.3 km | +3.9 | −13.7 | 13.7 km (−0.10 분) | 118.3° · 0.646 km/s |
+| 2024-04-08 | B9 · 앱 (현행) | 532.9 km | +333.1 | −415.4 | 420.8 km (−7.88 분) | 41.2° · 0.696 km/s |
+| | **DIRECT · 앱** | **123.0 km** | **+22.3** | **−120.7** | **120.9 km** (−0.53 분) | 41.1° · 0.696 km/s |
+| | DE441 · 앱 | 126.2 km | +23.4 | −123.8 | 124.0 km (−0.57 분) | 41.1° · 0.696 km/s |
+| | DIRECT · S1′ | 38.6 km | −38.6 | +0.5 | 0.5 km (+0.92 분) | 41.1° · 0.698 km/s |
+| | DIRECT · DE441 | 35.2 km | −35.0 | −2.6 | 2.7 km (+0.83 분) | 41.1° · 0.698 km/s |
+| | DE441 겉보기 | 32.9 km | −26.6 | −19.4 | 19.5 km (+0.63 분) | 41.1° · 0.698 km/s |
+
+- **cross-validate 의 추정은 2017 에만 맞다.**
+  - 2017 (DIRECT · 앱): `66.6 km` 중 along `66.1` · cross `−6.9 km`. 모델 중심선은 NASA 지점에서 `7.1 km` 로 지나가며, 경로 반폭 `57 km` 안이다.
+  - 2024 (DIRECT · 앱): `123.0 km` 중 along `22.3` · cross `−120.7 km`. 모델 중심선은 NASA 지점에서 `120.9 km` 떨어져 지나가며, **경로 반폭 `~99 km` (폭 `197.5 km` 의 절반) 보다 크다**.
+- 2024 cross-track 은 태양 축 몫이다. 달을 DE441 로 바꿔도 `−123.8 km` 이고, 태양을 S1′ 또는 DE441 로 바꾸면 `+0.5` · `−2.6 km` 가 된다. 이것이 후속 #1406 의 동기다.
+- 이 표는 DoD 보조 정보다 (D2 옆 기록). 새 DoD 로 승격하지 않는다.
+
 ---
 
 ## 후보 비교
@@ -191,18 +222,83 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ---
 
-## 결정 (Provisional — Q 표 권고안 기준)
+## 결정 (사용자 결정 2026-10-24 — 전부 권고안)
 
 ### 달 모델 · 데이터
 
-1. **L1 — 달 위치 = DIRECT** (Q1 (c)): Meeus 47장 식 47.1 ~ 47.5 의 평균 인자 (L′ · D · M · M′ · F, T⁴ 까지) · 표 47.A · 47.B 전 행 · 부가항 · 이심률 인자 `E = 1 − 0.002516 T − 0.0000074 T²` (`|M|` 계수만큼 곱함) 로 날짜 평균 분점의 (λ, β, Δ) 를 만들고, Meeus 식 21.5 · 21.6 의 황도 세차 회전으로 J2000 황도로 옮긴다. 장면 · 정보 카드 · 거리 자 · 사건이 모두 이 위치를 쓴다 (ADR 1354 결정 M4 단일 함수 유지).
-2. **L2 — 데이터** (Q3 (a)): `moon.orbit.lunarTheory` (optional, 달만). 내용은 평균 인자 다항식 계수 · 이심률 인자 계수 · 평균 거리 `385000.56 km` · 표 47.A 60행 · 표 47.B 60행 · 부가항이다.
-   - 표 진폭은 **원 단위 그대로** 둔다 (경도 · 위도 `1e-6 °`, 거리 `1e-3 km` — 원 표 숫자와 grep 대조 가능). 로더가 rad · m 로 바꾼다.
-   - 문헌이 분수로 쓴 계수 (`1/538841` 등) 는 소수로 옮기고 `$comment` 에 원 표기를 남긴다.
-   - 부가항은 표와 같은 행 형태로 둔다 — 인자 기저를 (D · M · M′ · F · L′ · A1 · A2 · A3) 로 넓혀 `sin(L′ − F)` · `sin(A1 + F)` 등을 정수 계수 행으로 쓴다. 표 행은 L′ · A 계수가 0 인 행이다.
-   - 로더 거부: `lunarTheory` 는 「모체가 계 뿌리를 도는 위성」 에만 둘 수 있다 (ADR 1354 M2 의 `periodicTerms` 거부 규칙을 그대로 옮긴다). 표 행 수 (60 · 60) 를 스키마로 고정하지는 않는다 — 단위 테스트가 센다.
-3. **L3 — 코드** (Q4 (a)): 신규 `packages/core/src/physics/lunar-theory.ts` (급수 · 황도 세차 회전). `parentRelativePositionAt` 은 `lunarTheory` 가 있으면 그 위치를 돌려주고, 없으면 현 Kepler 경로 그대로 (다른 천체 비트 동일). **`periodicTerms` 경로를 지운다** — 데이터 사용처가 0 이 되므로 스키마 · `LoadedPeriodicTerm` · `periodicArgumentsAt` · `periodicPerturbationAt` · `applyPerturbation` · `EARTH_ECCENTRICITY_FACTOR_PER_CENTURY` · 거부 규칙 · 관련 테스트를 함께 지운다 (다른 위성에 섭동이 필요해지면 ADR 1354 재검토 트리거 4 로 다시 설계한다).
-4. **L4 — 평균 요소는 그대로**: `moon.orbit` 의 기점 값 · `rates` 는 궤도선 · 궤적 · N-body 초기 상태 · 정보 카드 공전주기가 계속 쓴다 (ADR 1354 결정 M3 · M5 · V1 불변). 그래서 달은 궤도선에서 반경 방향으로 최대 `1.99 %` 벗어난다 (B9 `1.83 %` — 1900 ~ 2100 0.37일 간격 실측, 3차원 최대 `15,338 km`, ×30 후 달 메시 반경의 `33 %`). N-body 전환 순간의 달 위치 차도 같은 상한이다.
+1. **L1 — 달 위치 = DIRECT** (Q1 (c)). 장면 · 정보 카드 · 거리 자 · 사건이 모두 이 위치를 쓴다 (ADR 1354 결정 M4 단일 함수 유지). 계산 계약 (`T = (jd_TT − 2451545.0) / 36525`):
+   1. **기본 인자** — L′ · D · M · M′ · F 는 Meeus 식 47.1 ~ 47.5 의 T⁴ 다항식 [도]. 부가 인자 A1 · A2 · A3 는 T¹ 식 [도]. 모든 인자는 **도 단위 값을 `mod 360` 으로 `[0, 360)` 에 넣은 뒤 라디안으로 바꾼다** (cross-validate 반영). 설계 측정 구현은 정규화 없이도 예제 47.a 를 인쇄 자리수까지 재현했다. 1900 ~ 2100 에서 인자 크기는 `≤ 4.9e5°` 이고, double 상대 오차로는 `~1e-10°` 다 [계산]. 그래도 정규화는 계약으로 고정한다.
+   2. **주기 합** — 표 47.A 행 `[D, M, M′, F, l, r]` 마다 인자 `θ = D·D + M·M + M′·M′ + F·F` 로 `Σl += l · E^|M| · sin θ`, `Σr += r · E^|M| · cos θ`. 표 47.B 행 `[D, M, M′, F, b]` 는 `Σb += b · E^|M| · sin θ`. `E = 1 − 0.002516 T − 0.0000074 T²` 다. **`E^|M|` 는 Σl · Σr · Σb 세 합 모두에, 행의 M 계수 절댓값만큼 적용한다.**
+   3. **부가항** — 부가항은 M 을 포함하지 않는다 (아래 9행). 같은 규칙 (`E^|M|`, M 계수 0 → `E⁰ = 1`) 을 그대로 적용하므로 E 가 곱해지지 않는다. 경도 3행은 Σl 에, 위도 6행은 Σb 에 더한다 (`sin`).
+   4. **날짜 좌표** — `λ₀ = L′ + Σl · 1e-6°`, `β₀ = Σb · 1e-6°`, `Δ = 385000.56 + Σr · 1e-3` km (날짜 평균 황도 · 분점).
+   5. **J2000 황도로 회전 (구면식 — 행렬식이 아니다)** — 출발 epoch = 날짜 (`T`), 도착 epoch = J2000 이라 경과 `t = −T` [율리우스 세기]. 각 [″]:
+      - `η = (47.0029 − 0.06603 T + 0.000598 T²) t + (−0.03302 + 0.000598 T) t² + 0.000060 t³`
+      - `Π = 174.876384° + (3289.4789 T + 0.60622 T²)″ − (869.8089 + 0.50491 T) t″ + 0.03536 t²″`
+      - `p = (5029.0966 + 2.22226 T − 0.000042 T²) t + (1.11113 − 0.000042 T) t² − 0.000006 t³`
+      - `A = cos η cos β₀ sin(Π − λ₀) − sin η sin β₀` · `B = cos β₀ cos(Π − λ₀)` · `C = cos η sin β₀ + sin η cos β₀ sin(Π − λ₀)`
+      - `λ = p + Π − atan2(A, B)` · `β = asin(C)`
+      - **부호 규약**: 날짜 → J2000 이므로 `t < 0` (J2000 이후 시각), `p ≈ −p_A·T` 다. J2000 에서 `t = 0` 이라 `η = p = 0` · `λ = λ₀` · `β = β₀`. `atan2` 로 사분면을 정하고, `|β| ≤ 5.3°` 라 `asin` 특이점이 없다.
+      - 이 식이 설계 측정의 DIRECT 다. 회전을 빼면 위도가 `48.8″` 어긋나고, 세차 변환을 통째로 빼면 경도가 `4958.8″` 어긋난다 (§1-C · §DoD D3).
+   6. **직교 좌표** — `(Δ cos β cos λ, Δ cos β sin λ, Δ sin β)` [m] (J2000 황도 — 장면 데이터 좌표, 모체 = 지구 중심).
+2. **L2 — 데이터** (Q3 (a)): `moon.orbit.lunarTheory` (optional, 달만). **표와 부가항을 분리한다** (cross-validate 반영) — 표는 원형 4원소 인자 `[D, M, M′, F]` 그대로 두어 출처 표와 행 단위로 대조한다. 부가항만 넓은 기저를 쓴다. 형태 (값은 일부만 보인 예시):
+
+   ```json
+   "lunarTheory": {
+     "$comment": "J. Meeus, Astronomical Algorithms 2판 (1998) 47장 식 47.1~47.5 · 표 47.A · 47.B · 부가항. 날짜 평균 황도·분점. 1/538841 등 분수 계수는 소수로 옮김 (원 표기: …)",
+     "frame": "mean-equinox-of-date",
+     "meanArgumentsDeg": {
+       "Lp": [218.3164477, 481267.88123421, -0.0015786, 1.8558e-6, -1.5339e-8],
+       "D":  [297.8501921, 445267.1114034, -0.0018819, …, …],
+       "M":  [357.5291092, 35999.0502909, -0.0001536, …],
+       "Mp": [134.9633964, 477198.8675055, 0.0087414, …, …],
+       "F":  [93.272095, 483202.0175233, -0.0036539, …, …],
+       "A1": [119.75, 131.849], "A2": [53.09, 479264.29], "A3": [313.45, 481266.484]
+     },
+     "eccentricityFactor": [1, -0.002516, -0.0000074],
+     "meanDistanceKm": 385000.56,
+     "longitudeDistanceTerms": [[0, 0, 1, 0, 6288774, -20905355], [2, 0, -1, 0, 1274027, -3699111], …],
+     "latitudeTerms": [[0, 0, 0, 1, 5128122], [0, 0, 1, 1, 280602], …],
+     "additiveTerms": [
+       { "component": "longitude", "argument": { "A1": 1 }, "amplitude": 3958 },
+       { "component": "longitude", "argument": { "Lp": 1, "F": -1 }, "amplitude": 1962 },
+       { "component": "longitude", "argument": { "A2": 1 }, "amplitude": 318 },
+       { "component": "latitude", "argument": { "Lp": 1 }, "amplitude": -2235 },
+       { "component": "latitude", "argument": { "A3": 1 }, "amplitude": 382 },
+       { "component": "latitude", "argument": { "A1": 1, "F": -1 }, "amplitude": 175 },
+       { "component": "latitude", "argument": { "A1": 1, "F": 1 }, "amplitude": 175 },
+       { "component": "latitude", "argument": { "Lp": 1, "Mp": -1 }, "amplitude": 127 },
+       { "component": "latitude", "argument": { "Lp": 1, "Mp": 1 }, "amplitude": -115 }
+     ]
+   }
+   ```
+
+   - 다항식 배열은 T 의 오름차순 계수 `[c₀, c₁, c₂, …]` [도] 다.
+   - 표 진폭은 **원 단위 그대로** 둔다 — 경도 · 위도 `1e-6 °`, 거리 `1e-3 km` 이므로 원 표 숫자와 grep 으로 대조된다. 부가항 진폭도 `1e-6 °` 다.
+   - 로더가 진폭을 rad · m 로 바꾼다. 다항식 계수는 **도 그대로** 싣는다 (L1-1 의 `mod 360` 이 도 단위라서).
+   - 문헌이 분수로 쓴 계수 (`1/538841` 등) 는 소수로 옮기고, `$comment` 에 원 표기를 남긴다.
+   - `additiveTerms.argument` 의 키는 `D · M · Mp · F · Lp · A1 · A2 · A3` 만 허용한다 (zod enum). 값은 정수 계수다.
+   - 키 이름 (`longitudeDistanceTerms` 등) 은 이 저장소의 자체 스키마다. 대조 도구 (PyMeeus) 의 변수명 · 구조를 옮기지 않는다.
+   - 로더 거부: `lunarTheory` 는 「모체가 계 뿌리를 도는 위성」 에만 둘 수 있다 (ADR 1354 M2 의 `periodicTerms` 거부 규칙을 옮긴다). 표 행 수 (60 · 60 · 9) 는 스키마로 고정하지 않고 단위 테스트가 센다.
+   - **세차 회전 계수 (η · Π · p) 는 `lunarTheory` 에 넣지 않는다.** `lunar-theory.ts` 의 이름 있는 상수로 두고 출처 주석을 단다 (cross-validate 반영 — 배치 명시). 근거는 셋이다.
+     - (i) principles §1 의 데이터 SSoT 는 **천체의 물리 데이터** (`solar-system.json`) 를 묻는다. 세차는 달의 속성이 아니라 좌표계 변환이다.
+     - (ii) 시각척도 변환 다항식 (ΔT) 을 core 코드 모듈에 둔 선례가 있다 (ADR 1370 `delta-t.ts`).
+     - (iii) 소비처가 달 이론 하나다. #1406 이나 「그 날의 좌표계」 전환이 같은 회전을 쓰게 되면, 그때 shared 상수로 옮긴다.
+   - **다른 일반세차 값과의 관계** — 로더의 율 틀 변환은 `GENERAL_PRECESSION_DEG_PER_CENTURY` (IAU 2006 `5028.796195″`) 를 계속 쓴다 (평균 요소 — 궤도선 · 궤적). 이론 회전의 `p` 선형항 `5029.0966″` 은 다른 모델 (Meeus 21장) 의 값이다. 같은 이름의 상수로 합치지 않는다 — 숨은 상수 변형 (volt #69) 처럼 보이지만 출처가 다른 두 값이다. 두 값의 차 `0.30″/세기` 는 평균 요소 궤도선 ↔ 이론 위치 사이에만 나타나고, 궤도선 이탈 `15,338 km` (결정 L4) 에 비하면 무시할 크기다 [계산: `0.30″ × 384,400 km ≈ 0.6 km`/세기]. 주석에 두 값을 서로 참조로 남긴다.
+3. **L3 — 코드** (Q4 (a)): 신규 `packages/core/src/physics/lunar-theory.ts` (급수 · 황도 세차 회전). `parentRelativePositionAt` 은 `lunarTheory` 가 있으면 그 위치를 돌려주고, 없으면 현 Kepler 경로 그대로 (다른 천체 비트 동일). **`periodicTerms` 경로를 지운다** — 데이터 사용처가 0 이 되기 때문이다. 다른 위성에 섭동이 필요해지면 ADR 1354 재검토 트리거 4 로 다시 설계한다. 지울 목록 (`git grep -i periodic`, develop `09df2bc6` — cross-validate 반영으로 확정):
+
+   | 층 | 지울 것 | 위치 |
+   | --- | --- | --- |
+   | raw 스키마 | `PeriodicTermRawSchema` · `OrbitalElementsRawSchema.periodicTerms` | `ephemeris/solar-system-loader.ts` |
+   | 로더 타입 · 변환 | `LoadedPeriodicTerm` · `LoadedOrbitalElements.periodicTerms` · 진폭 변환 블록 · `assertPeriodicTermsHost` (→ `lunarTheory` 거부 규칙으로 교체) | 같은 파일. `METERS_PER_KM` 는 `lunarTheory` 거리 변환에 재사용 |
+   | 물리 함수 · 타입 | `periodicArgumentsAt` · `periodicPerturbationAt` · `applyPerturbation` · `PeriodicArguments` · `PeriodicPerturbation` · `EARTH_ECCENTRICITY_FACTOR_PER_CENTURY` | `physics/orbit-elements-at.ts` |
+   | export | `LoadedPeriodicTerm` | `ephemeris/index.ts` |
+   | export | `periodicArgumentsAt` · `periodicPerturbationAt` · `type PeriodicArguments` · `type PeriodicPerturbation` | `physics/index.ts` |
+   | export | `type PeriodicPerturbation` (`export type { OrbitPositionBody, PeriodicPerturbation }` 에서 제거) | **`packages/core/src/index.ts:91`** |
+   | 주석 | `periodicTerms` 언급 1곳 | `physics/nbody-engine.ts:108` |
+
+   - 새로 내보낼 것: `LoadedLunarTheory` 타입 (`ephemeris/index.ts`) · 달 이론 위치 함수 (`physics/index.ts`).
+   - web (`apps/**`) 의 사용처는 0 이다 (같은 grep).
+4. **L4 — 평균 요소는 그대로**: `moon.orbit` 의 기점 값 · `rates` 는 궤도선 · 궤적 · N-body 초기 상태 · 정보 카드 공전주기가 계속 쓴다 (ADR 1354 결정 M3 · M5 · V1 불변). 그래서 달은 궤도선에서 반경 방향으로 최대 `1.99 %` 벗어난다 (B9 `1.83 %` — 1900 ~ 2100 0.37일 간격 실측, 3차원 최대 `15,338 km`, ×30 후 달 메시 반경의 `33 %`). N-body 전환 순간의 달 위치 차도 같은 상한이다. **엔진을 전환할 때 달이 평균 요소 ↔ `lunarTheory` 차이 (최대 약 `15,338 km`, ×30 후 메시 반경의 `33 %`) 만큼 튀는 것은 현행 (B9 `13,913 km`) 을 그대로 잇는 의도된 동작이다** (cross-validate 반영 — qa 가 버그로 오인하지 않게).
 5. **L5 — 시각척도**: `lunarTheory` 의 시각 인자는 TT JD 다 (ADR 1370 §결정 P — 물리 함수 규약). 진입점 3곳은 바꾸지 않는다.
 
 ### 사건 · 기대값
@@ -215,7 +311,7 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ### 범위
 
-11. **S — 태양 축은 이 이슈 밖** (Q2 (a)): 지구 (EMB) · 행성 요소의 율은 후속 이슈로 분리한다. §1-D 의 수치를 그 이슈의 출발점으로 넘긴다. 지구만 율을 넣는 선택지 (c) 는 충 · 내합을 악화시키므로 어느 경우에도 쓰지 않는다.
+11. **S — 태양 축은 이 이슈 밖** (Q2 (a)): 지구 (EMB) · 행성 요소의 율은 후속 이슈 **#1406** 으로 분리했다. §1-D · §1-H 의 수치를 그 이슈의 출발점으로 넘겼다. 결과로 2024 의 모델 중심선은 NASA 최대식 지점에서 `120.9 km` 떨어져 지나간다 (경로 반폭 `~99 km` 밖, §1-H). #1406 전까지 남는 한계다. 지구만 율을 넣는 선택지 (c) 는 충 · 내합을 악화시키므로 어느 경우에도 쓰지 않는다.
 
 ### PR 분할 (Q5)
 
@@ -224,9 +320,9 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ---
 
-## 사용자 결정 (Q 표)
+## 사용자 결정 (Q 표 — 2026-10-24 전부 권고안)
 
-| Q | 질문 | 선택지 | 권고 | 근거 |
+| Q | 질문 | 선택지 | 권고 = 결정 | 근거 |
 | --- | --- | --- | --- | --- |
 | Q1 | 달 모델 | (a) B28 (데이터 28행) / (b) KALL (데이터 139행) / **(c) Meeus 47 전 항 직접 + 황도 세차 회전** / (d) ELP/MPP02 | **(c)** | 위치 max `14.3″` (B9 `1179″` · KALL `218″`). Kepler 구조는 139행에서도 일식 ±4 분대에 멈춘다. (d) 의 추가 개선 상한은 t* `0.31` 분 (DE441 달로 잰 값) |
 | Q2 | 태양 축 범위 | **(a) 달만 — EMB · 행성 율은 후속 이슈** / (b) 이 이슈에 8행성 율까지 (PR 2개) / (c) 지구만 율 | **(a)** | 이슈 범위 (달) 안에서 결정이 완결된다. (b) 는 2024 t* 그림자 중심 ↔ NASA 지점을 `123 → 39 km` (경로 반폭 `99 km` 안) 로 줄이지만 8행성 · 전 사건 종류 · 외부 기준 fixture · N-body · 궤도선 갱신의 설계가 따로 필요하다. (c) 는 화성 충 1909 오차를 `0.403 → 0.893` 일로 키운다 |
@@ -243,7 +339,7 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 | # | 기준 | 근거 (설계 실측) · 결함판 |
 | --- | --- | --- |
 | D1 | **일식 t* 시각** — 2017-08-21 · 2024-04-08 의 `|clockJdToTt(t*) − NASA TD|` ≤ `4.5` 분 | DIRECT `3.09` · `3.79` 분. B28 `7.69` · KALL `4.66` (2024) → FAIL |
-| D2 | **t* 그림자 중심 ↔ NASA 최대식 지점** (장면 규약 교점, 대원 반경 `6371 km`) ≤ `140 km` (두 일식 모두) | DIRECT `67` · `123 km` (현행 `313` · `533`). B28 `152` · KALL `165 km` (2024) → FAIL. 바닥 (위치 완벽) `14` · `33 km` |
+| D2 | **t* 그림자 중심 ↔ NASA 최대식 지점** (장면 규약 교점, 대원 반경 `6371 km`) ≤ `140 km` (두 일식 모두) | DIRECT `67` · `123 km` (현행 `313` · `533`). B28 `152` · KALL `165 km` (2024) → FAIL. 바닥 (위치 완벽) `14` · `33 km`. 보조 정보 (DoD 아님, §1-H): cross-track 2017 `−6.9 km` (반폭 `57 km` 안) · 2024 `−120.7 km` (반폭 `~99 km` 밖 — 태양 축, #1406) |
 | D3 | **P1 달 위치** (DE441 4시각 fixture) `|Δλ| ≤ 6″` · `|Δβ| ≤ 6″` · `|Δr| ≤ 10 km` | DIRECT `1.8″` · `1.7″` · `5.2 km`. 부가항 누락 `20.4″` (λ) · 황도 회전 누락 `41.4″` (β) · 세차 변환 누락 `4958.8″` (λ) → FAIL |
 | D4 | **Meeus 예제 47.a** — 회전 전 (날짜 분점) 출력이 λ `133.162655°` · β `−3.229126°` · Δ `368409.7 km` (인쇄 자리수) | 설계 구현이 재현 |
 | D5 | **E1 삭망** (DE441 717개) `≤ 0.5 h` | DIRECT + 앱 태양 `0.44 h` (B9 `0.76`). V0 양성 대조군 유지 |
@@ -270,12 +366,12 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ### Concrete Prediction (PR1)
 
-변이 실측 (§1-G) 과 정적 판독 (`git grep` — `periodicTerms` · `periodicPerturbationAt` · `periodicArgumentsAt` · `LoadedPeriodicTerm`, develop `09df2bc6`) 에 근거한다.
+변이 실측 (§1-G) 과 정적 판독 (`git grep -i periodic`, develop `09df2bc6`) 에 근거한다. 초판 (커밋 `3e0c28e7`) 은 `packages/core/src/index.ts:91` 의 `PeriodicPerturbation` 타입 export 를 빠뜨려 7파일로 적었다. cross-validate 의 「제거 목록 구체화」 지적을 따라 grep 술어를 넓혀 찾았고, 8파일로 정정한다.
 
-- **소스 7파일 (신규 1 + 기존 6)**:
+- **소스 8파일 (신규 1 + 기존 7)**:
   - 신규 `packages/core/src/physics/lunar-theory.ts`
   - `packages/core/src/physics/orbit-elements-at.ts` (분기 + 주기 항 함수 제거)
-  - `packages/core/src/physics/index.ts` · `packages/core/src/ephemeris/index.ts` (export)
+  - `packages/core/src/physics/index.ts` · `packages/core/src/ephemeris/index.ts` · `packages/core/src/index.ts` (export)
   - `packages/core/src/ephemeris/solar-system-loader.ts` (스키마 · 거부 규칙)
   - `packages/core/src/physics/nbody-engine.ts` (주석 1곳 — `periodicTerms` 언급)
   - `packages/shared/data/solar-system.json` (달 `periodicTerms` → `lunarTheory`)
@@ -287,7 +383,7 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ### 재검토 조건
 
-1. Q2 후속 (EMB · 행성 율) 이 들어오면 → D1 · D2 · D5 · D7 을 다시 재고 임계를 Amendment 한다 (§1-D 의 S1′ 수치가 기대값).
+1. Q2 후속 #1406 (EMB · 행성 율) 이 들어오면 → D1 · D2 · D5 · D7 을 다시 재고 임계를 Amendment 한다 (§1-D 의 S1′ 수치가 기대값).
 2. 스크러버 범위가 1900 ~ 2100 밖으로 넓어지면 → Meeus 47 의 유효 범위와 황도 세차 다항식의 외삽을 다시 잰다 (이 ADR 은 4개 구간만 DE441 로 쟀다).
 3. 위치 모델이 J2000 고정 좌표계에서 「그 날의 좌표계」 로 바뀌면 → 결정 L1 의 회전 방향 (날짜 → J2000) 을 다시 정한다.
 
@@ -306,7 +402,16 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 ## 구현 인계 (PR1)
 
 - **시작 지점**: `lunar-theory.ts` (급수 + 회전) → D4 예제 47.a · D3 P1 단위 테스트 → 로더 스키마 (`lunarTheory`) · 데이터 → `parentRelativePositionAt` 분기 → `periodicTerms` 경로 제거 → 기대값 갱신 (§Concrete Prediction 테스트 목록) → core 빌드 → `generate:time-events` → `EXPECTED_COUNTS` · `tour-card` 상수 → ADR 1354 Amendment 3.
-- **계수 대조**: 표 행은 PyMeeus `Moon.py` 의 `PERIODIC_TERMS_LR_TABLE` · `PERIODIC_TERMS_B_TABLE` 와 행 단위로 같아야 한다 (리뷰가 diff 로 확인). 회전 계수는 PyMeeus `Coordinates.precession_ecliptical` 과 같다.
+- **계수 대조 (출처 vs 대조 기준)**:
+  - 주 출처는 Meeus 47장 표 47.A · 47.B · 부가항과 21장이다. 데이터 `$comment` · 코드 주석에는 이것만 출처로 적는다.
+  - **대조 기준**은 PyMeeus `Moon.py` 의 표 숫자 · `Coordinates.precession_ecliptical` 의 계수다. 표 행의 수치가 대조 기준과 행 단위로 일치하는지 리뷰가 diff 로 확인한다.
+  - 대조 도구 (LGPL v3) 의 코드 · 변수명 · 주석은 옮기지 않는다. 저장소에는 사실 데이터 (수치) 와 자체 스키마만 들어간다.
+- **위치 전용 계약** (cross-validate 반영 — 주석으로 인계): `lunarTheory` 함수는 위치만 돌려주고 속도는 없다. N-body 초기 상태는 평균 요소 상태 벡터를 쓴다 (결정 L4). 정밀 속도가 필요해지면 (해석적 미분 또는 수치 미분) 별도 결정이 필요하다는 한계를 함수 JSDoc 에 적는다.
+- **PR1 착수 전 확인 — 고정 시각 CI 브라우저 가드** (cross-validate 반영). ADR 1370 구현 인계 1 의 8종을 정적으로 확인했다 (`grep -c moon`, develop `09df2bc6`).
+  - 6종은 식별자 `moon` 이 `0` 건이다: `1119-earth-mask` · `1202-atmosphere-rim` · `1215-cloud-layer` · `1226-night-lights` · `1265-display-panel` · `glow-marker`.
+  - `1274-surface-invariance` 는 `BODIES` 에 `moon` 이 있지만, 머리 주석이 두 빌드 비교 도구로 「CI 상시 가드가 아니다」 고 밝힌다.
+  - `783-earth-detail` 은 `moon` 을 `MODE=others` (두 빌드 diff 용) 에서만 쓴다. CI `shader-pixel-guard.yml` 은 기본 모드와 `MODE=ocean` 만 돌린다.
+  - 그래서 CI 가 달 좌표 · 달 픽셀을 직접 비교하는 경로는 정적으로 찾지 못했다. 다만 지구 포커스 프레임에 달 메시가 들어오는지는 정적 확인 밖이다. **영향 판정은 PR1 CI 실발화로 한다** (#1370 선례 — 7/7 무영향).
 - **명시적 비-범위 (손대지 말 것)**: 달 `rates` · 기점 값, `EVENT_KIND_TOLERANCE_DAYS`, 진입점 3곳 (ADR 1370), 지구 · 행성 요소, 위성 배율 상수, 투어 상수 값.
 - 참조: §1-G (변이에서 실패한 테스트와 이유), ADR 1370 §결정 R (재생성 절차 — core `dist` 선행 빌드).
 
@@ -314,11 +419,48 @@ scratch worktree (develop `09df2bc6`, 커밋 안 함) 에서 `parentRelativePosi
 
 ## 교차검증 반영 사항
 
-대기 — cross-validate 는 메인 오케스트레이터가 수행한다. 결과 통합 후 Accepted 로 전이한다 (CLAUDE.md §ADR Status 워크플로).
+agy 1회 (2026-10-23, 메인 오케스트레이터 실행 — outcome `applied` · exit 0 · `plan_bypass` false, `.claude/logs/cross-validate-architecture-20261023-184812-outcome.json`). 6기준 판정은 아래와 같다.
+
+- 구조 「우수 (일부 보완)」 · 결정 타당성 「매우 우수」 · 인터페이스 「보통 (명세 추가 권장)」 · 확장성 「우수」 · 보안 「양호 (라이선스 점검)」 · 누락 「엣지 케이스 확인 필요」
+- 결론은 Q1 ~ Q5 권고안 승인 + 승인 전 반영 3건 (인터페이스 구체화 · `mod 360` 정규화 · CI 브라우저 가드 정적 확인) 이다.
+
+아래는 메인 재분석 판정을 거쳐 통합한 결과다. 외부 모델은 문서 텍스트만 읽었고 저장소를 조회하지 않았다 (응답 자체가 그렇게 밝혔다).
+
+### 합의 (본문에 반영)
+
+1. **세차 회전 계수의 배치 위치 명시** → 결정 L2 마지막 항목. `lunarTheory` 밖 (`lunar-theory.ts` 상수) 에 두며, 근거 3개와 IAU 2006 `p_A` 와의 관계를 적었다.
+2. **`periodicTerms` 제거 목록 구체화** → 결정 L3 표 (raw · 로더 · 물리 · export 3곳 · 주석). 이 과정에서 초판 Concrete Prediction 이 `packages/core/src/index.ts:91` 을 빠뜨린 것을 찾아 7 → 8파일로 정정했다.
+3. **세차 회전 수식 · 부호 규약** → 결정 L1-5. 구면식 (Meeus 21장 — η · Π · p + A · B · C) 으로 정하고 행렬식은 쓰지 않는다. `t = −T`, J2000 항등을 명시했다.
+4. **표 / 부가항 스키마** → 결정 L2. 외부 모델이 권한 쪽 (표 4원소 `[D, M, M′, F]` 원형 유지 + 부가항 분리) 을 채택하고 JSON 예시를 넣었다. 초판의 「표와 같은 행 형태로 부가항을 넓은 기저에 합친다」 는 버렸다.
+5. **`E^|M|` 적용 규칙** → 결정 L1-2 · L1-3. Σl · Σr · Σb 셋 모두에 적용하고, 부가항은 M 계수 0 이라 같은 규칙으로 `E⁰` 이 된다.
+6. **인자 `mod 360` 정규화** → 결정 L1-1. 설계 구현이 정규화 없이 예제 47.a 를 재현했다는 사실을 함께 적었다.
+7. **라이선스** → 기준값 출처 · 구현 인계. 주 출처 = Meeus 1998 47장 (· 21장), PyMeeus (LGPL v3) = 대조 · 검증 도구, 저장소에는 사실 데이터와 자체 스키마만 들어간다. 「PyMeeus 와 행 단위로 같아야 한다」 를 「대조 기준」 으로 고쳤다.
+8. **N-body 전환 점프 현행 유지 명시** → 결정 L4.
+9. **위치 전용 계약 (속도 없음) 한계** → 구현 인계 「위치 전용 계약」.
+10. **CI 브라우저 가드 8종 정적 확인** → 구현 인계. CI 가 달 좌표 · 픽셀을 직접 비교하는 경로는 0 건으로 찾았고, 판정은 PR1 CI 실발화로 둔다.
+11. 결정 타당성 — 오차 분해, Kepler 구조 한계, Q2 (a) 분리 (지구만 율 → 충 · 내합 악화) 를 외부 모델도 같은 근거로 지지했다.
+
+### 이견 수용
+
+- **「Q2 (a) 의 `123 km` 는 대부분 along-track 이고 경로 자체는 거의 맞다」 — 실측해서 반은 반증했다** (§1-H). 원안은 「경로 안 / 밖인지 재지 않았다」 고 판정을 유보했다. 외부 모델은 근거 없이 판정을 냈다.
+  - 2017 에는 맞다: along `+66.1` · cross `−6.9 km`.
+  - **2024 에는 틀리다**: along `+22.3` · cross `−120.7 km`. 모델 중심선이 NASA 지점에서 `120.9 km` 로 지나가 반폭 `~99 km` 밖이다.
+  - 수용한 것은 「along / cross 를 나눠 재야 한다」 는 문제 제기다. 결론은 실측 결과로 바꿔 적었다 (결정 S · DoD D2 보조 정보 · #1406 동기). Q2 결정 자체는 사용자 결정 (a) 그대로다.
+
+### Claude 재분석으로 기각 · 보류한 외부 모델 제안
+
+- **「×30 배율 후 `461 km × 30 = 13,830 km` 이동이 가드 임계를 넘을 가능성이 높다」 — 보류.**
+  - 정적 확인 결과 CI 가 도는 모드에는 달 좌표 · 달 픽셀 비교가 없다 (구현 인계).
+  - 「가능성이 높다」 는 근거가 없는 확률 표현이다. 판정은 PR1 CI 실발화로 한다.
+- **「`mod 360` 을 안 하면 예제 47.a 마지막 자리 오차가 날 수 있다」 — 근거는 반증, 처방은 채택.** 설계 구현은 정규화 없이 인쇄 자리수까지 재현했다. 그래도 정규화는 계약 단순화를 위해 L1-1 에 넣었다.
+
+### 고유 발견 (후속 분리)
+
+- **#1406** — EMB · 8행성 궤도요소 변화율 (Standish). 외부 모델의 지적이 아니라, 설계 실측 (§1-D) 과 cross-validate 반영 실측 (§1-H, 2024 cross-track `−120.7 km` 가 태양 축) 에서 나왔다. 사용자 결정 Q2 (a) 로 분리했다 (`type:feat` · `priority:low`).
 
 ### 호출 전 Claude 편향 셀프 체크 (architect)
 
-- **낙관적 일정** — Concrete Prediction 은 변이 실측 (§1-G) 과 `git grep` 으로만 적었다. 단 `periodicTerms` 경로 제거분은 변이에 넣지 않았다 (정적 판독). → cross-validate 질문: 「제거 대상 목록에 빠진 참조가 있는가」.
-- **결합 간과** — 달 위치를 읽는 경로를 호출처 grep 으로 셌다 (§1-F). **미확인 축**: 고정 시각 장면을 비교하는 CI 브라우저 가드 (ADR 1370 구현 인계 1 의 8개 스크립트) 가 달 이동 (J2000 + 0 · 3 · 5 · 81일에 `461` · `450` · `92` · `924 km`, ×30 전) 에 반응하는지 — 변이에서 돌리지 않았다. 판정은 PR1 CI 실발화로 한다. → cross-validate 질문으로 넣는다.
-- **폐기 프레이밍** — B28 · KALL · ELP 를 수치로 기각했다. ELP 는 구현하지 않고 DE441 달로 상한만 쟀다 — 상한이 「완벽한 달」 이므로 과소평가 방향의 오류는 없다.
-- **순수주의** — 광행차 · 지구 방향 근사를 비범위로 둔 근거는 크기 (`≤ 0.58` 분 · `≤ 33 km`) 다. Q2 (a) 권고는 범위 보수 쪽이다 → cross-validate 질문: 「Q2 (a) 가 사용자 목표 (그림자가 실제 경로 위) 에 비해 보수적인가 — (b) 의 설계 공백이 실제로 큰가」. (a) 의 `67` · `123 km` 가 「경로 밖」 인지는 재지 않았다 — NASA 경로 중심선 좌표가 없어 지점 거리만 쟀다.
+- **낙관적 일정** — Concrete Prediction 은 변이 실측 (§1-G) 과 `git grep` 으로만 적었다. **미통과 1건**: `periodicTerms` 제거분 grep 술어가 좁아 `packages/core/src/index.ts:91` 을 놓쳤다 (7 → 8파일 정정). cross-validate 질문 「제거 대상 목록에 빠진 참조」 가 이것을 겨냥했고, 외부 모델의 구체화 요구를 따라 다시 grep 해 찾았다.
+- **결합 간과** — 달 위치를 읽는 경로를 호출처 grep 으로 셌다 (§1-F). CI 브라우저 가드 8종은 정적 확인까지만 했다 (구현 인계). 실발화 판정은 PR1 이다.
+- **폐기 프레이밍** — B28 · KALL · ELP 를 수치로 기각했다. ELP 는 DE441 달 (완벽한 달) 로 상한만 쟀으므로, 과소평가 방향의 오류는 없다. 통과.
+- **순수주의** — 광행차 · 지구 방향 근사를 비범위로 둔 근거는 크기 (`≤ 0.58` 분 · `≤ 33 km`) 다. Q2 (a) 는 범위 보수 쪽이고, §1-H 가 그 대가 (2024 cross-track 반폭 밖) 를 수치로 드러냈다. 결정은 사용자 몫으로 남겼다 (2026-10-24 (a)).
