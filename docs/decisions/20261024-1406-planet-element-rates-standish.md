@@ -552,12 +552,14 @@ agy 1회 (2026-10-24, 메인 오케스트레이터 실행 — outcome `applied` 
 
 ### 변이 판별력 [실측]
 
+전 행이 core 전 스위트 (`packages/core` 의 `vitest run`, 1,893 테스트) 기준 실패 수다.
+
 | 변이 | 실패 |
 | --- | --- |
 | C-2 제거 (띠 공명 기준을 Kepler `n` 으로 되돌림) | `belt-population.test.ts` 2 |
 | `perihelionTimes` throw 제거 | `compute-events.test.ts` 5 |
 | `elementsAt` 의 e 율 미적용 | `orbit-elements-at.test.ts` 1 |
-| J2000 평균경도 율에 `p_A` 를 뺌 (틀 오변환) | `orbit-elements-at` · `external-reference` · `eclipse-events` 합 27 |
+| J2000 평균경도 율에 `p_A` 를 뺌 (틀 오변환) | core 전 스위트 33건 · 6파일 — `orbit-elements-at` 11 · `eclipse-events` 9 · `external-reference` 7 · `self-rotation` 4 · `eclipse-shadow-uniforms` 1 · `belt-population` 1 (PR #1409 리뷰 지적 후 전 스위트로 재측정 — 초판 「3파일 합 27」 은 3파일만 돌린 값) |
 | J2000 `eccentricityPerCentury` 를 선택 필드로 (`default(0)`) | `orbit-elements-at.test.ts` 1 (D11) |
 | 행성 율 없는 판본 (`base`) | 새 E1 · E4 를 넘는다 — `eclipse-events.test.ts` 의 판별력 블록 |
 

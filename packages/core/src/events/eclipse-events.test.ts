@@ -333,7 +333,7 @@ describe('#1406 판별력 — 행성 율을 뺀 판본 (#1406 이전 태양) 은
     expect(Math.max(...m.errorsHours.map(Math.abs))).toBeGreaterThan(E4_MAX_HOURS);
   });
 
-  it('E1 — 삭 (실측 max 0.438 h)', () => {
+  it('E1 — 삭 (DE441 삭 358개)', () => {
     const roots = syzygyTimes(baseById, 'moon', 'new', START_JD, END_JD);
     let worst = 0;
     for (const ref of DE441_NEW_MOON_JD) {
