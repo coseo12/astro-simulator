@@ -8,9 +8,13 @@
  * - 최대식 정합 — 모든 사건 시각에서 식 지표가 국소 최소 (「최대식 대신 삭망 시각」 결함판을 잡는다).
  *
  * 임계는 구현 실측으로 재확정했다 (ADR E2 · E3 「구현 실측으로 재확정」). 실측값 · 결함판 판별은 각 상수 주석.
+ *
+ * #1404 (ADR `docs/decisions/20261023-1404-lunar-theory-meeus47.md` 결정 E4 · E5, DoD D5 ~ D7) — 달 위치가 `lunarTheory` 로
+ * 바뀌어 임계를 조였다. 달 `rates` 변이 (세차 부호 반전 · 틀 미변환) 는 더 이상 달 위치를 바꾸지 않아 (위치는 이론, 율은 평균
+ * 요소만) 그 판별력 테스트 2건을 지웠다 — 이론 변이 판별력은 `physics/lunar-theory.test.ts` (D3).
+ * 실측 환경 (아래 「실측」 전부): macOS · Apple M1 Pro · Node 24.14.0 · vitest, 이 PR 의 구현 · 데이터.
  */
 import solarSystemRaw from '@astro-simulator/shared/data/solar-system.json' with { type: 'json' };
-import { GENERAL_PRECESSION_DEG_PER_CENTURY } from '@astro-simulator/shared';
 import { describe, expect, it } from 'vitest';
 import type { Vec3Double } from '../coords/vec3.js';
 import {
@@ -57,29 +61,31 @@ const DEG = Math.PI / 180;
 const MATCH_WINDOW_DAYS = 3;
 
 /**
- * DoD E2 — 적중 하한 · 오탐 상한. 구현 실측 (develop `dbd5181f` + 본 PR, Node 24.14.0): 일식 적중 451/452 · 오탐 4, 월식 적중
- * 456/457 · 오탐 2 — ADR B9 측정 스크립트와 같은 수다. 임계는 ADR 제안값 그대로 확정 (실측 여유 일식 3 · 4, 월식 3 · 4).
- * 결함판: 세차 부호 반전 · 틀 미변환 (아래 판별력 테스트 — 실측 수는 각 테스트 주석).
+ * DoD E2 — 적중 하한 · 오탐 상한. #1404 DoD D6 — 일식 `≥ 449` · `≤ 4`, 월식 `≥ 454` · `≤ 3` (B9 때 448 · 8 / 453 · 6).
+ * 실측: 일식 적중 451/452 · 오탐 2 (사건 453), 월식 적중 456/457 · 오탐 1 (사건 457) — ADR 1404 §1-E 설계 실측과 같은 수다.
  */
 const E2 = {
-  'solar-eclipse': { minHits: 448, maxFalse: 8 },
-  'lunar-eclipse': { minHits: 453, maxFalse: 6 },
+  'solar-eclipse': { minHits: 449, maxFalse: 4 },
+  'lunar-eclipse': { minHits: 454, maxFalse: 3 },
 } as const;
 
 /**
- * DoD E3 — 종류 일치 하한 (적중 중, 혼성 = 개기 또는 금환이면 일치). 구현 실측 일식 443 · 월식 436 (ADR B9 와 같다). 임계는 ADR
- * 제안값 그대로 확정. 결함판: 주기 항 없는 A3 (실측 424 · 420) · 본영 반경 부호 반전 (변이 — PR 본문).
+ * DoD E3 — 종류 일치 하한 (적중 중, 혼성 = 개기 또는 금환이면 일치). #1404 DoD D6 — 일식 `≥ 443` · 월식 `≥ 442` (B9 때 438 ·
+ * 430). 실측 일식 446 · 월식 445. 결함판: `lunarTheory` 를 뺀 판본 (A3 — 아래 판별력 테스트) · 본영 반경 부호 반전 (#1354 변이).
  */
-const E3 = { 'solar-eclipse': 438, 'lunar-eclipse': 430 } as const;
+const E3 = { 'solar-eclipse': 443, 'lunar-eclipse': 442 } as const;
 
-/** DoD E4 — 적중마다 `|t* − NASA TD|` 상한 [h]. 구현 실측 일식 `−0.660 ~ +0.661` · 월식 `−0.670 ~ +0.665` h. */
-const E4_MAX_HOURS = 1.0;
+/**
+ * DoD E4 — 적중마다 `|t* − NASA TD|` 상한 [h]. #1404 DoD D7 — `1.0 → 0.5` h. 실측 일식 `−0.398 ~ +0.442` · 월식
+ * `−0.422 ~ +0.431` h (max `26.54` · `25.88` 분 — ADR 1404 §1-E 와 같다). 남는 오차의 대부분은 태양 축이다 (#1406).
+ */
+const E4_MAX_HOURS = 0.5;
 
 /** 완전성 — 삭망 인접 간격 상한 [일] (실제 `29.27 ~ 29.83` 일). 범위 양 끝 여백에도 같은 상한을 건다. */
 const MAX_SYZYGY_GAP_DAYS = 29.9;
 
-/** DoD E1 — 삭망 시각 허용 [h] (PR1 과 같은 대역). */
-const E1_SYZYGY_TOLERANCE_HOURS = 1.0;
+/** DoD E1 — 삭망 시각 허용 [h] (`orbit-elements-at.test.ts` 와 같은 대역). #1404 DoD D5 — `1.0 → 0.5` h. */
+const E1_SYZYGY_TOLERANCE_HOURS = 0.5;
 
 /** 최대식 정합 — 사건 시각 ± 이 값에서 식 지표가 사건 시각보다 작지 않아야 한다 [일] (1분). */
 const GREATEST_ECLIPSE_PROBE_DAYS = 1 / MINUTES_PER_DAY;
@@ -153,21 +159,6 @@ const fullMatch: Record<EclipseKindId, MatchResult> = {
   'lunar-eclipse': matchAgainstNasa(fullEvents['lunar-eclipse'], 'lunar-eclipse'),
 };
 
-/** 달 율을 `raw → f(raw)` 로 바꾼 판본 (결함판 재현 — 로더가 다시 p_A 를 뺀다). */
-function withMoonRates(
-  f: (raw: number, key: 'L' | 'node' | 'perigee') => number,
-): Map<string, LoadedCelestialBody> {
-  const raw: RawSystem = structuredClone(solarSystemRaw);
-  const rates = raw.bodies.find((b) => b.id === 'moon')!.orbit!.rates!;
-  rates.meanLongitudeDegPerCentury = f(rates.meanLongitudeDegPerCentury, 'L');
-  rates.longitudeOfAscendingNodeDegPerCentury = f(
-    rates.longitudeOfAscendingNodeDegPerCentury,
-    'node',
-  );
-  rates.longitudeOfPerihelionDegPerCentury = f(rates.longitudeOfPerihelionDegPerCentury, 'perigee');
-  return byIdOf(loadSolarSystem(raw).bodies);
-}
-
 describe('#1354 E1 — 사건 경로의 삭망 근 (DE441 717개)', () => {
   const roots = {
     new: syzygyTimes(fullById, 'moon', 'new', START_JD, END_JD),
@@ -185,7 +176,7 @@ describe('#1354 E1 — 사건 경로의 삭망 근 (DE441 717개)', () => {
         worst = Math.max(worst, nearest * HOURS_PER_DAY);
       }
     }
-    // 실측 `−0.756 ~ +0.688` h (PR1 헬퍼와 같은 값 — 같은 위치 함수). 근 개수는 삭 · 망 각 2,474.
+    // #1404 실측 max `0.438` h (`orbit-elements-at.test.ts` 헬퍼와 같은 값 — 같은 위치 함수). B9 때 `−0.756 ~ +0.688` h.
     expect(worst).toBeLessThanOrEqual(E1_SYZYGY_TOLERANCE_HOURS);
   });
 
@@ -253,30 +244,6 @@ describe('#1354 E2 — 식 적중 · 오탐 (NASA 1900 ~ 2100, 일식 452 · 월
     expect(m.hits).toBeGreaterThanOrEqual(E2[kind].minHits);
     expect(m.falsePositives).toBeLessThanOrEqual(E2[kind].maxFalse);
   });
-
-  it('판별력 — 세차 부호 반전 (Ω̇ · ϖ̇ 둘 다 −) 은 적중 · 오탐 임계를 넘는다', () => {
-    // J2000 틀 율 r′ = raw − p_A 의 부호를 뒤집는다 — raw′ = −r′ + p_A. 구현 실측 적중 · 오탐 89 · 392 / 91 · 389 (ADR 과 같다).
-    const byId = withMoonRates((raw, key) =>
-      key === 'L'
-        ? raw
-        : -(raw - GENERAL_PRECESSION_DEG_PER_CENTURY) + GENERAL_PRECESSION_DEG_PER_CENTURY,
-    );
-    for (const kind of ECLIPSE_KINDS) {
-      const m = matchAgainstNasa(eclipsesOf(byId, kind), kind);
-      expect(m.hits).toBeLessThan(E2[kind].minHits);
-      expect(m.falsePositives).toBeGreaterThan(E2[kind].maxFalse);
-    }
-  });
-
-  it('판별력 — 틀 미변환 (일반세차 p_A 를 빼지 않음) 은 오탐 임계를 넘는다', () => {
-    // 로더가 raw − p_A 를 싣는다 — raw′ = raw + p_A 면 Meeus 원값 (날짜 분점) 이 그대로 실린다. 구현 실측 적중 · 오탐
-    // 446 · 25 / 455 · 21 (ADR 과 같다 — 적중은 임계 안이라 오탐만 단언).
-    const byId = withMoonRates((raw) => raw + GENERAL_PRECESSION_DEG_PER_CENTURY);
-    for (const kind of ECLIPSE_KINDS) {
-      const m = matchAgainstNasa(eclipsesOf(byId, kind), kind);
-      expect(m.falsePositives).toBeGreaterThan(E2[kind].maxFalse);
-    }
-  });
 });
 
 describe('#1354 E3 — 종류 일치 (적중 중)', () => {
@@ -284,11 +251,11 @@ describe('#1354 E3 — 종류 일치 (적중 중)', () => {
     expect(fullMatch[kind].typeMatches).toBeGreaterThanOrEqual(E3[kind]);
   });
 
-  it('판별력 — 주기 항 없는 판본 (A3) 은 종류 일치 하한을 넘지 못한다', () => {
-    // 구현 실측 424 · 420 (ADR 축 M A3 와 같다) — 거리 2항이 개기 ↔ 금환 · 부분 ↔ 개기를 가른다.
+  it('판별력 — lunarTheory 를 뺀 판본 (A3 — Kepler 평균 요소 + 율) 은 종류 일치 하한을 넘지 못한다', () => {
+    // #1404 결정 E5 — 「주기 항 없는 판본」 을 「lunarTheory 를 뺀 판본」 으로 옮겼다 (같은 Kepler 평균 요소 경로).
+    // 실측 일식 424 · 월식 420 (ADR 1354 축 M A3 와 같다 — 같은 경로).
     const raw: RawSystem = structuredClone(solarSystemRaw);
-    delete (raw.bodies.find((b) => b.id === 'moon')!.orbit as Record<string, unknown>)
-      .periodicTerms;
+    delete (raw.bodies.find((b) => b.id === 'moon')!.orbit as Record<string, unknown>).lunarTheory;
     const byId = byIdOf(loadSolarSystem(raw).bodies);
     for (const kind of ECLIPSE_KINDS) {
       expect(matchAgainstNasa(eclipsesOf(byId, kind), kind).typeMatches).toBeLessThan(E3[kind]);
@@ -349,9 +316,9 @@ describe('#1354 최대식 정합 · 사전 필터', () => {
   };
 
   /**
-   * 「최대식 대신 삭망 시각」 결함판을 잡는 술어 — 사건 시각이 식 지표의 국소 최소다. E2 ~ E4 는 이 결함을 못 잡는다 (변이 실측:
-   * NASA 대비 최대 |오차| 일식 `0.767` · 월식 `0.816` h 로 E4 `1.0` h 안, 적중 · 오탐 · 종류는 451 · 4 · 444 / 456 · 2 · 438 로
-   * E2 · E3 임계 안).
+   * 「최대식 대신 삭망 시각」 결함판을 잡는 술어 — 사건 시각이 식 지표의 국소 최소다. #1354 (B9) 때는 E2 ~ E4 가 이 결함을 못
+   * 잡았다 (당시 변이 실측: NASA 대비 최대 |오차| 일식 `0.767` · 월식 `0.816` h 로 당시 E4 `1.0` h 안, 적중 · 오탐 · 종류는
+   * 451 · 4 · 444 / 456 · 2 · 438 로 당시 E2 · E3 임계 안). 위치 모델과 무관한 구조 술어라 #1404 이후에도 그대로 둔다.
    */
   // #1370 — 사건 시각 (장면 시계) 을 TT 로 옮겨 식 지표 (물리 함수) 를 평가한다.
   it.each(ECLIPSE_KINDS)('%s — 모든 사건 시각에서 식 지표가 ±1분보다 작거나 같다', (kind) => {

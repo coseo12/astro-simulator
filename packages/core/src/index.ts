@@ -59,6 +59,7 @@ export {
   EVENT_KINDS,
   ABSOLUTE_FOCUS_VIEWS,
   EVENT_KIND_TOLERANCE_DAYS,
+  GREATEST_ECLIPSE_TOLERANCE_DAYS,
   computeEventsForKind,
   eventDateIso,
   eventFocusBodyId,
@@ -81,14 +82,15 @@ export type {
   ParentRelativePositionFn,
 } from './physics/body-chain.js';
 // #1354 — 궤도 요소 시간 변화 · 위치 단일 함수 직접 named export. 정보 카드 공전주기 (`siderealPeriodOf`) 가 쓴다 —
-// SSR 기전은 위 `kepler.ts` 와 같다 (`orbit-elements-at.ts` 는 `kepler.ts` · shared 상수 · 로더 type import 만). exports field 불변.
+// SSR 기전은 위 `kepler.ts` 와 같다 (`orbit-elements-at.ts` 는 `kepler.ts` · `lunar-theory.ts` · 로더 type import 만 —
+// `lunar-theory.ts` (#1404) 도 shared 상수 · 로더 type import 만). exports field 불변.
 export {
   elementsAt,
   meanMotionOf,
   parentRelativePositionAt,
   siderealPeriodOf,
 } from './physics/orbit-elements-at.js';
-export type { OrbitPositionBody, PeriodicPerturbation } from './physics/orbit-elements-at.js';
+export type { OrbitPositionBody } from './physics/orbit-elements-at.js';
 // #1370 — 장면 시계 ↔ TT 변환 직접 named export (ADR `20261023-1370` §결정 P). web 거리 카드 (`body-distance.ts`) 는 SSR 평가
 // 대상이라 `time` namespace 를 쓰지 않는다 — 위 #402 와 같은 D1 패턴. `delta-t.ts` 는 `time/julian-date.ts` · shared 상수만
 // 가져 모듈 그래프 영향이 위 `kepler.ts` 와 같다. exports field 불변.
