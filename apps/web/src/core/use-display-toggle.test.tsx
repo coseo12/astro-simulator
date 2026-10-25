@@ -23,6 +23,7 @@ const HW = {
   belt: true,
   cometTails: true,
   corona: true,
+  sunspots: true,
   trails: true,
 };
 
@@ -45,6 +46,7 @@ beforeEach(() => {
     kuiperVisible: true,
     cometTailsVisible: true,
     coronaVisible: true,
+    sunspotsVisible: true,
     displayCapabilities: HW,
   });
 });
@@ -127,6 +129,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -149,6 +152,7 @@ describe('useDisplayToggle', () => {
         belt: true,
         cometTails: true,
         corona: true,
+        sunspots: true,
         trails: true,
       },
     });
@@ -206,6 +210,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -250,6 +255,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: true,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -276,6 +282,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -317,6 +324,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: true,
+        sunspots: false,
         trails: true,
       },
     });
@@ -343,6 +351,7 @@ describe('useDisplayToggle', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -354,6 +363,44 @@ describe('useDisplayToggle', () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(onUrlUpdate).not.toHaveBeenCalled();
+  });
+
+  it('#1412 PR2 태양 흑점 — OFF 명령 + URL `sunspots=off`, ON 은 키 삭제 (다른 키 유지)', async () => {
+    const { toggle, onUrlUpdate } = setup('?t=2456748.5&focus=sun');
+    act(() => toggle('sunspots'));
+    expect(useSimStore.getState().sunspotsVisible).toBe(false);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('sunspots')).toBe('off');
+    act(() => toggle('sunspots'));
+    expect(useSimStore.getState().sunspotsVisible).toBe(true);
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.has('sunspots')).toBe(false),
+    );
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.get('t')).toBe('2456748.5');
+    expect(last.searchParams.get('focus')).toBe('sun');
+    expect(sentCommands).toEqual([
+      { type: 'setSunspotsVisible', visible: false },
+      { type: 'setSunspotsVisible', visible: true },
+    ]);
+  });
+
+  it('#1412 PR2 소프트웨어 렌더 · ?surface=off — 태양 흑점 토글은 store · 명령 · URL 전부 무변화 (결정 5)', async () => {
+    for (const caps of [
+      { ...HW, starfield: false, belt: false, cometTails: false, corona: false, sunspots: false },
+      { ...HW, surfaceDetail: false },
+    ]) {
+      sentCommands = [];
+      useSimStore.setState({ sunspotsVisible: true, displayCapabilities: caps });
+      const { toggle, onUrlUpdate } = setup();
+      act(() => toggle('sunspots'));
+      expect(useSimStore.getState().sunspotsVisible).toBe(true);
+      expect(sentCommands).toEqual([]);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(onUrlUpdate).not.toHaveBeenCalled();
+    }
   });
 
   it('같은 틱 연속 호출 — 호출 시점 store 를 기준으로 반전 (왕복)', () => {

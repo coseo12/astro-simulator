@@ -12,7 +12,8 @@
  * `?comettails=` (`parse-comet-tails-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261010-1329` 결정 5), #1335 PR2 의
  * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6), #1341 PR1 의
  * `?trails=` (`parse-trails-mode.ts` — 기본 꺼짐 행, `on` 옵트인 — ADR `20261015-1341` 결정 T10), #1373 PR2 의 `?constellations=`
- * (`parse-constellations-mode.ts` — 같은 기본 꺼짐 · `on` 옵트인 — ADR `20261018-1373` 결정 T1). 쓰는 쪽은
+ * (`parse-constellations-mode.ts` — 같은 기본 꺼짐 · `on` 옵트인 — ADR `20261018-1373` 결정 T1), #1412 PR2 의 `?sunspots=`
+ * (`parse-sunspots-mode.ts` — 같은 `off` 옵트아웃, `force` 없음 — ADR `20261025-1412` 결정 5). 쓰는 쪽은
  * `serializeDisplayToggle(visible, defaultVisible)` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
@@ -27,6 +28,7 @@ import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
 import { parseOrbitsVisible } from './parse-orbits-mode';
 import { parseStarsVisible, resolveStarfieldVisible } from './parse-stars-mode';
+import { parseSunspotsVisible } from './parse-sunspots-mode';
 import { parseTrailsVisible } from './parse-trails-mode';
 import { parseConstellationsVisible } from './parse-constellations-mode';
 
@@ -41,6 +43,7 @@ export type DisplayToggleId =
   | 'kuiper'
   | 'cometTails'
   | 'corona'
+  | 'sunspots'
   | 'trails'
   | 'events';
 
@@ -69,6 +72,12 @@ export interface DisplayCapabilities {
    * `force` 는 소프트웨어 렌더에서도 메시를 만들므로 (CI 강제 셀) 그때는 토글도 연다 — `cometTails` 와 같은 규약.
    */
   corona: boolean;
+  /**
+   * #1412 PR2 — 태양 흑점을 그릴 수 있는가 (렌더러 축) — `!isSoftwareRenderer` (ADR `20261025-1412` 결정 5 · Q9). `force` 가 없어
+   * 소프트웨어 렌더에서는 늘 거짓이다. 표면 축 (`?surface=off` 면 sun 절차 셰이더 자체가 없다) 은 `surfaceDetail` 이 따로 진다 —
+   * 행의 가용성은 결정 5 의 `surfaceDetail && !isSoftwareRenderer` 그대로 두 필드의 곱이다.
+   */
+  sunspots: boolean;
   /**
    * #1341 PR1 — 궤적 trail 을 그릴 수 있는가 — 활성 물리 엔진이 Kepler 인가 (ADR `20261015-1341` 결정 T8 · Q-T4 (a)).
    * trail 점은 Kepler 해석해라 N-body 위치와 다르므로 그동안 core 가 메시를 끄고, 토글은 비활성 + 사유를 보인다.
@@ -99,6 +108,9 @@ export const DISPLAY_DISABLED_REASONS = {
   // #1373 PR2 — 별자리 (결정 R5). 별 배경과 같은 게이트 · 같은 사유 표현.
   softwareRendererConstellations:
     '소프트웨어 렌더링 환경에서는 성능 보호를 위해 별자리를 표시하지 않습니다',
+  // #1412 PR2 — 태양 흑점 (결정 5 · Q9). 같은 사유 표현.
+  softwareRendererSunspots:
+    '소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 흑점을 표시하지 않습니다',
   // #1341 PR1 — 궤적 trail (결정 T8). 렌더러가 아니라 물리 엔진 사유다.
   nbodyTrails: 'N-body 엔진에서는 궤적을 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
@@ -117,6 +129,7 @@ type IntentKey =
   | 'kuiperVisible'
   | 'cometTailsVisible'
   | 'coronaVisible'
+  | 'sunspotsVisible'
   | 'trailsVisible'
   | 'eventsVisible';
 type IntentSetterKey =
@@ -130,6 +143,7 @@ type IntentSetterKey =
   | 'setKuiperVisible'
   | 'setCometTailsVisible'
   | 'setCoronaVisible'
+  | 'setSunspotsVisible'
   | 'setTrailsVisible'
   | 'setEventsVisible';
 
@@ -147,6 +161,7 @@ export interface DisplayToggleDef {
     | 'kuiper'
     | 'comettails'
     | 'corona'
+    | 'sunspots'
     | 'trails'
     | 'events';
   label: string;
@@ -331,6 +346,26 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
       return caps.corona ? null : DISPLAY_DISABLED_REASONS.softwareRendererCorona;
     },
     pressed: (intent, caps) => intent && caps !== null && caps.corona,
+  },
+  {
+    // #1412 PR2 — 태양 흑점 (태양 disk 위 본영 · 반영 — 코로나 · granulation 은 그대로). 끄기 = `spotCount = 0`, 켜기 = 현재 장면
+    // 시각 목록 즉시 기록 (ADR `20261025-1412` 결정 5). 가용성 = 결정 5 의 `surfaceDetail && !isSoftwareRenderer` — 로드 경로
+    // (`resolveSunspotsAtLoad` · 장면 옵션 `sunspots && surfaceDetail`) 와 같은 결정식 (의도 ∧ 환경).
+    id: 'sunspots',
+    urlKey: 'sunspots',
+    label: '태양 흑점',
+    defaultVisible: true,
+    parse: parseSunspotsVisible,
+    command: (visible) => ({ type: 'setSunspotsVisible', visible }),
+    intentKey: 'sunspotsVisible',
+    setterKey: 'setSunspotsVisible',
+    // 렌더러 사유가 먼저다 — 소프트웨어 렌더는 사용자가 바꿀 수 없는 환경이고, `?surface=off` 는 URL 로 되돌릴 수 있는 선택이다.
+    disabledReason: (caps) => {
+      if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+      if (!caps.sunspots) return DISPLAY_DISABLED_REASONS.softwareRendererSunspots;
+      return caps.surfaceDetail ? null : DISPLAY_DISABLED_REASONS.surfaceOff;
+    },
+    pressed: (intent, caps) => intent && caps !== null && caps.sunspots && caps.surfaceDetail,
   },
   {
     // #1341 PR1 — 궤적 trail (ADR `20261015-1341`). **기본 꺼짐** · `?trails=on` 옵트인 (결정 T10). 처음 켤 때 지연 생성,

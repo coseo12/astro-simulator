@@ -76,6 +76,7 @@ beforeEach(() => {
       belt: true,
       cometTails: true,
       corona: true,
+      sunspots: true,
       trails: true,
     },
   });

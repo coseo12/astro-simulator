@@ -10,6 +10,8 @@ import {
   type TourPlanInput,
 } from './plan-tour-step';
 import type { TourStep } from './types';
+import { detectTourDrift } from './detect-tour-drift';
+import { SOLAR_SYSTEM_TOUR } from './solar-system-tour';
 
 /**
  * #1390 — `planTourStep` (ADR `20261021-1390` 결정 · 엔진 / DoD E2). 단계 → 액션 순서 · 기준 장면 (`planned`) 을 고정한다.
@@ -21,6 +23,7 @@ const CAPS_ALL: DisplayCapabilities = {
   belt: true,
   cometTails: true,
   corona: true,
+  sunspots: true,
   trails: true,
 };
 
@@ -253,9 +256,36 @@ describe('planDisplayRestore · readDisplayIntents (E5)', () => {
     expect(planDisplayRestore(snapshot, snapshot)).toEqual([]);
   });
 
-  it('store 의도 12종 (표 행 전부) 를 읽는다', () => {
+  it('store 의도 13종 (표 행 전부 — #1412 PR2 흑점 포함) 를 읽는다', () => {
     const intents = readDisplayIntents(useSimStore.getState());
     expect(Object.keys(intents).sort()).toEqual(DISPLAY_TOGGLES.map((d) => d.id).sort());
-    expect(Object.keys(intents)).toHaveLength(12);
+    expect(Object.keys(intents)).toHaveLength(13);
+    expect(intents.sunspots).toBe(true);
+  });
+
+  it('#1412 PR2 흑점 — 지정하지 않은 단계는 이탈 축에 넣지 않고, 단계 전환 · 종료 복원은 스냅샷으로 되돌린다', () => {
+    // 「태양」 단계는 코로나만 지정한다 — 흑점은 지정 안 한 토글 (기존 규칙: 이탈 판정은 지정 토글만 본다).
+    const sunStep = SOLAR_SYSTEM_TOUR.steps.find((s) => s.id === 'sun')!;
+    const plan = planTourStep(sunStep, input());
+    if (!plan.ok) throw new Error(plan.reason);
+    expect(plan.planned.display).toEqual({ corona: true });
+    const userOff = { ...DEFAULT_INTENTS, sunspots: false };
+    expect(
+      detectTourDrift(plan.planned, {
+        selectedBodyId: 'sun',
+        freeFlyMode: false,
+        julianDate: null,
+        timeScale: 0,
+        display: userOff,
+      }),
+    ).toEqual([]);
+    // 다음 단계 진입 — 지정 안 한 토글은 스냅샷 값으로 맞춘다 (다른 토글과 같은 경로).
+    const next = planTourStep(SOLAR_SYSTEM_TOUR.steps[2]!, input({ current: userOff }));
+    if (!next.ok) throw new Error(next.reason);
+    expect(next.actions).toContainEqual({ type: 'display', id: 'sunspots', visible: true });
+    // 종료 복원.
+    expect(planDisplayRestore(DEFAULT_INTENTS, userOff)).toEqual([
+      { type: 'display', id: 'sunspots', visible: true },
+    ]);
   });
 });
