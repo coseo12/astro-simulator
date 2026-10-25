@@ -698,20 +698,20 @@ const UI_URL_KEY = {
   constellations: 'constellations',
   clouds: 'clouds',
   nightLights: 'nightlights',
-  // #1293 — 이름 라벨 (web 전용 5번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
+  // #1293 — 이름 라벨 (web 전용 6번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
   labels: 'labels',
-  // #1319 PR3 — 소행성대 · 카이퍼 벨트 (6 · 7번째 행). 소프트웨어 렌더에서는 별과 같이 가용성이 막는다 (ADR 20261008-1319 결정 3).
+  // #1319 PR3 — 소행성대 · 카이퍼 벨트 (7 · 8번째 행). 소프트웨어 렌더에서는 별과 같이 가용성이 막는다 (ADR 20261008-1319 결정 3).
   belt: 'belt',
   kuiper: 'kuiper',
-  // #1329 PR2 — 혜성 꼬리 (8번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261010-1329 결정 4).
+  // #1329 PR2 — 혜성 꼬리 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261010-1329 결정 4).
   cometTails: 'comettails',
-  // #1335 PR2 — 태양 코로나 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
+  // #1335 PR2 — 태양 코로나 (10번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
   corona: 'corona',
-  // #1412 PR2 — 태양 흑점 (코로나 다음 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261025-1412 결정 5 · Q9).
+  // #1412 PR2 — 태양 흑점 (11번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261025-1412 결정 5 · Q9).
   sunspots: 'sunspots',
-  // #1341 PR1 — 궤적 (10번째 행). **유일한 기본 꺼짐 행** (ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
+  // #1341 PR1 — 궤적 (12번째 행). 기본 꺼짐 행 — 별자리 (#1373) 와 둘 (`DEFAULT_OFF_IDS`, ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
   trails: 'trails',
-  // #1347 — 시간 사건 마커 (11번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
+  // #1347 — 시간 사건 마커 (13번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
   events: 'events',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
@@ -722,7 +722,10 @@ const UI_IDS = Object.keys(UI_URL_KEY);
  */
 const DEFAULT_OFF_IDS = ['trails', 'constellations'];
 const UI_DEFAULT_ON_IDS = UI_IDS.filter((id) => !DEFAULT_OFF_IDS.includes(id));
-/** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c · #1335 PR2 D9d · #1412 PR2). */
+/**
+ * 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다. 전용 게이트가 있는 행: 별 D9 · 띠 D9b (#1319 PR3) ·
+ * 혜성 꼬리 D9c (#1329 PR2) · 코로나 D9d (#1335 PR2). 별자리 (#1373 PR2) · 흑점 (#1412 PR2) 은 전용 D9x 게이트가 없고 D11 제외로만 쓴다.
+ */
 const SOFTWARE_GATED_IDS = [
   'stars',
   'constellations',
