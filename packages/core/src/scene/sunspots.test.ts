@@ -118,7 +118,7 @@ describe('#1412 sunspots — 차등 자전 (D4)', () => {
 });
 
 describe('#1412 sunspots — 위도 분포 · 상한 (D3)', () => {
-  it('1900~2100 7.3 일 간격 — |위도| 5~35° 비율 ≥ 90 % · 최대 < 45° (필라멘트 기저 cos 위도 ≥ 0.707)', () => {
+  it('1900~2100 7.3 일 간격 — |위도| 5~35° 비율 ≥ 90 % · 최대 < 45° (표본 통계 — 필라멘트 기저 cos 위도 ≥ 0.707)', () => {
     const out = createHeliographicSpots();
     let inBand = 0;
     let total = 0;
@@ -162,6 +162,17 @@ describe('#1412 sunspots — 위도 분포 · 상한 (D3)', () => {
     // 930 MSH → 지름 0.0862 R (= 60,000 km 근처, Solanki 2006 §6.2 상한) · 2.3 MSH → 약 3,000 km.
     expect(2 * rMax * 695_700).toBeCloseTo(60_010, -2);
     expect(2 * Math.sqrt(2e-6 * SUNSPOT_AREA_MIN_MSH) * 695_700).toBeCloseTo(2_984, -1);
+  });
+
+  it('생성기 상한 배선 — 출력 버퍼보다 많으면 그 길이까지 면적 큰 순으로 자른다 (리뷰 R4 — 상한 무시 변이 검출)', () => {
+    const full = createHeliographicSpots();
+    const n = generateHeliographicSunspots(JD_POC, full);
+    expect(n).toBe(17);
+    const areas = Array.from(full.areaMsh.subarray(0, n)).sort((a, b) => b - a);
+    const small = createHeliographicSpots(10);
+    expect(generateHeliographicSunspots(JD_POC, small)).toBe(10);
+    expect(lastSunspotCandidateCount()).toBe(17);
+    expect(Array.from(small.areaMsh)).toEqual(areas.slice(0, 10));
   });
 
   it('상한 절단 — 현재 면적 큰 순, 동률은 id (slot, group, part) 사전순', () => {
@@ -299,22 +310,51 @@ describe('#1412 sunspots — 결정성 · 입력 방어 (D5 · D10)', () => {
   });
 });
 
-describe('#1412 sunspots — 광과민성 감쇠 (D6 · 결정 3)', () => {
+describe('#1412 sunspots — 광과민성 감쇠 (D6 · 결정 3 · Amendment 1 창 판정)', () => {
   const FRAME_MS = 1000 / 60;
+  /** 스크러버 1 step 에 해당하는 점프 크기 [일] — Radix 썸 0.25 년 양자화. */
+  const QUARTER_YEAR = 365.25 / 4;
 
-  /** 일정 배속 [일/s] 으로 `seconds` 동안 60 fps 재생 — 가시도 이력을 반환. */
+  type State = ReturnType<typeof createSunspotVisibilityState>;
+  /** 시작 표본 + 정지 0.5 s (창 이력 채움). */
+  function start(): { s: State; t: { jd: number; ms: number } } {
+    const s = createSunspotVisibilityState();
+    const t = { jd: JD_POC, ms: 1000 };
+    stepSunspotVisibility(s, t.jd, t.ms);
+    play(s, t, 0, 0.5);
+    return { s, t };
+  }
+  /** 일정 배속 [일/s] 으로 `seconds` 동안 `frameMs` 간격 재생 — 가시도 이력을 반환. */
   function play(
-    state: ReturnType<typeof createSunspotVisibilityState>,
-    start: { jd: number; ms: number },
+    s: State,
+    t: { jd: number; ms: number },
     daysPerSec: number,
+    seconds: number,
+    frameMs = FRAME_MS,
+  ): number[] {
+    const history: number[] = [];
+    const frames = Math.round((seconds * 1000) / frameMs);
+    for (let f = 0; f < frames; f++) {
+      t.ms += frameMs;
+      t.jd += (daysPerSec * frameMs) / 1000;
+      history.push(stepSunspotVisibility(s, t.jd, t.ms));
+    }
+    return history;
+  }
+  /** `everyFrames` 프레임마다 `stepDays` 점프 (나머지 프레임은 jd 정지) — 스크러버 · 키 반복 형태. */
+  function jumps(
+    s: State,
+    t: { jd: number; ms: number },
+    stepDays: number,
+    everyFrames: number,
     seconds: number,
   ): number[] {
     const history: number[] = [];
     const frames = Math.round((seconds * 1000) / FRAME_MS);
-    for (let f = 0; f < frames; f++) {
-      start.ms += FRAME_MS;
-      start.jd += (daysPerSec * FRAME_MS) / 1000;
-      history.push(stepSunspotVisibility(state, start.jd, start.ms));
+    for (let f = 1; f <= frames; f++) {
+      t.ms += FRAME_MS;
+      if (f % everyFrames === 0) t.jd += stepDays;
+      history.push(stepSunspotVisibility(s, t.jd, t.ms));
     }
     return history;
   }
@@ -329,19 +369,14 @@ describe('#1412 sunspots — 광과민성 감쇠 (D6 · 결정 3)', () => {
   });
 
   it('1M 재생 — 가시도 1 유지', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
+    const { s, t } = start();
     expect(Math.min(...play(s, t, 30, 3))).toBe(1);
   });
 
   it('1y 재생 — 지속 1/6 s 를 채운 뒤에만 내려가기 시작해 0 에 닿고, 변화율 ≤ 6/s', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
+    const { s, t } = start();
     const h = play(s, t, 365.25, 2);
     const firstDrop = h.findIndex((v) => v < 1);
-    // 프레임 k 의 판정 구간 끝 = (k+1) 프레임. 지속 시간을 채우기 전에는 1.
     expect((firstDrop + 1) * FRAME_MS).toBeGreaterThanOrEqual(
       SUNSPOT_VISIBILITY_PERSIST_S * 1000 - 1e-6,
     );
@@ -353,51 +388,108 @@ describe('#1412 sunspots — 광과민성 감쇠 (D6 · 결정 3)', () => {
     }
   });
 
-  it('한 프레임 Δjd 급등 (날짜 점프) — 가시도 불변', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
-    play(s, t, 0, 1);
-    t.ms += FRAME_MS;
-    t.jd += 10_000;
-    expect(stepSunspotVisibility(s, t.jd, t.ms)).toBe(1);
-    expect(Math.min(...play(s, t, 0, 1))).toBe(1);
+  it('단발 점프 (10,000 일) — 점프 프레임 길이와 무관하게 가시도 불변 (리뷰 B2: 170 ms 이상 프레임에서 0 이던 결함)', () => {
+    for (const jumpFrameMs of [FRAME_MS, 100, 170, 200, 250, 500, 2000]) {
+      const { s, t } = start();
+      play(s, t, 1, 1); // 1 d/s 재생 중
+      t.ms += jumpFrameMs;
+      t.jd += 10_000;
+      expect(stepSunspotVisibility(s, t.jd, t.ms), `점프 프레임 ${jumpFrameMs} ms`).toBe(1);
+      expect(Math.min(...play(s, t, 1, 1)), `점프 프레임 ${jumpFrameMs} ms 뒤 1 s`).toBe(1);
+    }
   });
 
-  it('1y 재생 후 일시정지 — 지속 시간 뒤 1 로 복귀 (켜짐↔꺼짐 왕복 ≥ 1/3 s)', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
+  it('스크러버 형태 — 0.25 년 점프가 3 프레임마다 (20 회/s) 오면 감쇠한다 (리뷰 B1 · 종전 알려진 한계 해소)', () => {
+    const { s, t } = start();
+    const h = jumps(s, t, QUARTER_YEAR, 3, 1.5);
+    expect(h[h.length - 1]).toBe(0);
+    // 변화율 제한은 그대로.
+    for (let i = 1; i < h.length; i++) {
+      expect(Math.abs(h[i]! - h[i - 1]!)).toBeLessThanOrEqual(
+        SUNSPOT_VISIBILITY_RATE_PER_S * (FRAME_MS / 1000) + 1e-12,
+      );
+    }
+  });
+
+  it('프레임마다 정지 · 2 배속을 번갈아도 (평균 14.7 Hz) 감쇠한다 — 창 평균이 정지 프레임을 묶는다', () => {
+    const { s, t } = start();
+    let last = 1;
+    for (let f = 0; f < 120; f++) {
+      t.ms += FRAME_MS;
+      if (f % 2 === 0) t.jd += (365.25 * 2 * FRAME_MS) / 1000;
+      last = stepSunspotVisibility(s, t.jd, t.ms);
+    }
+    expect(last).toBe(0);
+  });
+
+  it('점프 열의 경계 — 간격 150 ms (9 프레임) 는 감쇠, 200 ms (12 프레임) 는 불변 (창 1/6 s = 10 프레임)', () => {
+    // 창 길이와 같은 10 프레임 · 한 프레임 넘는 11 프레임 간격은 표본 시각의 부동소수 반올림이 창 경계를 정해 어느 쪽도
+    // 계약으로 단언하지 않는다 (프레임 양자화 — 창 끝 표본이 「빠름」 이면 다음 점프와 이어진다).
+    const fast = start();
+    expect(jumps(fast.s, fast.t, QUARTER_YEAR, 9, 2).at(-1)).toBe(0);
+    const slow = start();
+    expect(Math.min(...jumps(slow.s, slow.t, QUARTER_YEAR, 12, 2))).toBe(1);
+  });
+
+  it('1y 재생 후 일시정지 — 1 로 복귀 (창 비움 1/6 s + 지속 1/6 s 뒤에 오르기 시작)', () => {
+    const { s, t } = start();
     play(s, t, 365.25, 2);
     expect(s.visibility).toBe(0);
     const h = play(s, t, 0, 1);
     expect(h[h.length - 1]).toBe(1);
-    // 0 → 1 은 지속 1/6 s + 상승 1/6 s 이상.
-    const reachOne = h.findIndex((v) => v === 1);
-    expect((reachOne + 1) * FRAME_MS).toBeGreaterThanOrEqual(
+    const firstRise = h.findIndex((v) => v > 0);
+    expect((firstRise + 1) * FRAME_MS).toBeGreaterThanOrEqual(
       2 * SUNSPOT_VISIBILITY_PERSIST_S * 1000 - 1e-6,
     );
   });
 
-  it('문턱 근처에서 판정이 매 프레임 뒤집혀도 목표는 바뀌지 않는다 (지속 조건)', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
-    // 1y 와 정지를 프레임마다 번갈아 — 평균은 문턱 위지만 어느 판정도 1/6 s 를 채우지 못한다.
+  it('같은 프레임 2회 호출 — 1y 감쇠 결과가 1회 호출과 같다 (창 평균은 같은 jd 표본 추가에 불변)', () => {
+    const once = start();
+    const twice = start();
+    let minOnce = 1;
+    let minTwice = 1;
     for (let f = 0; f < 120; f++) {
-      t.ms += FRAME_MS;
-      if (f % 2 === 0) t.jd += (365.25 * 2 * FRAME_MS) / 1000;
-      expect(stepSunspotVisibility(s, t.jd, t.ms)).toBe(1);
+      for (const st of [once, twice]) {
+        st.t.ms += FRAME_MS;
+        st.t.jd += (365.25 * FRAME_MS) / 1000;
+      }
+      minOnce = Math.min(minOnce, stepSunspotVisibility(once.s, once.t.jd, once.t.ms));
+      minTwice = Math.min(minTwice, stepSunspotVisibility(twice.s, twice.t.jd, twice.t.ms));
+      minTwice = Math.min(minTwice, stepSunspotVisibility(twice.s, twice.t.jd, twice.t.ms + 0.1));
     }
+    expect(minOnce).toBe(0);
+    expect(minTwice).toBe(0);
   });
 
-  it('같은 시각 재호출 (Δt ≤ 0) 은 상태를 바꾸지 않는다', () => {
-    const s = createSunspotVisibilityState();
-    const t = { jd: JD_POC, ms: 1000 };
-    stepSunspotVisibility(s, t.jd, t.ms);
+  it('표본 이력보다 빠른 프레임률 (1 kHz) — 1y 는 감쇠, 단발 점프는 불변', () => {
+    const a = start();
+    expect(play(a.s, a.t, 365.25, 1, 1).at(-1)).toBe(0);
+    const b = start();
+    play(b.s, b.t, 0, 0.5, 1);
+    b.t.ms += 1;
+    b.t.jd += 10_000;
+    stepSunspotVisibility(b.s, b.t.jd, b.t.ms);
+    expect(Math.min(...play(b.s, b.t, 0, 1, 1))).toBe(1);
+  });
+
+  it('같은 시각 재호출 (Δt ≤ 0) 은 버린다 — 표본 수 · 판정 · 가시도 불변', () => {
+    const { s, t } = start();
     play(s, t, 365.25, 0.1);
-    const before = { ...s };
+    const before = {
+      count: s.count,
+      head: s.head,
+      fast: s.fast,
+      target: s.target,
+      visibility: s.visibility,
+    };
     stepSunspotVisibility(s, t.jd + 5, t.ms);
-    expect(s).toEqual(before);
+    stepSunspotVisibility(s, t.jd + 5, t.ms - 3);
+    expect({
+      count: s.count,
+      head: s.head,
+      fast: s.fast,
+      target: s.target,
+      visibility: s.visibility,
+    }).toEqual(before);
   });
 });

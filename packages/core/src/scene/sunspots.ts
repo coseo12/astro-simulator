@@ -138,7 +138,10 @@ export const SUNSPOT_JD_RANGE_DAYS = 1e7;
 
 /** 광과민성 문턱 [Hz] — WCAG 2.2 SC 2.3.1 「1 초에 3 회를 넘는 섬광 금지」 (결정 3). */
 export const SUNSPOT_MAX_FLICKER_HZ = 3;
-/** 목표 전환 지속 시간 [s] = `1/(2·3)` — 같은 3 Hz 에서 나온다 (새 시상수 0, 결정 3). */
+/**
+ * 목표 전환 지속 시간 [s] = `1/(2·3)` — 같은 3 Hz 에서 나온다 (새 시상수 0, 결정 3). 실효 주파수 판정 창의 길이도 이 값이다
+ * (ADR 1412 Amendment 1). 점프 하나 = 흑점 무늬 변화 1 회라 창 안에 점프가 끊기지 않는 열 (1 초 6 회 = WCAG 섬광 3 쌍 초과) 이 걸린다.
+ */
 export const SUNSPOT_VISIBILITY_PERSIST_S = 1 / (2 * SUNSPOT_MAX_FLICKER_HZ);
 /** 가시도 최대 변화율 [1/s] = `2·3` — 켜짐↔꺼짐 1 왕복이 1/3 s 이상 (결정 3). */
 export const SUNSPOT_VISIBILITY_RATE_PER_S = 2 * SUNSPOT_MAX_FLICKER_HZ;
@@ -516,8 +519,9 @@ export function generateHeliographicSunspots(jd: number, out: HeliographicSpots)
   }
 
   lastUncappedCount = m;
-  // 상한 이하면 생성 순서 (= id 사전순: 슬롯 · 군 · 성분 오름차순) 그대로.
-  return selectLargestSpots(candidates, m, out, SUNSPOT_MAX);
+  // 상한 이하면 생성 순서 (= id 사전순: 슬롯 · 군 · 성분 오름차순) 그대로. 상한은 출력 버퍼 길이로도 묶는다 —
+  // Float64Array 는 범위 밖 쓰기를 소리 없이 버리므로, 작은 버퍼면 그 길이까지 면적 순으로 자른다.
+  return selectLargestSpots(candidates, m, out, Math.min(SUNSPOT_MAX, out.latDeg.length));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -525,20 +529,36 @@ export function generateHeliographicSunspots(jd: number, out: HeliographicSpots)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * 실효 자전 주파수 [Hz] = `|Δjd| / Δt × ω(0) / 360` — 흑점이 한 자리를 지나 다시 오는 빈도 (결정 3).
- * 재생 · 스크러버 드래그 · 점프를 같은 식으로 잡는다. 역재생은 `|Δjd|` 라 같다.
+ * 실효 자전 주파수 [Hz] = `|Δjd| / Δt × ω(0) / 360` — 흑점이 한 자리를 지나 다시 오는 빈도 (결정 3). 역재생은 `|Δjd|` 라 같다.
+ *
+ * {@link stepSunspotVisibility} 는 이 식을 **프레임 하나가 아니라 직전 `1/6 s` 창** (Δt = 창 길이, Δjd = 창 양 끝 jd 차) 에
+ * 적용한다 (ADR 1412 Amendment 1). 재생은 프레임마다 jd 가 움직여 창 평균 = 프레임 값이다. 스크러버 드래그 · 키 반복은
+ * 입력 이벤트가 프레임보다 드물어 (실측 14~30 회/s) jd 가 움직이는 프레임과 멈춘 프레임이 섞이는데, 창 평균이 그 둘을
+ * 묶어 지속 조건을 채운다. 창보다 짧게 끝나는 **단발 점프**는 지속 조건을 채우지 못해 무시하는 대상이다.
  */
 export function sunspotEffectiveHz(deltaJd: number, deltaSec: number): number {
   return (Math.abs(deltaJd) / deltaSec) * (SUNSPOT_ROTATION_A_DEG_PER_DAY / 360);
 }
 
-/** 감쇠 상태 — 호출자 소유 (장면 1 개당 1 개). */
+/**
+ * 판정 창 표본 이력 용량. 창 `1/6 s` 를 덮으려면 프레임률 × 1/6 + 1 개가 필요하다 — 64 는 약 380 fps 까지.
+ * 그보다 빠르면 가장 오래된 표본까지만 보아 창이 짧아진다 (단발 점프는 여전히 지속 조건 미달 — 보수 쪽).
+ */
+const VISIBILITY_HISTORY = 64;
+/** 판정 창 = 지속 시간 [ms] (같은 값 — 창 경계와 지속 조건을 한 식으로 비교하려고 ms 로 한 번만 만든다). */
+const VISIBILITY_WINDOW_MS = SUNSPOT_VISIBILITY_PERSIST_S * 1000;
+
+/** 감쇠 상태 — 호출자 소유 (장면 1 개당 1 개). 표본 이력은 고정 길이 링 버퍼 (할당 0). */
 export interface SunspotVisibilityState {
-  lastJd: number;
-  lastMs: number;
-  /** 현재 연속 구간의 판정 (`f > 3`). */
+  /** 표본 시각 [ms] · 장면 시계 jd 링 버퍼. */
+  sampleMs: Float64Array;
+  sampleJd: Float64Array;
+  /** 다음에 쓸 index · 채워진 표본 수. */
+  head: number;
+  count: number;
+  /** 현재 연속 구간의 판정 (창 평균 `f > 3`). */
   fast: boolean;
-  /** 그 판정이 시작된 시각 [ms]. */
+  /** 그 판정이 처음 나온 표본 시각 [ms]. */
   fastSinceMs: number;
   /** 목표 가시도 (0 · 1). */
   target: number;
@@ -548,8 +568,10 @@ export interface SunspotVisibilityState {
 
 export function createSunspotVisibilityState(): SunspotVisibilityState {
   return {
-    lastJd: Number.NaN,
-    lastMs: Number.NaN,
+    sampleMs: new Float64Array(VISIBILITY_HISTORY),
+    sampleJd: new Float64Array(VISIBILITY_HISTORY),
+    head: 0,
+    count: 0,
     fast: false,
     fastSinceMs: Number.NaN,
     target: 1,
@@ -560,40 +582,62 @@ export function createSunspotVisibilityState(): SunspotVisibilityState {
 /**
  * 감쇠 한 걸음 — 장면 시계 jd 와 실시간 `nowMs` (performance.now) 로 가시도를 갱신해 반환한다 (할당 0).
  *
- * - 목표: `f > 3 Hz` 가 연속 `1/6 s` 이상 이어지면 0, `f ≤ 3` 이 같은 시간 이어지면 1, 그 사이는 직전 목표 유지.
- *   한 프레임만 튀는 Δjd (날짜 점프 · 탭 복귀) 는 지속 시간을 채우지 못해 무시된다.
- *   판정 구간은 직전 표본 시각부터다 — 구간 `[lastMs, nowMs]` 동안 그 주파수였다고 본다.
+ * - 판정량: 직전 `W = 1/6 s` 창의 실효 주파수 {@link sunspotEffectiveHz}. 기준 표본 = `nowMs − W` 이전의 가장 최근 표본
+ *   (없으면 가장 오래된 표본). 재생은 창 평균 = 순간값이고, 스크러버처럼 jd 가 멈춘 프레임이 섞인 입력도 창 안에서 묶인다.
+ * - 목표: 그 판정이 연속 `W` 이상 「빠름」 이면 0, 「느림」 이 같은 시간 이어지면 1, 그 사이는 직전 목표 유지. 연속 구간의
+ *   시작은 그 판정이 **처음 나온 표본 시각**이다 (프레임 간격을 소급하지 않는다 — 긴 프레임 하나가 혼자 지속 조건을 채우지 않게).
+ * - 단발 점프 (날짜 입력 · 스크러버 1회): 점프 표본이 창 안에 있는 동안만 「빠름」 이고, 그 기간은 `W` 보다 짧다 → 목표 불변.
+ *   점프 프레임이 길어도 (무거운 점프) 같다. 점프 둘이 `W` 안에 이어지면 「빠름」 이 `W` 를 넘겨 감쇠한다 — 점프 하나가 흑점
+ *   무늬를 한 번 바꾸므로, 1 초 6 회 (= 3 쌍) 를 넘는 점프 열이 여기에 걸린다.
  * - 실제 값은 목표를 향해 초당 최대 `6` 으로만 움직인다 → 켜짐↔꺼짐 1 왕복 ≥ 1/3 s (1 초에 3 회 이하).
- * - 일시정지 (`Δjd = 0`) 는 `f = 0` 이라 지속 시간 뒤 가시도가 1 로 돌아온다 (프레임 위상은 일시정지에도 돈다, ADR 1-H).
- * - `Δt ≤ 0` (같은 시각의 재호출 · 시계 역행) 표본은 정보가 없어 상태를 바꾸지 않는다.
+ * - 일시정지 (`Δjd = 0`): 창이 비워진 뒤 (`W`) 「느림」 이 `W` 이어져 목표 1, 다시 1/6 s 에 걸쳐 1 로 돌아온다.
+ * - `Δt ≤ 0` (같은 시각의 재호출 · 시계 역행) 표본은 버린다. 같은 프레임의 2회째 호출은 같은 jd 의 표본 하나를 더할 뿐이라
+ *   창 평균이 바뀌지 않는다.
+ * - 탭 복귀: `TimeController.tick` 이 실시간 dt 를 자르지 않아 복귀 프레임의 Δjd/Δt 는 재생 속도와 같다 — 급등이 아니다.
  */
 export function stepSunspotVisibility(
   state: SunspotVisibilityState,
   jd: number,
   nowMs: number,
 ): number {
-  if (!Number.isFinite(state.lastMs)) {
-    state.lastJd = jd;
-    state.lastMs = nowMs;
+  const cap = state.sampleMs.length;
+  const lastIdx = (state.head - 1 + cap) % cap;
+  if (state.count > 0 && !(nowMs > state.sampleMs[lastIdx]!)) return state.visibility;
+  const prevMs = state.count > 0 ? state.sampleMs[lastIdx]! : Number.NaN;
+  // 비유한 jd 는 직전 표본 jd 로 대신한다 (Δjd 0 — 판정에 기여하지 않음).
+  const sampleJd = Number.isFinite(jd) ? jd : state.count > 0 ? state.sampleJd[lastIdx]! : 0;
+  state.sampleMs[state.head] = nowMs;
+  state.sampleJd[state.head] = sampleJd;
+  state.head = (state.head + 1) % cap;
+  if (state.count < cap) state.count++;
+  if (state.count === 1) {
     state.fastSinceMs = nowMs;
     return state.visibility;
   }
-  const dtMs = nowMs - state.lastMs;
-  if (!(dtMs > 0)) return state.visibility;
-  const dtSec = dtMs / 1000;
-  const deltaJd = Number.isFinite(jd) && Number.isFinite(state.lastJd) ? jd - state.lastJd : 0;
-  const fast = sunspotEffectiveHz(deltaJd, dtSec) > SUNSPOT_MAX_FLICKER_HZ;
+
+  // 기준 표본 — `nowMs − W` 이전의 가장 최근 표본, 없으면 가장 오래된 표본.
+  // ⚠️ 창 경계와 지속 조건은 **같은 식** (`nowMs − 표본 시각 >= W`) 으로 잰다. 둘을 다른 식으로 반올림하면 단발 점프의 「빠름」
+  // 마지막 표본에서 지속 조건만 먼저 참이 되는 경계가 생긴다 (183 ms 간격 점프 열 테스트가 그 경계를 잡았다).
+  let ref = (state.head - state.count + cap) % cap;
+  for (let k = 2; k <= state.count; k++) {
+    const idx = (state.head - k + cap) % cap;
+    if (nowMs - state.sampleMs[idx]! >= VISIBILITY_WINDOW_MS) {
+      ref = idx;
+      break;
+    }
+  }
+  const spanSec = (nowMs - state.sampleMs[ref]!) / 1000;
+  const fast =
+    sunspotEffectiveHz(sampleJd - state.sampleJd[ref]!, spanSec) > SUNSPOT_MAX_FLICKER_HZ;
   if (fast !== state.fast) {
     state.fast = fast;
-    state.fastSinceMs = state.lastMs;
+    state.fastSinceMs = nowMs;
   }
-  if ((nowMs - state.fastSinceMs) / 1000 >= SUNSPOT_VISIBILITY_PERSIST_S) {
+  if (nowMs - state.fastSinceMs >= VISIBILITY_WINDOW_MS) {
     state.target = fast ? 0 : 1;
   }
-  const maxStep = SUNSPOT_VISIBILITY_RATE_PER_S * dtSec;
+  const maxStep = SUNSPOT_VISIBILITY_RATE_PER_S * ((nowMs - prevMs) / 1000);
   const diff = state.target - state.visibility;
   state.visibility += Math.max(-maxStep, Math.min(maxStep, diff));
-  state.lastJd = jd;
-  state.lastMs = nowMs;
   return state.visibility;
 }

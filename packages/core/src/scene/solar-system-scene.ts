@@ -2130,15 +2130,17 @@ export function createSolarSystemScene(
     bindSunspotMaterial(meshes.get('sun')?.material);
     bindSunspotMaterial(midVariants.get('sun')?.material);
   };
-  /** 프레임 위상 — 감쇠 가시도 갱신 + 지연 생성된 variant 머티리얼 묶기 (결정 3). */
+  const syncSunspotMaterialFrame = (material: unknown, visibility: number): void => {
+    if (!isSunSurfaceMaterial(material)) return;
+    if (!sunspotBoundMaterials.has(material)) bindSunspotMaterial(material);
+    material.setFloat('spotVisibility', visibility);
+  };
+  /** 프레임 위상 — 감쇠 가시도 갱신 + 지연 생성된 variant 머티리얼 묶기 (결정 3). 매 프레임이라 할당 0 (배열 · 이터레이터 없음). */
   const syncSunspotFrame = (): void => {
     if (!surfaceDetail) return;
     const visibility = stepSunspotVisibility(sunspotVisibility, currentClockJd, performance.now());
-    for (const material of [meshes.get('sun')?.material, midVariants.get('sun')?.material]) {
-      if (!isSunSurfaceMaterial(material)) continue;
-      if (!sunspotBoundMaterials.has(material)) bindSunspotMaterial(material);
-      material.setFloat('spotVisibility', visibility);
-    }
+    syncSunspotMaterialFrame(meshes.get('sun')?.material, visibility);
+    syncSunspotMaterialFrame(midVariants.get('sun')?.material, visibility);
   };
 
   // #1341 — 궤적 trail (ADR 20261015-1341 결정 T1 ~ T10). 기본 꺼짐 — 로드 시 아무것도 만들지 않는다 (결정 T10).
