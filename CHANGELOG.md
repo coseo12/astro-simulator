@@ -23,6 +23,8 @@ Semantic Versioning을 따른다.
 - **ADR 1205 Amendment 1** — 프레임 위상 (`runFramePass`) 의 두 번째 멤버 `syncSunspotFrame` 의 멤버십 3조건 판정 (조건 2 만 충족, 1 · 3 명시 예외) 과 「2×/프레임 금지」 가드 기각의 재판정을 적었다 ([`20260907-1205`](docs/decisions/20260907-1205-frame-phase-vs-time-phase.md)).
 - **알려진 한계 — 스크러버 조작은 감쇠되지 않는다** (#1412). 스크러버는 1 년 단위로 움직여 값이 바뀌는 프레임과 안 바뀌는 프레임이 섞이고, 결정 3 의 지속 조건 (`f > 3` 이 `1/6 s` 연속) 을 채우지 못한다. 로컬 실측 (macOS · Apple M1 Pro · Chrome 155, WebGPU): 키보드 20 Hz 반복 · 마우스 드래그에서 흑점 목록이 1 초에 14 ~ 29 프레임 바뀌는 동안 가시도는 1 로 남았다.
 
+## [0.106.0] - 2026-10-24
+
 ### Changed
 
 - **[#1404] 달 위치를 Meeus 47장 전 항으로 계산한다** ([#1404](https://github.com/coseo12/astro-simulator/issues/1404)). 달 위치를 Kepler 평균 요소 + 주기 9항 (B9) 대신 J. Meeus 《Astronomical Algorithms》 2판 47장의 이론 전 항 (표 47.A 60행 · 47.B 60행 · 부가항 9행) 으로 계산하고, 21장 황도 세차 회전으로 J2000 황도에 옮긴다. 장면 · 정보 카드 · 거리 자 · 사건이 같은 위치를 쓴다. ADR [`20261023-1404`](docs/decisions/20261023-1404-lunar-theory-meeus47.md).
