@@ -472,7 +472,9 @@ function judgeRadial(radial) {
       {
         const { context, page, consoleErrors } = await setupPage(
           browser,
-          `?gpu=a&focus=sun&lod=auto`,
+          // #1412 결정 6 — 흑점은 본 가드 판정량 (granulation · limb · 색온도) 의 대상이 아니다. 기본 재생 (1 d/s) 에서
+          // 흑점 위치가 로드 시간에 따라 달라지므로 끄고 잰다 (로컬 실 GPU 와 CI 소프트웨어 게이트의 판정 입력을 같게).
+          `?gpu=a&focus=sun&lod=auto&sunspots=off`,
         );
         const m = await measureSunDisk(page, 'sun', 'sun-on');
         out.sunOn = m;
@@ -499,7 +501,7 @@ function judgeRadial(radial) {
       {
         const { context, page, consoleErrors } = await setupPage(
           browser,
-          `?gpu=a&focus=sun&lod=auto&surface=off`,
+          `?gpu=a&focus=sun&lod=auto&surface=off&sunspots=off`,
         );
         const m = await measureSunDisk(page, 'sun', 'sun-off');
         out.sunOff = m;

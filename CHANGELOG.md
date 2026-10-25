@@ -5,7 +5,23 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
-## [0.106.0] - 2026-10-24
+### Added
+
+- **[#1412] 태양 표면에 흑점을 그린다 (PR1 — 렌더 경로 + `?sunspots=off`)** ([#1412](https://github.com/coseo12/astro-simulator/issues/1412)). 흑점 목록은 CPU 가 장면 시계 jd 에서 만든다 — 차등 자전 (Howard et al. 1984) · 생성과 소멸 · 11년 주기 (Hathaway 2015 Table 2 극소 + 사이클 25 극소 2019/12, 그 밖은 평균 주기 131.7 개월 외삽). 셰이더는 `vec4 spots[48]` 로 중심 단위벡터와 반영 각반경만 받는다. 본영 · 반영 색은 휘도비 20 % · 75 % 에서 Planck 비로 유도했고, 반영에는 자전축에 고정된 방위 필라멘트를 넣었다. ADR [`20261025-1412`](docs/decisions/20261025-1412-sunspots.md).
+  - 신규 모듈 `packages/core/src/scene/sunspots.ts` (생성기 `generateHeliographicSunspots` · 변환기 `heliographicToScene` · 감쇠 `stepSunspotVisibility`). 기록기 `writeSunspotUniforms` 는 `sun-shader.ts` 에 있다 (크기 배율이 셰이더 상수라서).
+  - 장면 옵션 `sunspots` (core 기본 `false`) 와 `setSunspotsVisible`. web 은 `?sunspots=off` 로 끄고 (`parse-sunspots-mode.ts`), 소프트웨어 렌더에서는 흑점 0 개로 막는다. 표시 패널 토글은 PR2.
+  - 표시 근사: 흑점 크기는 각반경 ×2.5 (면적 6.25 배) 이고, 흑점 위치 · 크기 · 개수는 통계 모델이라 특정 날짜의 실제 흑점과 같지 않다. 신생률 · 크기 분포 계수 일부는 POC 육안 승인값이다. 정보 카드 반지름은 그대로다.
+
+### Behavior Changes
+
+- **하드웨어 렌더의 태양 표면이 바뀐다** (#1412). LOD high · mid 의 태양에 흑점이 보이고, 재생하면 흑점이 자전하며 생기고 사라진다. `?surface=off` · LOD low · tier C · 소프트웨어 렌더 · `?sunspots=off` 에서는 흑점이 없다.
+- **빠른 재생에서 흑점이 사라진다** (#1412 결정 3). 실효 자전 주파수 `|Δjd|/Δt × 14.522/360` 가 3 Hz 를 넘는 상태가 `1/6 s` 이어지면 흑점 가시도가 초당 6 의 속도로 0 이 되고, 3 Hz 이하가 같은 시간 이어지면 1 로 돌아온다 (WCAG 2.2 SC 2.3.1). `1M` 프리셋은 1.21 Hz 라 보이고 `1y` 는 14.73 Hz 라 사라진다.
+- `verify:774-sun` 의 태양 쿼리 2곳에 `&sunspots=off` 를 붙였다 (ADR 1412 결정 6). 판정량은 그대로다.
+
+### Notes
+
+- **ADR 1205 Amendment 1** — 프레임 위상 (`runFramePass`) 의 두 번째 멤버 `syncSunspotFrame` 의 멤버십 3조건 판정 (조건 2 만 충족, 1 · 3 명시 예외) 과 「2×/프레임 금지」 가드 기각의 재판정을 적었다 ([`20260907-1205`](docs/decisions/20260907-1205-frame-phase-vs-time-phase.md)).
+- **알려진 한계 — 스크러버 조작은 감쇠되지 않는다** (#1412). 스크러버는 1 년 단위로 움직여 값이 바뀌는 프레임과 안 바뀌는 프레임이 섞이고, 결정 3 의 지속 조건 (`f > 3` 이 `1/6 s` 연속) 을 채우지 못한다. 로컬 실측 (macOS · Apple M1 Pro · Chrome 155, WebGPU): 키보드 20 Hz 반복 · 마우스 드래그에서 흑점 목록이 1 초에 14 ~ 29 프레임 바뀌는 동안 가시도는 1 로 남았다.
 
 ### Changed
 

@@ -22,7 +22,29 @@ import {
   sunColorMirror,
   SUN_VERTEX_SHADER,
   SUN_FRAGMENT_SHADER,
+  SUNSPOT_SIZE_EXAGGERATION,
+  UMBRA_LUMINANCE_RATIO,
+  PENUMBRA_LUMINANCE_RATIO,
+  SUN_EFFECTIVE_TEMPERATURE_K,
+  SUNSPOT_CHANNEL_WAVELENGTHS_UM,
+  UMBRA_RGB,
+  PENUMBRA_RGB,
+  UMBRA_RADIUS_RATIO,
+  FILAMENT_CONTRAST,
+  FILAMENT_AZIMUTH_FREQUENCY,
+  FILAMENT_SEED_SCALE,
+  PENUMBRA_GRANULATION_SUPPRESSION,
+  planckChannelRatio,
+  sunspotShadeMirror,
+  sunspotFilamentBasisMirror,
+  writeSunspotUniforms,
 } from './sun-shader.js';
+import {
+  SUNSPOT_MAX,
+  SUN_AXIS_SCENE,
+  createHeliographicSpots,
+  generateHeliographicSunspots,
+} from './sunspots.js';
 import {
   SURFACE_TYPE_BY_BODY,
   luminance709,
@@ -285,5 +307,170 @@ describe('#774 sun-shader — noise 텍스트 planet 동일성 (fbmMirror 재사
 describe('#774 sun-shader — SURFACE_TYPE_BY_BODY sun 미등록 유지 (ADR §결정 1)', () => {
   it('planet 테이블에 sun 부재 — 테이블은 "외부광 반사 표면" 전용 (procedural-planet 변경 0)', () => {
     expect(SURFACE_TYPE_BY_BODY.sun).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1412 — 흑점 (ADR `docs/decisions/20261025-1412-sunspots.md` §DoD D10)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('#1412 sun-shader 흑점 — 상수 SSoT · 본영/반영 인자 유도식 (결정 4 · 7)', () => {
+  it('승인 상수 — 배율 ×2.5 (각반경) · 필라멘트 대비 0.35 · 본영 반경비 1/√5.5 · 반영 granulation 억제 0.7', () => {
+    expect(SUNSPOT_SIZE_EXAGGERATION).toBe(2.5);
+    expect(FILAMENT_CONTRAST).toBe(0.35);
+    expect(UMBRA_RADIUS_RATIO).toBeCloseTo(1 / Math.sqrt(5.5), 15);
+    expect(PENUMBRA_GRANULATION_SUPPRESSION).toBe(0.7);
+    expect(FILAMENT_AZIMUTH_FREQUENCY).toBe(9);
+    expect(FILAMENT_SEED_SCALE).toBe(17);
+  });
+
+  it('휘도비 20 % · 75 % → Stefan–Boltzmann 온도 3860 K · 5371 K (T☉ 5772 K)', () => {
+    expect(UMBRA_LUMINANCE_RATIO).toBe(0.2);
+    expect(PENUMBRA_LUMINANCE_RATIO).toBe(0.75);
+    expect(SUN_EFFECTIVE_TEMPERATURE_K).toBe(5772);
+    expect(SUN_EFFECTIVE_TEMPERATURE_K * UMBRA_LUMINANCE_RATIO ** 0.25).toBeCloseTo(3860, 0);
+    expect(SUN_EFFECTIVE_TEMPERATURE_K * PENUMBRA_LUMINANCE_RATIO ** 0.25).toBeCloseTo(5371, 0);
+  });
+
+  it('Planck 비 채널 인자 — 본영 (0.130, 0.105, 0.070) · 반영 (0.734, 0.711, 0.669) (ADR POC 값)', () => {
+    expect(SUNSPOT_CHANNEL_WAVELENGTHS_UM).toEqual([0.61, 0.55, 0.465]);
+    [0.13, 0.105, 0.07].forEach((v, i) => expect(UMBRA_RGB[i]).toBeCloseTo(v, 3));
+    [0.734, 0.711, 0.669].forEach((v, i) => expect(PENUMBRA_RGB[i]).toBeCloseTo(v, 3));
+    // 기준 온도에서는 1, 낮은 온도일수록 짧은 파장이 더 어둡다 (R > G > B — 붉은 흑점).
+    expect(planckChannelRatio(0.55, 5772, 5772)).toBeCloseTo(1, 15);
+    expect(UMBRA_RGB[0]).toBeGreaterThan(UMBRA_RGB[1]);
+    expect(UMBRA_RGB[1]).toBeGreaterThan(UMBRA_RGB[2]);
+    expect(PENUMBRA_RGB[0]).toBeGreaterThan(PENUMBRA_RGB[2]);
+  });
+});
+
+describe('#1412 sun-shader 흑점 — GLSL 정적 계약 (D10)', () => {
+  it('uniform vec4 spots[48] + spotCount + spotVisibility + sunAxis 선언', () => {
+    expect(SUNSPOT_MAX).toBe(48);
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform vec4 spots[48];');
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform float spotCount;');
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform float spotVisibility;');
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform vec3 sunAxis;');
+    // jd 는 셰이더로 가지 않는다 (#782 규약 · ADR 774 재검토 조건 3).
+    expect(SUN_FRAGMENT_SHADER).not.toMatch(/uniform\s+float\s+\w*(jd|julian|time)\w*\s*;/i);
+  });
+
+  it('루프 상수 상한 48 + spotCount 조기 탈출 (if-else 만, switch 없음)', () => {
+    expect(SUN_FRAGMENT_SHADER).toContain('for (int i = 0; i < 48; i++) {');
+    expect(SUN_FRAGMENT_SHADER).toContain('if (float(i) >= spotCount) break;');
+    expect(SUN_FRAGMENT_SHADER).not.toMatch(/\bswitch\b/);
+  });
+
+  it('원판 판정은 현 거리 length(p − c) · 합성 baseColor × granulation′ × spotFactor × limb · gl_FragDepth 유지', () => {
+    expect(SUN_FRAGMENT_SHADER).toContain('vec3 dv = p - c;');
+    expect(SUN_FRAGMENT_SHADER).toContain('float d = length(dv);');
+    expect(SUN_FRAGMENT_SHADER).toContain(
+      'vec3 col = baseColor * granulation * spotFactor * limb;',
+    );
+    expect(SUN_FRAGMENT_SHADER).toContain(
+      'spotFactor = mix(vec3(1.0), spotFactor, spotVisibility);',
+    );
+    expect(SUN_FRAGMENT_SHADER).toContain('gl_FragDepth');
+  });
+
+  it('필라멘트 기저는 자전축 고정 — t = normalize(cross(sunAxis, c)) · b = cross(c, t) · 시드 dot(c, sunAxis)', () => {
+    expect(SUN_FRAGMENT_SHADER).toContain('vec3 t = normalize(cross(sunAxis, c));');
+    expect(SUN_FRAGMENT_SHADER).toContain('vec3 b = cross(c, t);');
+    expect(SUN_FRAGMENT_SHADER).toContain('dot(c, sunAxis) * 17.0');
+    // POC 시안 C 의 흐르는 입력 (`+ c * 17.0`) 은 쓰지 않는다 (결정 4 ⚠️).
+    expect(SUN_FRAGMENT_SHADER).not.toContain('c * 17.0');
+  });
+});
+
+describe('#1412 sun-shader 흑점 — JS 미러 (D10)', () => {
+  it('중심은 본영색 · 바깥은 인자 1 (granulation 억제 0) — spotCount = 0 경로와 같은 값', () => {
+    const r = 0.02;
+    const center = sunspotShadeMirror(0, r, 0, 1);
+    center.factor.forEach((v, i) => expect(v).toBeCloseTo(UMBRA_RGB[i]!, 12));
+    expect(center.granulationWeight).toBe(1);
+    const outside = sunspotShadeMirror(r, r, 0.3, 1);
+    expect(outside.factor).toEqual([1, 1, 1]);
+    expect(outside.granulationWeight).toBe(0);
+  });
+
+  it('반영 띠 — 반영색 × (1 ± 대비 × 필라멘트), granulation 억제 0.7', () => {
+    const r = 0.02;
+    // 본영 바깥 · 반영 smoothstep 안쪽 (0.8 R 미만) — 반영 마스크 1, 본영 마스크 0.
+    const d = (r * UMBRA_RADIUS_RATIO + r * 0.8) / 2;
+    const plain = sunspotShadeMirror(d, r, 0, 1);
+    plain.factor.forEach((v, i) => expect(v).toBeCloseTo(PENUMBRA_RGB[i]!, 12));
+    expect(plain.granulationWeight).toBeCloseTo(0.7, 12);
+    const bright = sunspotShadeMirror(d, r, 0.5, 1);
+    bright.factor.forEach((v, i) => expect(v).toBeCloseTo(PENUMBRA_RGB[i]! * (1 + 0.35 * 0.5), 12));
+  });
+
+  it('가시도 0 — 흑점 위치에서도 인자 1 · 억제 0 (감쇠 끝 = 흑점 없음)', () => {
+    const z = sunspotShadeMirror(0, 0.02, 0.2, 0);
+    expect(z.factor).toEqual([1, 1, 1]);
+    expect(z.granulationWeight).toBe(0);
+  });
+
+  it('필라멘트 기저가 흑점과 함께 돈다 — c 를 자전축 둘레로 θ 회전하면 t · b 도 같은 회전', () => {
+    const axis = SUN_AXIS_SCENE;
+    // Rodrigues 회전 (axis 단위벡터).
+    const rot = (v: readonly number[], th: number): [number, number, number] => {
+      const k = axis;
+      const c = Math.cos(th);
+      const s = Math.sin(th);
+      const kv = k[0] * v[0]! + k[1] * v[1]! + k[2] * v[2]!;
+      const x = [
+        k[1] * v[2]! - k[2] * v[1]!,
+        k[2] * v[0]! - k[0] * v[2]!,
+        k[0] * v[1]! - k[1] * v[0]!,
+      ];
+      return [0, 1, 2].map((i) => v[i]! * c + x[i]! * s + k[i]! * kv * (1 - c)) as [
+        number,
+        number,
+        number,
+      ];
+    };
+    // 실제 흑점 중심 (기록기 출력) 들로 검사한다.
+    const buf = new Array<number>(4 * SUNSPOT_MAX).fill(0);
+    const n = writeSunspotUniforms(2456748.5, buf);
+    expect(n).toBeGreaterThan(0);
+    for (let i = 0; i < n; i++) {
+      const c: [number, number, number] = [buf[4 * i]!, buf[4 * i + 1]!, buf[4 * i + 2]!];
+      const base = sunspotFilamentBasisMirror(c, axis);
+      for (const th of [0.3, 1.7, -2.4]) {
+        const moved = sunspotFilamentBasisMirror(rot(c, th), axis);
+        const tR = rot(base.t, th);
+        const bR = rot(base.b, th);
+        for (let k = 0; k < 3; k++) {
+          expect(moved.t[k]).toBeCloseTo(tR[k]!, 12);
+          expect(moved.b[k]).toBeCloseTo(bR[k]!, 12);
+        }
+      }
+    }
+  });
+});
+
+describe('#1412 sun-shader 흑점 — 기록기 writeSunspotUniforms (결정 1 · 2)', () => {
+  it('vec4 배열 — xyz 단위벡터 · w = 2.5 × 물리 각반경 · 개수 뒤 0', () => {
+    const jd = 2456748.5;
+    const spots = createHeliographicSpots();
+    const n = generateHeliographicSunspots(jd, spots);
+    const buf = new Array<number>(4 * SUNSPOT_MAX).fill(7);
+    expect(writeSunspotUniforms(jd, buf)).toBe(n);
+    for (let i = 0; i < n; i++) {
+      const v = buf.slice(4 * i, 4 * i + 3);
+      expect(Math.hypot(v[0]!, v[1]!, v[2]!)).toBeCloseTo(1, 12);
+      // 장면 자전축과의 내적 = sin 위도.
+      const sinLat =
+        v[0]! * SUN_AXIS_SCENE[0] + v[1]! * SUN_AXIS_SCENE[1] + v[2]! * SUN_AXIS_SCENE[2];
+      expect(sinLat).toBeCloseTo(Math.sin((spots.latDeg[i]! * Math.PI) / 180), 12);
+      expect(buf[4 * i + 3]).toBeCloseTo(2.5 * spots.radiusRad[i]!, 15);
+    }
+    for (let k = 4 * n; k < 4 * SUNSPOT_MAX; k++) expect(buf[k]).toBe(0);
+  });
+
+  it('범위 밖 jd → 0 개 · 배열 전부 0', () => {
+    const buf = new Array<number>(4 * SUNSPOT_MAX).fill(3);
+    expect(writeSunspotUniforms(Number.NaN, buf)).toBe(0);
+    expect(buf.every((v) => v === 0)).toBe(true);
   });
 });

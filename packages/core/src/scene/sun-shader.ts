@@ -40,6 +40,12 @@
  *
  * **WebGPU↔WebGL parity**: GLSL 은 양 백엔드 동작 (Babylon GLSL→WGSL 변환 — ring/starfield/
  *   planet 선례). **switch-case 금지** (WGSL 변환 깨짐 — #756 이견 수용 1), if-else 만 사용.
+ *
+ * **#1412 흑점** (ADR `docs/decisions/20261025-1412-sunspots.md`): 흑점 목록은 CPU 가 만든다 (`sunspots.ts` —
+ *   jd 순수 함수). 셰이더는 `uniform vec4 spots[48]` (`xyz` 장면 단위벡터 중심 · `w` 반영 각반경 ×2.5) + `spotCount`
+ *   만 받아 상수 상한 루프로 원판 판정한다 (결정 1). jd 는 셰이더로 가지 않는다 (#782 규약). 합성은
+ *   `baseColor × granulation′ × spotFactor × limb` (결정 4). `spotCount = 0` 이면 흑점 도입 전과 같은 식이 된다
+ *   (`mix(x, y, 0) = x`, `× 1` — 소프트웨어 렌더 게이트 · `?sunspots=off` 의 경로).
  */
 
 import { Effect, ShaderMaterial, Vector3, type Scene } from '@babylonjs/core';
@@ -47,6 +53,13 @@ import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import { fbmMirror } from './procedural-planet-shader.js';
 import { hexToColor3 } from './color-utils.js';
 import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
+import {
+  SUNSPOT_MAX,
+  SUN_AXIS_SCENE,
+  createHeliographicSpots,
+  generateHeliographicSunspots,
+  heliographicToScene,
+} from './sunspots.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rendering-only 미학 상수 SSoT (#69 숨은 상수 drift 차단 — sun-shader.test.ts 가드 대상).
@@ -76,6 +89,86 @@ export const GRANULATION_SCALE = 48;
  * #FFE9A8 실측) 보존 우선 (#756 상수 철학 동형). 0 이면 단색과 동일, 과도하면 base 가 묻힘.
  */
 export const GRANULATION_CONTRAST = 0.12;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1412 흑점 — rendering-only 상수 SSoT (ADR 20261025-1412 결정 7: 색 · 반경비 · 필라멘트 · 배율은 본 모듈).
+// 출처 계수 · 극소 표 · 신생률 · 감쇠 주파수는 `sunspots.ts` 소유.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 흑점 크기 배율 — **각반경**에 곱한다 (면적으로는 6.25 배, 결정 1 · 사용자 Q2). 표시 근사다 (Visual Fidelity — 정보 카드
+ * 반지름은 실측 그대로). 수명 · 정렬 · 상한 판정은 물리 면적으로 하고, 배율은 uniform 기록 직전에만 곱한다.
+ */
+export const SUNSPOT_SIZE_EXAGGERATION = 2.5;
+
+/**
+ * 본영 · 반영의 조용한 광구 대비 파장 적분 휘도비 — 본영 약 20 % · 반영 약 75 % (Solanki, Inhester & Schüssler 2006,
+ * *Rep. Prog. Phys.* 69:563 §6.1).
+ */
+export const UMBRA_LUMINANCE_RATIO = 0.2;
+export const PENUMBRA_LUMINANCE_RATIO = 0.75;
+
+/** 태양 유효온도 [K] — IAU 2015 Resolution B3 (nominal). 휘도비 → 온도 (Stefan–Boltzmann `T = T☉ · 비^¼`) 의 기준. */
+export const SUN_EFFECTIVE_TEMPERATURE_K = 5772;
+
+/** 채널 대표 파장 [µm] — R 610 · G 550 · B 465 nm. **렌더 선택**이다 (출처 값 아님, 결정 4). */
+export const SUNSPOT_CHANNEL_WAVELENGTHS_UM = [0.61, 0.55, 0.465] as const;
+
+/** 제2 복사 상수 `c₂ = hc/k` [µm·K] (CODATA). Planck 비 계산용. */
+const PLANCK_C2_UM_K = 14387.77;
+
+/**
+ * Planck 비 `B(λ, T) / B(λ, T_ref)` — 같은 파장에서 온도 T 의 분광 복사휘도를 기준 온도 대비로 (결정 4 유도식).
+ * `B ∝ 1 / (exp(c₂/λT) − 1)` 이라 상수 인자는 소거된다.
+ */
+export function planckChannelRatio(
+  lambdaUm: number,
+  temperatureK: number,
+  referenceK: number,
+): number {
+  return (
+    (Math.exp(PLANCK_C2_UM_K / (lambdaUm * referenceK)) - 1) /
+    (Math.exp(PLANCK_C2_UM_K / (lambdaUm * temperatureK)) - 1)
+  );
+}
+
+/** 휘도비 → 채널 인자 RGB: `T = 5772 K × 비^¼` 의 Planck 비를 대표 파장 3개에서 (결정 4). */
+function spotChannelFactors(luminanceRatio: number): readonly [number, number, number] {
+  const t = SUN_EFFECTIVE_TEMPERATURE_K * Math.pow(luminanceRatio, 0.25);
+  const [r, g, b] = SUNSPOT_CHANNEL_WAVELENGTHS_UM;
+  return [
+    planckChannelRatio(r, t, SUN_EFFECTIVE_TEMPERATURE_K),
+    planckChannelRatio(g, t, SUN_EFFECTIVE_TEMPERATURE_K),
+    planckChannelRatio(b, t, SUN_EFFECTIVE_TEMPERATURE_K),
+  ];
+}
+
+/** 본영 채널 인자 (3860 K) — 약 `(0.130, 0.105, 0.070)`. */
+export const UMBRA_RGB = spotChannelFactors(UMBRA_LUMINANCE_RATIO);
+/** 반영 채널 인자 (5371 K) — 약 `(0.734, 0.711, 0.669)`. */
+export const PENUMBRA_RGB = spotChannelFactors(PENUMBRA_LUMINANCE_RATIO);
+
+/** 본영 반경 / 반영 반경 = `1/√5.5` — 반영 면적이 본영의 4~5 배 → 전체 5~6 배의 중간 (Solanki 2006 §6.1). */
+export const UMBRA_RADIUS_RATIO = 1 / Math.sqrt(5.5);
+
+/** 테두리 smoothstep 안쪽 경계 (반경 비례) — 반영 0.8~1.0 · 본영 0.6~1.0 (POC 시안 C). */
+export const PENUMBRA_EDGE_INNER = 0.8;
+export const UMBRA_EDGE_INNER = 0.6;
+
+/** 반영 안의 granulation 억제 비율 — `granulation′ = mix(granulation, 1, max(본영, 반영 × 0.7))` (결정 4). */
+export const PENUMBRA_GRANULATION_SUPPRESSION = 0.7;
+
+/** 반영 필라멘트 대비 (±) — 시안 C 승인값 (사용자 Q8). */
+export const FILAMENT_CONTRAST = 0.35;
+/** 필라멘트 방위 주파수 — 단위 방위 벡터 × 9 가 noise 입력 (시안 C 와 같은 줄무늬 밀도). */
+export const FILAMENT_AZIMUTH_FREQUENCY = 9.0;
+/** 필라멘트 noise 시드 배율 — `dot(c, sunAxis) × 17` (흑점마다 다른 noise 단면, 시안 C 의 17). */
+export const FILAMENT_SEED_SCALE = 17.0;
+
+/** GLSL 실수 리터럴 (정수값도 `.0` 을 붙인다 — GLSL ES 는 int → float 암묵 변환이 없다). */
+function glslFloat(n: number): string {
+  return Number.isInteger(n) ? `${n}.0` : `${n}`;
+}
 
 /** shader 이름 prefix — ShadersStore key 충돌 방지 (ring/starfield/planet 패턴 답습). */
 const SHADER_NAME = 'sunSurface';
@@ -163,6 +256,17 @@ uniform float granulationScale;
 uniform float granulationContrast;
 uniform vec3 cameraPosition;
 uniform float logDepthConstant;
+// #1412 흑점 (ADR 20261025-1412 결정 1 · 4). xyz = 장면 단위벡터 중심 · w = 반영 각반경 (×2.5 적용 후).
+uniform vec4 spots[${SUNSPOT_MAX}];
+uniform float spotCount;
+// 결정 3 — 광과민성 감쇠 가시도 0~1 (프레임 위상이 매 프레임 쓴다).
+uniform float spotVisibility;
+// 결정 4 — 필라멘트 접선 기저 · noise 시드의 기준 (태양 자전축, 장면 좌표 상수).
+uniform vec3 sunAxis;
+uniform vec3 umbraRgb;
+uniform vec3 penumbraRgb;
+uniform float umbraRadiusRatio;
+uniform float filamentContrast;
 
 // 3D hash — sin-free fract-mix (procedural-planet-shader.ts 와 동일 텍스트 — JS 미러 fbmMirror
 // 재사용 계약. 한쪽 수정 시 양쪽 + 미러 동기화 의무, sun-shader.test.ts 정적 가드).
@@ -217,8 +321,45 @@ void main(void) {
   float granule = fbm(p * granulationScale);
   float granulation = 1.0 + (granule - 0.5) * 2.0 * granulationContrast;
 
-  // emissive 합성 — 광원 shade 없음 (ADR §결정 4). 출력이 곧 발광색.
-  vec3 col = baseColor * granulation * limb;
+  // ── #1412 흑점 (ADR 20261025-1412 결정 1 · 4) — 상수 상한 루프 + 원판 판정 (현 거리 length(p − c)) ──
+  // 반영이 가장 진한 흑점 하나의 필라멘트만 쓴다 (겹침 시). spotCount = 0 이면 첫 반복에서 빠진다.
+  float penMask = 0.0;
+  float umbMask = 0.0;
+  float fil = 0.0;
+  for (int i = 0; i < ${SUNSPOT_MAX}; i++) {
+    if (float(i) >= spotCount) break;
+    vec4 spot = spots[i];
+    vec3 c = spot.xyz;
+    float rP = spot.w;
+    vec3 dv = p - c;
+    float d = length(dv);
+    if (d < rP) {
+      float pen = 1.0 - smoothstep(rP * ${glslFloat(PENUMBRA_EDGE_INNER)}, rP, d);
+      float rU = rP * umbraRadiusRatio;
+      float umb = 1.0 - smoothstep(rU * ${glslFloat(UMBRA_EDGE_INNER)}, rU, d);
+      if (pen > penMask) {
+        penMask = pen;
+        // 반영 필라멘트 — 방위각만의 noise (반경 방향으로 늘어진 줄무늬). 접선 기저는 자전축에 고정한다:
+        // t = 동서, b = 남북. 흑점이 자전축 둘레로 돌면 t · b 도 같이 돌아 무늬가 흑점에 붙어 다닌다 (결정 4).
+        // |cross(sunAxis, c)| = cos(위도) ≥ 0.707 (위도 < 45° — sunspots.test.ts D3) 라 특이점 분기가 없다.
+        vec3 t = normalize(cross(sunAxis, c));
+        vec3 b = cross(c, t);
+        vec2 az = vec2(dot(dv, t), dot(dv, b));
+        az = az / max(length(az), 1e-6);
+        // 시드 = sin(위도) — 흑점 수명 동안 상수 (배열 index 는 정렬로 바뀔 수 있어 쓰지 않는다).
+        fil = valueNoise(vec3(az * ${glslFloat(FILAMENT_AZIMUTH_FREQUENCY)}, dot(c, sunAxis) * ${glslFloat(FILAMENT_SEED_SCALE)})) - 0.5;
+      }
+      umbMask = max(umbMask, umb);
+    }
+  }
+  vec3 spotFactor = mix(vec3(1.0), penumbraRgb * (1.0 + filamentContrast * fil), penMask);
+  spotFactor = mix(spotFactor, umbraRgb, umbMask);
+  // 결정 3 — 감쇠. granulation 억제도 같은 가시도로 (가시도 0 = 흑점 없는 픽셀과 같은 식).
+  spotFactor = mix(vec3(1.0), spotFactor, spotVisibility);
+  granulation = mix(granulation, 1.0, max(umbMask, penMask * ${glslFloat(PENUMBRA_GRANULATION_SUPPRESSION)}) * spotVisibility);
+
+  // emissive 합성 — 광원 shade 없음 (ADR §결정 4). 출력이 곧 발광색. 흑점도 limb darkening 을 받는다 (#1412 결정 4).
+  vec3 col = baseColor * granulation * spotFactor * limb;
   // 안전 clamp — u ≤ 1 이라 limb ≥ 0 구조 보장이지만 granulation 상향 변조 (>1) 의 [0,1]
   // 이탈만 보정 (흰색 saturate — warm 색역 유지, 테스트 가드).
   col = clamp(col, 0.0, 1.0);
@@ -231,6 +372,14 @@ void main(void) {
 `;
 
 let shaderRegistered = false;
+
+/** #1412 — `createSunSurfaceMaterial` 이 만든 머티리얼 집합 (planet `isProceduralPlanetMaterial` 동형 — WeakSet 이라 GC 무간섭). */
+const sunSurfaceMaterials = new WeakSet<ShaderMaterial>();
+
+/** #1412 — 이 머티리얼이 태양 절차 표면 머티리얼인가 (흑점 uniform 을 받는가). */
+export function isSunSurfaceMaterial(material: unknown): material is ShaderMaterial {
+  return material instanceof ShaderMaterial && sunSurfaceMaterials.has(material);
+}
 
 /**
  * GLSL shader 를 Babylon `Effect.ShadersStore` 에 1회 등록 (ring/starfield/planet 패턴 답습).
@@ -285,9 +434,19 @@ export function createSunSurfaceMaterial(
         'granulationScale',
         'granulationContrast',
         'logDepthConstant',
+        // #1412 흑점 (ADR 20261025-1412 결정 1 · 3 · 4).
+        'spots',
+        'spotCount',
+        'spotVisibility',
+        'sunAxis',
+        'umbraRgb',
+        'penumbraRgb',
+        'umbraRadiusRatio',
+        'filamentContrast',
       ],
     },
   );
+  sunSurfaceMaterials.add(material);
 
   // base color (실측 colorHint.hex #FFE9A8) — 발광의 기준 (데이터 SSoT, read-only).
   const hex = body.colorHint?.hex ?? '#FFE9A8';
@@ -307,7 +466,45 @@ export function createSunSurfaceMaterial(
   const maxZ = scene.activeCamera?.maxZ ?? 1e14;
   material.setFloat('logDepthConstant', 2.0 / (Math.log(maxZ + 1.0) / Math.LN2));
 
+  // #1412 — 흑점 없음으로 시작한다 (`spotCount = 0`). 목록은 장면이 시간 위상 (`updateAt`) 에서 쓰고 (`setArray4` 에
+  // 장면 버퍼를 다시 묶는다), 가시도는 프레임 위상이 쓴다. 상수 uniform 은 여기서 한 번.
+  material.setArray4('spots', new Array<number>(4 * SUNSPOT_MAX).fill(0));
+  material.setFloat('spotCount', 0);
+  material.setFloat('spotVisibility', 1);
+  material.setVector3(
+    'sunAxis',
+    new Vector3(SUN_AXIS_SCENE[0], SUN_AXIS_SCENE[1], SUN_AXIS_SCENE[2]),
+  );
+  material.setVector3('umbraRgb', new Vector3(UMBRA_RGB[0], UMBRA_RGB[1], UMBRA_RGB[2]));
+  material.setVector3(
+    'penumbraRgb',
+    new Vector3(PENUMBRA_RGB[0], PENUMBRA_RGB[1], PENUMBRA_RGB[2]),
+  );
+  material.setFloat('umbraRadiusRatio', UMBRA_RADIUS_RATIO);
+  material.setFloat('filamentContrast', FILAMENT_CONTRAST);
+
   return material;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1412 — 기록기 (생성기 + 변환기 → vec4 배열)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 기록기 scratch — 생성기 출력 (모듈 재사용, 호출당 할당 0). */
+const writerSpots = createHeliographicSpots();
+
+/**
+ * #1412 기록기 — 장면 시계 jd 의 흑점을 `vec4` 배열 `out` (길이 `4 × SUNSPOT_MAX`) 에 쓰고 개수를 반환한다 (할당 0).
+ * `out[4i..4i+2]` = 장면 단위벡터 중심, `out[4i+3]` = `2.5 × √(2·10⁻⁶·A(t))` (반영 각반경, 결정 1). 개수 뒤는 0 으로 채운다.
+ */
+export function writeSunspotUniforms(jd: number, out: number[]): number {
+  const n = generateHeliographicSunspots(jd, writerSpots);
+  for (let i = 0; i < n; i++) {
+    heliographicToScene(writerSpots.latDeg[i]!, writerSpots.lonDeg[i]!, out, 4 * i);
+    out[4 * i + 3] = SUNSPOT_SIZE_EXAGGERATION * writerSpots.radiusRad[i]!;
+  }
+  for (let k = 4 * n; k < 4 * SUNSPOT_MAX; k++) out[k] = 0;
+  return n;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -365,6 +562,69 @@ export function sunColorMirror(
     clamp01(baseColor[1] * granulation * limb[1]),
     clamp01(baseColor[2] * granulation * limb[2]),
   ];
+}
+
+/** GLSL `smoothstep` 의 JS 미러 (edge0 < edge1 가정). */
+function smoothstepMirror(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * #1412 — 흑점 한 개의 FRAGMENT_SHADER 흑점 합성 (`spotFactor` · granulation 억제 가중치) 의 **순수 JS 미러**.
+ *
+ * @param chordDist 표면점 ↔ 흑점 중심 현 거리 `length(p − c)`
+ * @param penumbraRadius 반영 각반경 (uniform `w` — 배율 적용 후)
+ * @param filamentNoise GLSL `valueNoise(...) − 0.5` 값 (필라멘트 — noise 미러는 planet 쪽 비공개라 입력으로 받는다)
+ * @param visibility 감쇠 가시도 0~1
+ * @returns `factor` = 채널 인자 RGB, `granulationWeight` = `mix(granulation, 1, w)` 의 w
+ * ⚠️ FRAGMENT_SHADER 와 같은 식이어야 한다 (한쪽 수정 시 양쪽 동기화).
+ */
+export function sunspotShadeMirror(
+  chordDist: number,
+  penumbraRadius: number,
+  filamentNoise: number,
+  visibility: number,
+): { factor: readonly [number, number, number]; granulationWeight: number } {
+  let pen = 0;
+  let umb = 0;
+  if (chordDist < penumbraRadius) {
+    pen = 1 - smoothstepMirror(penumbraRadius * PENUMBRA_EDGE_INNER, penumbraRadius, chordDist);
+    const rU = penumbraRadius * UMBRA_RADIUS_RATIO;
+    umb = 1 - smoothstepMirror(rU * UMBRA_EDGE_INNER, rU, chordDist);
+  }
+  const fil = pen > 0 ? filamentNoise : 0;
+  const mix = (a: number, b: number, w: number): number => a * (1 - w) + b * w;
+  const factor = [0, 1, 2].map((ch) => {
+    const penCh = PENUMBRA_RGB[ch]! * (1 + FILAMENT_CONTRAST * fil);
+    const f = mix(mix(1, penCh, pen), UMBRA_RGB[ch]!, umb);
+    return mix(1, f, visibility);
+  }) as unknown as readonly [number, number, number];
+  return {
+    factor,
+    granulationWeight: Math.max(umb, pen * PENUMBRA_GRANULATION_SUPPRESSION) * visibility,
+  };
+}
+
+/**
+ * #1412 — 필라멘트 접선 기저 GLSL (`t = normalize(cross(sunAxis, c))` · `b = cross(c, t)`) 의 JS 미러.
+ * 흑점이 자전축 둘레로 돌면 `t` · `b` 도 같은 회전으로 돈다 (결정 4 — 무늬가 흑점에 붙어 다님).
+ */
+export function sunspotFilamentBasisMirror(
+  c: readonly [number, number, number],
+  axis: readonly [number, number, number],
+): { t: [number, number, number]; b: [number, number, number] } {
+  const tx = axis[1] * c[2] - axis[2] * c[1];
+  const ty = axis[2] * c[0] - axis[0] * c[2];
+  const tz = axis[0] * c[1] - axis[1] * c[0];
+  const len = Math.hypot(tx, ty, tz);
+  const t: [number, number, number] = [tx / len, ty / len, tz / len];
+  const b: [number, number, number] = [
+    c[1] * t[2] - c[2] * t[1],
+    c[2] * t[0] - c[0] * t[2],
+    c[0] * t[1] - c[1] * t[0],
+  ];
+  return { t, b };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -51,6 +51,8 @@ import {
 } from './belt-population.js';
 import { cometOrbitNormal, createCometTail, type CometTailHandles } from './comet-tail.js';
 import { createSunCorona, type SunCoronaHandles } from './sun-corona.js';
+import { isSunSurfaceMaterial, writeSunspotUniforms } from './sun-shader.js';
+import { SUNSPOT_MAX, createSunspotVisibilityState, stepSunspotVisibility } from './sunspots.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -319,6 +321,12 @@ export interface SolarSystemSceneHandles {
    * ⚠️ `setEnabled` 는 **토글 전용**이다 — LOD 추종은 프레임 위상이 `isVisible` 로 쓴다 (결정 4 의 1). 두 플래그를 합치지 않는다.
    */
   setSunCoronaVisible: (visible: boolean) => void;
+  /**
+   * #1412 — 태양 흑점 표시 토글 (ADR 20261025-1412 결정 2 수명주기 · 결정 5). 끄기 = `spotCount = 0` 기록, 켜기 = 현재 장면
+   * 시각의 목록을 즉시 기록 (일시정지 중에도 바로 보인다). 렌더러 종류는 묻지 않는다 (소프트웨어 게이트는 web 책임).
+   * `surfaceDetail = false` (`?surface=off`) 면 셰이더가 없어 no-op. 표시 패널 연결은 PR2.
+   */
+  setSunspotsVisible: (visible: boolean) => void;
   /**
    * #1341 — 궤적 trail 표시 토글 (ADR 20261015-1341 결정 T7 · T8). 처음 켤 때 지연 생성, 이후 `setEnabled` 만 바꾼다
    * (dispose 는 장면 dispose 때만). N-body 엔진 (`activeEngine !== 'kepler'`) 이면 의도만 기억하고 켜지 않는다 —
@@ -699,6 +707,13 @@ export interface SolarSystemSceneOptions {
    */
   sunCorona?: boolean;
   /**
+   * #1412 — 태양 흑점을 **로드 시** 켠다 (ADR 20261025-1412 결정 5). 기본 false (core 보수 기본). 유효 조건은
+   * `sunspots && surfaceDetail` — 흑점은 sun 절차 셰이더 (high · mid) 안에만 있다.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 5 · Q9) 는 호출자(web) 가 판정해 이 값으로만 전달한다.
+   */
+  sunspots?: boolean;
+  /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
    * BH tree / GPU compute 가속 효과 실측 가능. 기본 false (기존 Kepler 해석해 경로 유지).
@@ -918,6 +933,7 @@ export function createSolarSystemScene(
     kuiperBelt: kuiperBeltAtLoad = false,
     cometTails: cometTailsAtLoad = false,
     sunCorona: sunCoronaAtLoad = false,
+    sunspots: sunspotsAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -2088,6 +2104,43 @@ export function createSolarSystemScene(
   // 태양 코로나 (로드 시 꺼져 있으면 빈 구간).
   phase('scene:sun-corona');
 
+  // #1412 — 태양 흑점 (ADR 20261025-1412). 새 메시 · 새 옵저버 0 — 기록 대상은 sun high · mid 의 기존 절차 머티리얼이다.
+  //  - 목록 (`spots` · `spotCount`) 은 jd 의 함수라 시간 위상 (`updateAt`) 이 쓴다 (결정 2 갱신 위상).
+  //  - 가시도 (`spotVisibility`, 결정 3 감쇠) 는 시각이 멈춰도 갱신돼야 하므로 프레임 위상 (`runFramePass`) 이 쓴다.
+  //  - mid variant 는 LOD 첫 전환 때 지연 생성되므로 머티리얼을 저장하지 않고 쓸 때마다 찾는다. 처음 본 머티리얼은 프레임
+  //    위상에서 장면 버퍼를 묶는다 (`setArray4` 는 참조 저장 — 이후 버퍼 제자리 갱신이 그대로 업로드된다).
+  //  - 해제: 머티리얼 dispose 와 함께 사라진다. 버퍼 · 상태는 장면 클로저 소유.
+  let sunspotsEnabled = sunspotsAtLoad;
+  let sunspotCount = 0;
+  const sunspotUniforms = new Array<number>(4 * SUNSPOT_MAX).fill(0);
+  const sunspotBoundMaterials = new WeakSet<object>();
+  const sunspotVisibility = createSunspotVisibilityState();
+  const bindSunspotMaterial = (material: unknown): void => {
+    if (!isSunSurfaceMaterial(material)) return;
+    if (!sunspotBoundMaterials.has(material)) {
+      material.setArray4('spots', sunspotUniforms);
+      sunspotBoundMaterials.add(material);
+    }
+    material.setFloat('spotCount', sunspotCount);
+  };
+  /** 시간 위상 — 장면 시계 jd 의 흑점 목록을 기록한다 (`surfaceDetail = false` 면 셰이더가 없어 no-op). */
+  const writeSunspots = (clockJd: number): void => {
+    if (!surfaceDetail) return;
+    sunspotCount = sunspotsEnabled ? writeSunspotUniforms(clockJd, sunspotUniforms) : 0;
+    bindSunspotMaterial(meshes.get('sun')?.material);
+    bindSunspotMaterial(midVariants.get('sun')?.material);
+  };
+  /** 프레임 위상 — 감쇠 가시도 갱신 + 지연 생성된 variant 머티리얼 묶기 (결정 3). */
+  const syncSunspotFrame = (): void => {
+    if (!surfaceDetail) return;
+    const visibility = stepSunspotVisibility(sunspotVisibility, currentClockJd, performance.now());
+    for (const material of [meshes.get('sun')?.material, midVariants.get('sun')?.material]) {
+      if (!isSunSurfaceMaterial(material)) continue;
+      if (!sunspotBoundMaterials.has(material)) bindSunspotMaterial(material);
+      material.setFloat('spotVisibility', visibility);
+    }
+  };
+
   // #1341 — 궤적 trail (ADR 20261015-1341 결정 T1 ~ T10). 기본 꺼짐 — 로드 시 아무것도 만들지 않는다 (결정 T10).
   //  - 점 출처: Kepler 해석해, E 등간격, 무상태 (`trail-sampling.ts`). 대상 = 궤도선과 같은 집합 (결정 T9).
   //  - 정점 기록은 body `mesh.position` 을 쓰는 **두 지점** (`updateAt` · `setTier`) 에서만 — `syncTrails` (결정 T3).
@@ -2739,6 +2792,9 @@ export function createSolarSystemScene(
     // #1341 결정 R2 — 자 선 끝점도 같은 스냅샷 기준계로.
     syncRuler(ox, oy, oz, sceneUnitPerMeter);
 
+    // #1412 결정 2 — 흑점 목록 (장면 시계 — 자전과 같은 축, ADR 1370 §결정 P). 감쇠는 프레임 위상 몫.
+    writeSunspots(clockJd);
+
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
     //
@@ -3308,7 +3364,8 @@ export function createSolarSystemScene(
    * 카메라만 움직이는 프레임의 갱신 소유자이며, ADR
    * `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 2 의 멤버십 3조건
    * (카메라/뷰포트 종속 · 시간이 멈춰도 의미 있음 · 멱등) 을 전건 충족하는 것만 들어온다.
-   * **현재 멤버는 `runLodPass` 하나뿐이다.** 늘리기 전에 그 3조건 판정을 ADR 에 박제할 것.
+   * **멤버는 `runLodPass` 와 `syncSunspotFrame` (#1412) 둘이다.** 늘리기 전에 그 3조건 판정을 ADR 에 박제할 것.
+   * `syncSunspotFrame` 의 판정은 ADR 1205 Amendment 1 (조건 2 만 충족 — 조건 1 · 3 은 명시 예외, 근거는 ADR 1412 결정 2 · 3).
    *
    * 아래 hook 책임 서술은 #1205 이전 `updateAt` 안 P11-B #289 hook 자리에 있던 것을 옮겨온 것이다.
    *
@@ -3327,6 +3384,8 @@ export function createSolarSystemScene(
     if (cam) {
       runLodPass(cam);
     }
+    // #1412 결정 3 — 흑점 감쇠 (LOD 뒤 — 이번 프레임에 지연 생성된 mid variant 머티리얼도 같은 프레임에 묶인다).
+    syncSunspotFrame();
   };
 
   // P11-B #289 — LOD API 외부 노출.
@@ -3606,6 +3665,13 @@ export function createSolarSystemScene(
     sunCorona?.mesh.setEnabled(false);
   };
 
+  // #1412 결정 2 수명주기 · 결정 5 — 흑점 런타임 토글. 끄기 = `spotCount = 0`, 켜기 = 현재 장면 시각 목록 즉시 기록.
+  const setSunspotsVisible = (visible: boolean) => {
+    if (sunspotsEnabled === visible) return;
+    sunspotsEnabled = visible;
+    writeSunspots(currentClockJd);
+  };
+
   // #1341 결정 T7 · T10 — 궤적 trail 런타임 토글. 기본 꺼짐 · 처음 켤 때 지연 생성 · 이후 `setEnabled`.
   const setTrailsVisible = (visible: boolean) => {
     trailsVisible = visible;
@@ -3761,6 +3827,7 @@ export function createSolarSystemScene(
     setKuiperBeltVisible,
     setCometTailsVisible,
     setSunCoronaVisible,
+    setSunspotsVisible,
     setTrailsVisible,
     setTrailDirection,
     getTier,
