@@ -35,6 +35,7 @@ import { parseCloudsVisible } from '@/core/parse-cloud-mode';
 import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/parse-belt-mode';
 import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-comet-tails-mode';
 import { parseCoronaParam, resolveCoronaAtLoad } from '@/core/parse-corona-mode';
+import { parseSunspotsVisible, resolveSunspotsAtLoad } from '@/core/parse-sunspots-mode';
 import { parseTrailsVisible } from '@/core/parse-trails-mode';
 import { parseConstellationsVisible } from '@/core/parse-constellations-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
@@ -669,6 +670,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #1335 — 태양 코로나 (ADR 20261014-1335 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 미지정 켜짐 · `off` 꺼짐 · `force` 켜짐 + 소프트웨어 렌더 게이트 우회 (CI 셰이더 실행 경로 — Q7).
         const coronaMode = parseCoronaParam(beltUrl.get('corona'));
+        // #1412 — 태양 흑점 (ADR 20261025-1412 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // 미지정 켜짐 · `off` 꺼짐 (`force` 없음 — CI 강제 셀을 만들지 않는다). 표시 패널 토글은 PR2.
+        const sunspotsParamVisible = parseSunspotsVisible(beltUrl.get('sunspots'));
         // #1341 — 궤적 trail (ADR 20261015-1341 결정 T10). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 기본 꺼짐 · `on` 옵트인. 로드 시 생성하지 않고 아래 핸들러 등록 블록에서 의도만 scene 에 넘긴다 (지연 생성).
         const trailsParamVisible = parseTrailsVisible(beltUrl.get('trails'));
@@ -851,6 +855,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             coronaMode.forced,
             !isSoftwareRenderer,
           ),
+          // #1412 — 태양 흑점. 소프트웨어 렌더 게이트는 여기서 (결정 5 · Q9 — core 는 렌더러를 모른다).
+          sunspots: resolveSunspotsAtLoad(sunspotsParamVisible, !isSoftwareRenderer),
           grMode,
           integrator,
           ringRenderMode,

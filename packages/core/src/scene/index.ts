@@ -85,6 +85,17 @@ export {
   CORONA_OUTER_RHO,
 } from './sun-corona.js';
 export type { SunCoronaHandles, SunCoronaUniforms, SunCoronaFrame } from './sun-corona.js';
+// #1412 — 태양 흑점 (ADR 20261025-1412). 생성기 · 변환기는 Babylon 비의존, 기록기는 sun 셰이더 소유.
+export {
+  SUNSPOT_MAX,
+  SUN_AXIS_SCENE,
+  createHeliographicSpots,
+  generateHeliographicSunspots,
+  heliographicToScene,
+  sunspotEffectiveHz,
+} from './sunspots.js';
+export type { HeliographicSpots } from './sunspots.js';
+export { SUNSPOT_SIZE_EXAGGERATION, writeSunspotUniforms } from './sun-shader.js';
 // #1341 — 궤적 trail (ADR 20261015-1341). 샘플러는 Babylon 비의존.
 export { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
 export type { TrailLinesHandles } from './trail-lines.js';
