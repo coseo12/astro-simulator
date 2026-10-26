@@ -53,7 +53,7 @@
  *   장면 준비  UI 페이지마다 부팅 직후 `displayCapabilities !== null` (sim-canvas 가 여는 제품 가용성 게이트 — 게이트다).
  *   D1   모드 4종 (`?mode=` 진입) × 1280×720 — 트리거 1 개 · 클릭 시 `aria-expanded="true"` · `aria-pressed` 토글 전부 가시
  *        (`UI_IDS` — #1293 이 이름 라벨을, #1319 PR3 이 소행성대 · 카이퍼 벨트를, #1329 PR2 가 혜성 꼬리를, #1335 PR2 가
- *        태양 코로나를, #1341 PR1 이 궤적을, #1347 이 시간 사건 마커를, #1373 PR2 가 별자리를 더해 12 개).
+ *        태양 코로나를, #1341 PR1 이 궤적을, #1347 이 시간 사건 마커를, #1373 PR2 가 별자리를, #1412 PR2 가 태양 흑점을 더해 13 개).
  *   D2   같은 페이지 — 우측 그룹 버튼 전부 `x + width ≤ 1280` · 좌측 단축 바 버튼 전부 스크롤로 도달 + 그 지점 hit.
  *   D3   패널 궤도선 ↔ 단축 바 `toggle-orbits` ↔ `store.orbitLinesVisible` — 어느 쪽을 눌러도 세 값 일치.
  *   D4   관찰 모드 · 패널 열림 · 4 초 무입력 → 상단 바 computed `opacity === "1"`.
@@ -238,7 +238,7 @@ const READY_TIMEOUT_MS = 20_000;
 /** UI 판정 기본 로드 — D15 스트레스와 같은 쿼리 (4 효과 전부 켜진 상태 · focus=earth · 관찰 모드). */
 const UI_BASE = STRESS;
 /** D11 — 패널 키를 전부 끈 로드 (로드 직후 URL 불변 · `?orbits=off` 북마크 불일치 해소). #1293 `labels` · #1347 `events` 포함. */
-const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off&events=off`;
+const UI_ALL_OFF = `${UI_BASE}&stars=off&clouds=off&nightlights=off&orbits=off&labels=off&belt=off&kuiper=off&comettails=off&corona=off&sunspots=off&events=off`;
 /** 계약 D1 — 모드 4종. */
 const UI_MODES = ['observe', 'research', 'education', 'sandbox'];
 /** 계약 D1 · D2 — 1280×720 (`setupPage` · `setupUiPage` 뷰포트와 같은 값). */
@@ -698,18 +698,20 @@ const UI_URL_KEY = {
   constellations: 'constellations',
   clouds: 'clouds',
   nightLights: 'nightlights',
-  // #1293 — 이름 라벨 (web 전용 5번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
+  // #1293 — 이름 라벨 (web 전용 6번째 행). 표시 패널 토글 집합이 늘면 여기도 같이 는다 (D1 개수 · D14 순회 · D11 왕복).
   labels: 'labels',
-  // #1319 PR3 — 소행성대 · 카이퍼 벨트 (6 · 7번째 행). 소프트웨어 렌더에서는 별과 같이 가용성이 막는다 (ADR 20261008-1319 결정 3).
+  // #1319 PR3 — 소행성대 · 카이퍼 벨트 (7 · 8번째 행). 소프트웨어 렌더에서는 별과 같이 가용성이 막는다 (ADR 20261008-1319 결정 3).
   belt: 'belt',
   kuiper: 'kuiper',
-  // #1329 PR2 — 혜성 꼬리 (8번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261010-1329 결정 4).
+  // #1329 PR2 — 혜성 꼬리 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261010-1329 결정 4).
   cometTails: 'comettails',
-  // #1335 PR2 — 태양 코로나 (9번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
+  // #1335 PR2 — 태양 코로나 (10번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261014-1335 결정 5).
   corona: 'corona',
-  // #1341 PR1 — 궤적 (10번째 행). **유일한 기본 꺼짐 행** (ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
+  // #1412 PR2 — 태양 흑점 (11번째 행). 소프트웨어 렌더에서는 가용성이 막는다 (ADR 20261025-1412 결정 5 · Q9).
+  sunspots: 'sunspots',
+  // #1341 PR1 — 궤적 (12번째 행). 기본 꺼짐 행 — 별자리 (#1373) 와 둘 (`DEFAULT_OFF_IDS`, ADR 20261015-1341 결정 T10 — 켜짐 = `on`, 꺼짐 = 키 삭제).
   trails: 'trails',
-  // #1347 — 시간 사건 마커 (11번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
+  // #1347 — 시간 사건 마커 (13번째 행). web 전용 · 기본 켜짐 (`?events=off` 옵트아웃 — ADR 20261016-1347 결정 D7).
   events: 'events',
 };
 const UI_IDS = Object.keys(UI_URL_KEY);
@@ -720,8 +722,19 @@ const UI_IDS = Object.keys(UI_URL_KEY);
  */
 const DEFAULT_OFF_IDS = ['trails', 'constellations'];
 const UI_DEFAULT_ON_IDS = UI_IDS.filter((id) => !DEFAULT_OFF_IDS.includes(id));
-/** 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다 (D9 · #1319 PR3 D9b · #1329 PR2 D9c · #1335 PR2 D9d). */
-const SOFTWARE_GATED_IDS = ['stars', 'constellations', 'belt', 'kuiper', 'cometTails', 'corona'];
+/**
+ * 소프트웨어 렌더에서 가용성이 막는 토글 — URL 계약 (D11) 은 하드웨어에서만 잰다. 전용 게이트가 있는 행: 별 D9 · 띠 D9b (#1319 PR3) ·
+ * 혜성 꼬리 D9c (#1329 PR2) · 코로나 D9d (#1335 PR2). 별자리 (#1373 PR2) · 흑점 (#1412 PR2) 은 전용 D9x 게이트가 없고 D11 제외로만 쓴다.
+ */
+const SOFTWARE_GATED_IDS = [
+  'stars',
+  'constellations',
+  'belt',
+  'kuiper',
+  'cometTails',
+  'corona',
+  'sunspots',
+];
 
 /** 패널 열림/닫힘을 트리거 클릭으로 맞춘다. 결과(패널 개수)는 호출부가 판정한다. */
 async function setPanelOpen(page, open) {
