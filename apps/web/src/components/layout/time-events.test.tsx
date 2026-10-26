@@ -59,6 +59,7 @@ const CAPS = {
   belt: true,
   cometTails: true,
   corona: true,
+  sunspots: true,
   trails: true,
 };
 const J2000 = 2_451_545.0;

@@ -23,7 +23,7 @@ export interface TourStoreState {
    * (`UrlSync` 초기 effect) 과 목록 버튼이 같은 경로를 쓴다 (ADR 결정 · URL — 초기 적용 진입점 단일).
    */
   pendingStart: { tourId: string; stepIndex: number } | null;
-  /** 투어 시작 순간의 표시 의도 12종 — 종료 시 복원 (결정 Q7). */
+  /** 투어 시작 순간의 표시 의도 (표 행 전부) — 종료 시 복원 (결정 Q7). */
   displaySnapshot: DisplayIntents | null;
   /** 투어 시작 순간의 표시 URL 키 원문 — 종료 시 그대로 되돌린다 (`null` = 키 없음). */
   displayUrlSnapshot: Readonly<Record<string, string | null>> | null;

@@ -24,7 +24,7 @@ import {
 import type { FocusViewRequest, SimStoreState } from '@/store/sim-store';
 import { TOUR_OVERVIEW, type TourStep } from './types';
 
-/** 표시 토글 의도 12종 (표 행 전부). 투어 시작 스냅샷 · 현재 store 의도를 같은 형식으로 다룬다. */
+/** 표시 토글 의도 (표 행 전부). 투어 시작 스냅샷 · 현재 store 의도를 같은 형식으로 다룬다. */
 export type DisplayIntents = Readonly<Record<DisplayToggleId, boolean>>;
 
 const HOURS_PER_DAY = 24;
@@ -74,7 +74,7 @@ export type TourPlan =
     }
   | { ok: false; reason: string };
 
-/** store → 표시 의도 12종. 표 (`display-toggles.ts`) 를 순회하므로 행을 더해도 고칠 곳이 없다. */
+/** store → 표시 의도 (표 행 전부). 표 (`display-toggles.ts`) 를 순회하므로 행을 더해도 고칠 곳이 없다. */
 export function readDisplayIntents(
   state: Pick<SimStoreState, (typeof DISPLAY_TOGGLES)[number]['intentKey']>,
 ): DisplayIntents {

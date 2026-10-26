@@ -69,6 +69,7 @@ const CAPS = {
   belt: true,
   cometTails: true,
   corona: true,
+  sunspots: true,
   trails: true,
 };
 
@@ -216,7 +217,7 @@ const HOURS_PER_DAY = 24;
 describe.each(TOURS.map((t) => [t.id, t] as const))(
   'TourCard — 전 단계 상태 (E2) · %s',
   (_id, tour: TourDef) => {
-    it('단계마다 포커스 · 시각 · 배속 · 시점 요청 · 표시 의도 12종 · 거리 자 = 단계 선언, 이탈 0', async () => {
+    it('단계마다 포커스 · 시각 · 배속 · 시점 요청 · 표시 의도 13종 · 거리 자 = 단계 선언, 이탈 0', async () => {
       const snapshot = { ...INITIAL_INTENTS, starsVisible: false } as Record<string, boolean>;
       render(<TourCard />);
       await act(async () => {
@@ -477,7 +478,7 @@ describe('TourCard — 이탈 (E4)', () => {
 });
 
 describe('TourCard — 종료 복원 (E5)', () => {
-  it('종료 · 모드 전환 — 표시 의도 12종 = 시작 전, 표시 URL 키 = 시작 전 원문 (투어 중 패널 직접 조작 포함)', async () => {
+  it('종료 · 모드 전환 — 표시 의도 13종 = 시작 전, 표시 URL 키 = 시작 전 원문 (투어 중 패널 직접 조작 포함)', async () => {
     const before = { ...useSimStore.getState() };
     await startEclipse();
     // 2단계 (궤도선 끔) 에서 끝낸다 — 투어가 바꾼 토글도 되돌아와야 한다.
@@ -487,16 +488,19 @@ describe('TourCard — 종료 복원 (E5)', () => {
     act(() => {
       useSimStore.getState().setStarsVisible(true);
       useSimStore.getState().setTrailsVisible(true);
+      // #1412 PR2 — 흑점 (어느 투어도 지정하지 않는 행) 도 시작 전 값으로 돌아와야 한다.
+      useSimStore.getState().setSunspotsVisible(false);
     });
     act(() => fireEvent.click(screen.getByTestId('tour-close')));
     const after = useSimStore.getState();
     for (const def of DISPLAY_TOGGLES) {
       expect(after[def.intentKey], def.id).toBe(before[def.intentKey]);
     }
-    // URL — 시작 전 원문 (`?stars=off`, 나머지 키 없음) 을 12키 전부 다시 쓴다.
+    // URL — 시작 전 원문 (`?stars=off`, 나머지 키 없음) 을 13키 (#1412 PR2 `sunspots` 포함) 전부 다시 쓴다.
     const urlCall = setDisplayUrl.mock.calls.at(-1)![0] as Record<string, string | null>;
     expect(urlCall.stars).toBe('off');
-    expect(Object.keys(urlCall)).toHaveLength(12);
+    expect(Object.keys(urlCall)).toHaveLength(13);
+    expect(urlCall).toHaveProperty('sunspots', null);
     expect(
       Object.entries(urlCall)
         .filter(([k]) => k !== 'stars')

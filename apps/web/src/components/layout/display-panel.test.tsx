@@ -30,6 +30,7 @@ const IDS = [
   'kuiper',
   'cometTails',
   'corona',
+  'sunspots',
   'trails',
   'events',
 ] as const;
@@ -55,6 +56,7 @@ beforeEach(() => {
     kuiperVisible: true,
     cometTailsVisible: true,
     coronaVisible: true,
+    sunspotsVisible: true,
     // #1341 — 기본은 꺼짐이지만 이 파일의 전제 (전 토글 ON) 에 맞춘다.
     trailsVisible: true,
     eventsVisible: true,
@@ -64,6 +66,7 @@ beforeEach(() => {
       belt: true,
       cometTails: true,
       corona: true,
+      sunspots: true,
       trails: true,
     },
     displayPanelOpen: false,
@@ -364,6 +367,7 @@ describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -413,6 +417,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -441,6 +446,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -478,6 +484,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -515,6 +522,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });
@@ -544,6 +552,44 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(sentCommands.at(-1)).toEqual({ type: 'setSunCoronaVisible', visible: true });
   });
 
+  it('#1412 PR2 소프트웨어 렌더 — 태양 흑점: aria-disabled + 흑점 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 5)', () => {
+    useSimStore.setState({
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+        corona: false,
+        sunspots: false,
+        trails: true,
+      },
+    });
+    renderPanel();
+    openPanel();
+    const el = toggleEl('sunspots');
+    expect(el).toHaveAttribute('aria-disabled', 'true');
+    expect(el).not.toBeDisabled();
+    expect(el).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.softwareRendererSunspots);
+    expect(el).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRendererSunspots);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(el);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    expect(sentCommands).toEqual([]);
+  });
+
+  it('#1412 PR2 하드웨어 — 태양 흑점 클릭 → aria-pressed 반전 + 명령 (코로나 행은 그대로)', () => {
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '태양 흑점' })).toBe(toggleEl('sunspots'));
+    fireEvent.click(toggleEl('sunspots'));
+    expect(toggleEl('sunspots')).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleEl('corona')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setSunspotsVisible', visible: false }]);
+    fireEvent.click(toggleEl('sunspots'));
+    expect(toggleEl('sunspots')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands.at(-1)).toEqual({ type: 'setSunspotsVisible', visible: true });
+  });
+
   it('#1341 PR1 궤적 — 클릭 → aria-pressed 반전 + 명령 / N-body 엔진이면 aria-disabled + 엔진 사유 · 클릭 no-op (D9)', () => {
     useSimStore.setState({ trailsVisible: false });
     renderPanel();
@@ -562,6 +608,7 @@ describe('DisplayPanel — 토글 분기', () => {
           belt: true,
           cometTails: true,
           corona: true,
+          sunspots: true,
           trails: false,
         },
       }),
@@ -574,7 +621,7 @@ describe('DisplayPanel — 토글 분기', () => {
     expect(toggleEl('orbits')).toHaveAttribute('aria-disabled', 'false');
   });
 
-  it('?surface=off — 구름·불빛 aria-disabled + 사유, 클릭 no-op (D10)', () => {
+  it('?surface=off — 구름·불빛·흑점 aria-disabled + 사유, 클릭 no-op (D10 · #1412 PR2)', () => {
     useSimStore.setState({
       displayCapabilities: {
         starfield: true,
@@ -582,12 +629,14 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: true,
         cometTails: true,
         corona: true,
+        sunspots: true,
         trails: true,
       },
     });
     renderPanel();
     openPanel();
-    for (const id of ['clouds', 'nightLights'] as const) {
+    // #1412 PR2 — 태양 흑점도 sun 절차 셰이더가 없어 같은 표면 사유로 막힌다 (결정 5).
+    for (const id of ['clouds', 'nightLights', 'sunspots'] as const) {
       expect(toggleEl(id)).toHaveAttribute('aria-disabled', 'true');
       expect(toggleEl(id)).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.surfaceOff);
       fireEvent.click(toggleEl(id));
@@ -604,6 +653,7 @@ describe('DisplayPanel — 토글 분기', () => {
         belt: false,
         cometTails: false,
         corona: false,
+        sunspots: false,
         trails: true,
       },
     });

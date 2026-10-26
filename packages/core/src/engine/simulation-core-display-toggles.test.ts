@@ -24,7 +24,8 @@ type ToggleType =
   | 'setCometTailsVisible'
   | 'setSunCoronaVisible'
   | 'setTrailsVisible'
-  | 'setConstellationsVisible';
+  | 'setConstellationsVisible'
+  | 'setSunspotsVisible';
 type Register = (core: SimulationCore, handler: (visible: boolean) => void) => void;
 
 const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
@@ -45,6 +46,8 @@ const CASES: ReadonlyArray<{ type: ToggleType; register: Register }> = [
     type: 'setConstellationsVisible',
     register: (c, h) => c.setConstellationsVisibleHandler(h),
   },
+  // #1412 PR2 — 태양 흑점 토글 (같은 5 케이스 + 교차 라우팅 0).
+  { type: 'setSunspotsVisible', register: (c, h) => c.setSunspotsVisibleHandler(h) },
 ];
 
 describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, register }) => {
@@ -104,7 +107,7 @@ describe.each(CASES)('SimulationCore $type command 라우팅 (#1265)', ({ type, 
 });
 
 describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
-  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 10종 — #1319 PR3 띠 2종 · #1329 혜성 꼬리 · #1335 코로나 · #1341 trail · #1373 별자리)', () => {
+  it('각 명령은 자기 효과의 핸들러만 부른다 (궤도선 포함 11종 — #1319 PR3 띠 2종 · #1329 혜성 꼬리 · #1335 코로나 · #1341 trail · #1373 별자리 · #1412 흑점)', () => {
     const core = new SimulationCore(makeCanvas());
     const handlers = {
       setOrbitLinesVisible: vi.fn(),
@@ -118,6 +121,7 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
       setSunCoronaVisible: vi.fn(),
       setTrailsVisible: vi.fn(),
       setConstellationsVisible: vi.fn(),
+      setSunspotsVisible: vi.fn(),
     };
     core.setOrbitLinesVisibleHandler(handlers.setOrbitLinesVisible);
     core.setStarfieldVisibleHandler(handlers.setStarfieldVisible);
@@ -129,6 +133,7 @@ describe('SimulationCore 표시 토글 — 교차 라우팅 0 (#1265)', () => {
     core.setSunCoronaVisibleHandler(handlers.setSunCoronaVisible);
     core.setTrailsVisibleHandler(handlers.setTrailsVisible);
     core.setConstellationsVisibleHandler(handlers.setConstellationsVisible);
+    core.setSunspotsVisibleHandler(handlers.setSunspotsVisible);
 
     for (const type of Object.keys(handlers) as (keyof typeof handlers)[]) {
       for (const h of Object.values(handlers)) h.mockClear();

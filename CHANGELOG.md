@@ -11,12 +11,17 @@ Semantic Versioning을 따른다.
   - 신규 모듈 `packages/core/src/scene/sunspots.ts` (생성기 `generateHeliographicSunspots` · 변환기 `heliographicToScene` · 감쇠 `stepSunspotVisibility`). 기록기 `writeSunspotUniforms` 는 `sun-shader.ts` 에 있다 (크기 배율이 셰이더 상수라서).
   - 장면 옵션 `sunspots` (core 기본 `false`) 와 `setSunspotsVisible`. web 은 `?sunspots=off` 로 끄고 (`parse-sunspots-mode.ts`), 소프트웨어 렌더에서는 흑점 0 개로 막는다. 표시 패널 토글은 PR2.
   - 표시 근사: 흑점 크기는 각반경 ×2.5 (면적 6.25 배) 이고, 흑점 위치 · 크기 · 개수는 통계 모델이라 특정 날짜의 실제 흑점과 같지 않다. 신생률 · 크기 분포 계수 일부는 POC 육안 승인값이다. 정보 카드 반지름은 그대로다.
+- **[#1412] 표시 패널에 「태양 흑점」 토글 (PR2)** ([#1412](https://github.com/coseo12/astro-simulator/issues/1412)). 표시 토글 표에서 태양 코로나 바로 다음 행이다 (표는 13행). 끄면 URL 에 `sunspots=off` 를 쓰고 켜면 키를 지운다 (ADR 1265 결정 5 어휘 — 역방향 파서는 PR1 `parseSunspotsVisible`). 가용성은 ADR 1412 결정 5 의 `surfaceDetail && !isSoftwareRenderer` 다 — 소프트웨어 렌더면 「소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 흑점을 표시하지 않습니다」, `?surface=off` 면 기존 표면 사유로 `aria-disabled` 가 된다 (두 축이 다 막히면 렌더러 사유).
+  - core 명령 `setSunspotsVisible` · `SimulationCore.setSunspotsVisibleHandler` · store `sunspotsVisible` · 가용성 필드 `displayCapabilities.sunspots` (`!isSoftwareRenderer`). sim-canvas 가 PR1 장면 핸들 `setSunspotsVisible` 에 잇는다.
+  - 교육 투어는 흑점을 지정하지 않는다. 투어 엔진은 표를 순회하므로 흑점도 시작 스냅샷 · 단계 전환 · 종료 복원 (의도 + URL 키) 에 들어가고, 지정하지 않은 토글이라 투어 중 사용자가 바꿔도 이탈로 세지 않는다 (기존 규칙).
 
 ### Behavior Changes
 
 - **하드웨어 렌더의 태양 표면이 바뀐다** (#1412). LOD high · mid 의 태양에 흑점이 보이고, 재생하면 흑점이 자전하며 생기고 사라진다. `?surface=off` · LOD low · tier C · 소프트웨어 렌더 · `?sunspots=off` 에서는 흑점이 없다.
 - **빠른 재생 · 빠른 스크러빙에서 흑점이 사라진다** (#1412 결정 3 · Amendment 1). 직전 `1/6 s` 창의 실효 자전 주파수 `|Δjd|/Δt × 14.522/360` 가 3 Hz 를 넘는 판정이 `1/6 s` 이어지면 흑점 가시도가 초당 6 의 속도로 0 이 되고, 3 Hz 이하가 같은 시간 이어지면 1 로 돌아온다 (WCAG 2.2 SC 2.3.1). `1M` 프리셋은 1.21 Hz 라 보이고 `1y` 는 14.73 Hz 라 사라진다. 스크러버 드래그 · 키 반복처럼 점프가 1 초에 약 6 회를 넘게 이어지면 사라지고, 날짜 입력 같은 단발 점프에서는 그대로 보인다.
 - `verify:774-sun` 의 태양 쿼리 2곳에 `&sunspots=off` 를 붙였다 (ADR 1412 결정 6). 판정량은 그대로다.
+- **표시 패널 토글이 13개가 된다** (#1412 PR2). 흑점을 런타임에 끄고 켤 수 있고, 끈 상태는 URL · 북마크 · 새로고침으로 이어진다. 로컬 실측 1회 (macOS · Apple M1 Pro · Chrome 155 headed · WebGPU, `?t=2456748.5&speed=0&focus=sun`, 기본 시점과 카메라 radius 8 두 시점): 차이 픽셀 = 캔버스 요소 캡처 1280×720 전체 (DOM 오버레이 숨김) 에서 RGB 중 한 채널이라도 값이 다른 픽셀 수. 패널 끔 ↔ `?sunspots=off` 로드, 다시 켬 ↔ 처음 로드가 두 시점 모두 0 이고, 같은 술어로 흑점 켬 ↔ 끔은 110 · 435 다 (양성 대조). CI (swiftshader) 는 흑점이 0 개라 이 대조를 하지 않는다.
+- `verify:1265-display-panel` 의 토글 집합에 `sunspots` 를 더했다 (D1 개수 · D11 URL · D14 Tab 순회 · D15 스트레스 — 소프트웨어 렌더 게이트 집합 포함). 새 게이트는 없다.
 
 ### Notes
 

@@ -77,6 +77,9 @@ export type CoreEvents = {
  * #1373 PR2 — `setConstellationsVisible` 추가. 별자리 선 · 이름의 런타임 토글 (ADR
  * `docs/decisions/20261018-1373-star-catalog-constellations.md` 결정 T1 — 기본 꺼짐). 소프트웨어 렌더 게이트 (결정 R5) 는
  * 별 배경과 같이 web 이 한다.
+ *
+ * #1412 PR2 — `setSunspotsVisible` 추가. 태양 흑점의 런타임 토글 (ADR
+ * `docs/decisions/20261025-1412-sunspots.md` 결정 5 · 사용자 결정 Q6). 소프트웨어 렌더 · `?surface=off` 게이트는 web 이 한다.
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -100,4 +103,5 @@ export type CoreCommand =
   | { type: 'setSunCoronaVisible'; visible: boolean }
   | { type: 'setTrailsVisible'; visible: boolean }
   | { type: 'setConstellationsVisible'; visible: boolean }
+  | { type: 'setSunspotsVisible'; visible: boolean }
   | { type: 'setRuler'; anchorId: string | null; targetId: string | null };
