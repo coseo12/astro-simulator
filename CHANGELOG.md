@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.107.0] - 2026-10-26
+
 ### Added
 
 - **[#1412] 태양 표면에 흑점을 그린다 (PR1 — 렌더 경로 + `?sunspots=off`)** ([#1412](https://github.com/coseo12/astro-simulator/issues/1412)). 흑점 목록은 CPU 가 장면 시계 jd 에서 만든다 — 차등 자전 (Howard et al. 1984) · 생성과 소멸 · 11년 주기 (Hathaway 2015 Table 2 극소 + 사이클 25 극소 2019/12, 그 밖은 평균 주기 131.7 개월 외삽). 셰이더는 `vec4 spots[48]` 로 중심 단위벡터와 반영 각반경만 받는다. 본영 · 반영 색은 휘도비 20 % · 75 % 에서 Planck 비로 유도했고, 반영에는 자전축에 고정된 방위 필라멘트를 넣었다. ADR [`20261025-1412`](docs/decisions/20261025-1412-sunspots.md).
