@@ -81,7 +81,7 @@ v3 완주 직후 진단 (2026-06-22 방향성 기획): **"엔진·콘텐츠는 �
 
 ## 진행 중
 
-- [#1419](https://github.com/coseo12/astro-simulator/issues/1419) (트랙 A) — 지구 밖 천체 표면 확장 · 설계 단계 (ADR [20261030-1419](../decisions/20261030-1419-body-surface-catalog.md), Provisional). §후보 첫 행의 잔여 (Cratered 확장 · 위성 표면 타입) 를 다룬다.
+- [#1419](https://github.com/coseo12/astro-simulator/issues/1419) (트랙 A) — 지구 밖 천체 표면 확장 · 설계 확정 · 구현 대기 (ADR [20261030-1419](../decisions/20261030-1419-body-surface-catalog.md), Accepted 2026-10-30). §후보 첫 행의 잔여 (Cratered 확장 · 위성 표면 타입) 를 다룬다.
 
 직전 #1412 는 v0.107.0 으로 §완료 에 올렸다 (v0.107.0 릴리스 준비 PR 에서 버전 확정과 함께). 그 전 #1404 · #1406 은 v0.106.0 으로 §완료 이동했다.
 
