@@ -320,19 +320,22 @@ EXTERNAL_VALIDATOR_PRINT_TIMEOUT="${EXTERNAL_VALIDATOR_PRINT_TIMEOUT:-300s}"
 # capacity probe 의 --print-timeout. 이전에는 probe 호출부의 30s 리터럴이었다 (#1363 에서 상수로 승격).
 CAPACITY_PROBE_PRINT_TIMEOUT="${CAPACITY_PROBE_PRINT_TIMEOUT:-30s}"
 
-# 하드 타임아웃 (#1363) — agy 가 --print-timeout 을 넘겨 멈추는 경우 스크립트가 직접 끊는다.
-# 관측된 멈춤은 응답 대기가 아니라 턴 완료 **후** 종료 경로 정체였다 (agy 로그: "CLI store manager
-# shutting down" 뒤 "Language server shutting down" 이 오지 않음). 턴이 끝났으므로 --print-timeout 은
-# 발동할 대상이 없다. 외부 SIGTERM 을 받고도 "Waiting for migrations to complete" 뒤 5일 넘게 산
-# 사례가 3건이고, 그 3개 정리 시 2개가 kill -9 를 요구했다 (#1363 코멘트).
+# 하드 타임아웃 (#1363) — agy 가 --print-timeout (300s) 을 넘겨 멈추는 경우 스크립트가 직접 끊는다.
+# 관측 (agy 로그 ~/.gemini/antigravity-cli/log, hang 5건 · agy 1.4.0/1.4.5/1.4.7): 시작 1~2분에
+# "CLI store manager shutting down" 이 찍힌 뒤, 외부 SIGTERM 을 받기 전까지 "Language server shutting
+# down" 이 기록되지 않았다 (외부 신호 없이 끝난 실행은 그 줄이 marker 후 10 ms 안에 찍힌다). 그중
+# 3건은 SIGTERM 뒤 "Waiting for migrations to complete" 를 남기고 5일 넘게 살았고, 그 3개 정리 시
+# 2개가 kill -9 를 요구했다 (#1363 코멘트). 턴 완료 후라 --print-timeout 이 걸리지 않았다는 것은 추론이다.
 #   시도당 상한 = --print-timeout + GRACE (agy 기동 + 자체 timeout 처리 여유) → 도달 시 TERM,
 #                KILL_GRACE 안에 안 죽으면 KILL. 대상은 agy 와 그 자손 전체 (agy 1.4.7 실측: 자식
 #                `--bg-updater` 를 별도 프로세스 그룹으로 띄운다 — 그룹 kill 로는 못 잡는다).
 # GRACE 기본 60 초 근거: 실측 1회 (macOS 26.6.2 · Apple M1 Pro · agy 1.4.11, 2026-10-30)
 #   `--print-timeout 3s` 호출의 wall time 12.26 초 — 기동 오버헤드 약 9 초가 timeout 바깥에 붙는다.
 EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS="${EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS:-60}"
-# TERM 후 KILL 까지 유예 (초). 정상 프로세스는 TERM 즉시 종료하므로 짧게 둔다.
-EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS="${EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS:-5}"
+# TERM 후 KILL 까지 유예 (초). 실측 1회 (agy 1.4.11, 턴 진행 중 TERM): agy 는 "Waiting for migrations
+# to complete" 로 들어가 자체 shutdown 상한 5.0 초 ("Language server shutdown timed out") 를 다 쓴 뒤
+# 끝났다. 그 상한과 겹치지 않도록 그보다 크게 둔다.
+EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS="${EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS:-10}"
 # 하드 타임아웃 도달 시 내부 반환 코드 (GNU timeout 관례와 동일). 스크립트 exit code 로는 노출되지 않는다.
 RC_HARD_TIMEOUT=124
 # agy 자체 --print-timeout 발동 시 stderr 첫 줄 (실측 agy 1.4.11: "[agy] print timeout after 3s with turn
@@ -388,7 +391,7 @@ if ! CAPACITY_PROBE_HARD_TIMEOUT_SECONDS=$(resolve_hard_timeout_seconds "${CAPAC
 fi
 # 전체 상한 (구성상 최악) — 본 호출 MAX_EXTERNAL_VALIDATOR_RETRIES 회 + 그 사이 probe 1회 + 재시도 sleep 1회:
 #   MAX_RETRIES × (HARD + KILL_GRACE + 1) + (PROBE_HARD + KILL_GRACE + 1) + MIN(SLEEP_CAP, 2 × SLEEP_BASE)
-#   (+1 은 watchdog 의 1 초 폴링 단위). 기본값: 2 × (360+5+1) + (90+5+1) + 10 = 838 초 ≈ 14 분.
+#   (+1 은 watchdog 의 1 초 폴링 단위). 기본값: 2 × (360+10+1) + (90+10+1) + 10 = 853 초 ≈ 14 분.
 #   probe 는 재시도 사이에만 돈다 (MAX_RETRIES - 1 = 1 회).
 
 # 현재 실행 중인 agy / watchdog PID — EXIT/INT/TERM trap 이 정리한다 (빈 값 = 실행 중 아님)
@@ -461,9 +464,10 @@ run_agy_with_hard_timeout() {
   ACTIVE_WATCHDOG_PID=$!
   # 2>/dev/null — watchdog 가 KILL 한 경우 bash 가 찍는 "Killed: 9" 작업 알림 억제 (사실은 log 로 남긴다)
   wait "${ACTIVE_AGY_PID}" 2>/dev/null || agy_rc=$?
+  # reap 직후 클리어 — 아래 watchdog 대기 중 INT/TERM 이 와도 trap 이 이미 끝난 PID 를 치지 않게 한다
+  ACTIVE_AGY_PID=""
   # watchdog 는 대상 종료를 1 초 폴링으로 감지하고 스스로 끝난다 (kill 하면 sleep 자식이 고아로 남는다)
   wait "${ACTIVE_WATCHDOG_PID}" || watchdog_rc=$?
-  ACTIVE_AGY_PID=""
   ACTIVE_WATCHDOG_PID=""
   if [ "${watchdog_rc}" -eq "${RC_HARD_TIMEOUT}" ]; then
     return "${RC_HARD_TIMEOUT}"

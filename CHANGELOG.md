@@ -7,14 +7,14 @@ Semantic Versioning을 따른다.
 
 ### Fixed
 
-- **[#1363] `cross_validate.sh` 의 agy 호출에 스크립트 하드 타임아웃을 건다** ([#1363](https://github.com/coseo12/astro-simulator/issues/1363)). agy 가 턴을 마친 뒤 종료하지 않고 멈춰 `--print-timeout` 이 발동하지 않던 문제다 (실피해 5회 — 10~26 분 수동 종료 3회, 7시간 30분 · 8시간 40분 각 1회). agy 로그 5건 모두 「CLI store manager shutting down」 뒤 「Language server shutting down」 이 없었고, 5건 모두 외부 SIGTERM 을 받았고, 그중 10-17 · 10-18 의 3건은 「Waiting for migrations to complete」 를 남긴 뒤 5일 넘게 살아 있었다.
-  - 본 호출 · capacity probe 를 `--print-timeout + EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS` (기본 60) 초에서 끊는다. agy 와 자손 전체에 TERM 을 보내고, `EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS` (기본 5) 초 뒤 남은 것에 KILL 을 보낸다. 별도 watchdog 프로세스라 스크립트 본체가 SIGKILL 로 죽어도 상한에서 agy 를 끊고, EXIT · INT · TERM trap 이 실행 중인 agy 를 정리한다.
-  - 하드 타임아웃은 capacity 실패와 같은 경로다 (재시도 → exit 77, outcome `429-fallback-claude-only`). 기본값에서 agy 호출 구간의 구성상 상한은 838 초다 (스크립트 주석의 식).
+- **[#1363] `cross_validate.sh` 의 agy 호출에 스크립트 하드 타임아웃을 건다** ([#1363](https://github.com/coseo12/astro-simulator/issues/1363)). agy 가 `--print-timeout` (300 s) 을 넘겨 끝나지 않던 문제다 (실피해 5회 — `10~26` 분 수동 종료 3회, 7시간 30분 · 8시간 40분 각 1회). agy 로그 5건 모두 시작 `1~2` 분에 「CLI store manager shutting down」 이 찍힌 뒤, 외부 SIGTERM 을 받기 전까지 「Language server shutting down」 이 기록되지 않았다 (외부 신호 없이 끝난 실행은 marker 후 10 ms 안에 찍힌다). 그중 10-17 · 10-18 의 3건은 SIGTERM 뒤 「Waiting for migrations to complete」 를 남기고 5일 넘게 살아 있었다. 턴을 마친 뒤라 `--print-timeout` 이 걸리지 않았다는 것은 추론이다.
+  - 본 호출 · capacity probe 를 `--print-timeout + EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS` (기본 60) 초에서 끊는다. agy 와 자손 전체에 TERM 을 보내고, `EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS` (기본 10) 초 뒤 남은 것에 KILL 을 보낸다. 10 은 agy 가 TERM 뒤 쓰는 자체 shutdown 상한 5.0 s (agy 1.4.11 실측 1회) 와 겹치지 않게 고른 값이다. 별도 watchdog 프로세스라 스크립트 본체가 SIGKILL 로 죽어도 상한에서 agy 를 끊고, EXIT · INT · TERM trap 이 실행 중인 agy 를 정리한다.
+  - 하드 타임아웃은 capacity 실패와 같은 경로다 (재시도 → exit 77, outcome `429-fallback-claude-only`). 기본값에서 agy 호출 구간의 구성상 상한은 853 초다 (스크립트 주석의 식).
   - agy 자체 timeout (stderr `[agy] print timeout after …`, agy 1.4.11 실측) 도 같은 경로로 보낸다. 이전에는 이 경우의 부분 stdout 이 정상 응답 (`applied`) 으로 채택됐다 (develop 판본에 가짜 agy 로 재현).
 
 ### Behavior Changes
 
-- **cross-validate 가 agy 정체에 무기한 매달리지 않는다** (#1363). 기본값에서 agy 호출 구간이 838 초를 넘지 않고, 넘으면 claude-only 폴백 (exit 77) 으로 끝난다. agy 자체 timeout 의 부분 출력도 이제 `applied` 가 아니라 exit 77 이다.
+- **cross-validate 가 agy 정체에 무기한 매달리지 않는다** (#1363). 기본값에서 agy 호출 구간이 853 초를 넘지 않고, 넘으면 claude-only 폴백 (exit 77) 으로 끝난다. agy 자체 timeout 의 부분 출력도 이제 `applied` 가 아니라 exit 77 이다.
 
 ## [0.107.0] - 2026-10-26
 
