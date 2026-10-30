@@ -317,12 +317,174 @@ EXTERNAL_VALIDATOR_STRICT_PREFIX="STRICT INSTRUCTION: You are performing read-on
 
 # agy --print-timeout 기본값 (초). 응답 대기 한계. agy 의 default 는 5m (300s).
 EXTERNAL_VALIDATOR_PRINT_TIMEOUT="${EXTERNAL_VALIDATOR_PRINT_TIMEOUT:-300s}"
+# capacity probe 의 --print-timeout. 이전에는 probe 호출부의 30s 리터럴이었다 (#1363 에서 상수로 승격).
+CAPACITY_PROBE_PRINT_TIMEOUT="${CAPACITY_PROBE_PRINT_TIMEOUT:-30s}"
+
+# 하드 타임아웃 (#1363) — agy 가 --print-timeout 을 넘겨 멈추는 경우 스크립트가 직접 끊는다.
+# 관측된 멈춤은 응답 대기가 아니라 턴 완료 **후** 종료 경로 정체였다 (agy 로그: "CLI store manager
+# shutting down" 뒤 "Language server shutting down" 이 오지 않음). 턴이 끝났으므로 --print-timeout 은
+# 발동할 대상이 없다. 외부 SIGTERM 을 받고도 "Waiting for migrations to complete" 뒤 5일 넘게 산
+# 사례가 3건이고, 그 3개 정리 시 2개가 kill -9 를 요구했다 (#1363 코멘트).
+#   시도당 상한 = --print-timeout + GRACE (agy 기동 + 자체 timeout 처리 여유) → 도달 시 TERM,
+#                KILL_GRACE 안에 안 죽으면 KILL. 대상은 agy 와 그 자손 전체 (agy 1.4.7 실측: 자식
+#                `--bg-updater` 를 별도 프로세스 그룹으로 띄운다 — 그룹 kill 로는 못 잡는다).
+# GRACE 기본 60 초 근거: 실측 1회 (macOS 26.6.2 · Apple M1 Pro · agy 1.4.11, 2026-10-30)
+#   `--print-timeout 3s` 호출의 wall time 12.26 초 — 기동 오버헤드 약 9 초가 timeout 바깥에 붙는다.
+EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS="${EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS:-60}"
+# TERM 후 KILL 까지 유예 (초). 정상 프로세스는 TERM 즉시 종료하므로 짧게 둔다.
+EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS="${EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS:-5}"
+# 하드 타임아웃 도달 시 내부 반환 코드 (GNU timeout 관례와 동일). 스크립트 exit code 로는 노출되지 않는다.
+RC_HARD_TIMEOUT=124
+# agy 자체 --print-timeout 발동 시 stderr 첫 줄 (실측 agy 1.4.11: "[agy] print timeout after 3s with turn
+# in progress; returning partial output"). stdout 이 부분 출력이라 정상 응답으로 채택하면 안 된다.
+AGY_PRINT_TIMEOUT_PATTERN='^\[agy\] print timeout after '
 
 # Exit code 규약 (CLAUDE.md API capacity 폴백 프로토콜)
 # 0  = 외부 검증 모델 정상 응답 수신
 # 77 = claude-only fallback (외부 모델 429/timeout 최종 실패, 단일 모델 편향 노출 미확보)
 # 1  = 그 외 실패 (인자 오류 / 파일 부재 / 민감 파일 등)
 EXIT_CLAUDE_ONLY_FALLBACK=77
+
+# agy duration 문자열 → 초. 지원 형식: 정수 + 선택 단위 s/m/h (예: 300s · 5m · 300).
+# 그 외 형식 (예: 1m30s) 은 실패 반환 — 호출 측이 fail-fast 한다 (가드 설계 원칙: fallback 분기 금지).
+duration_to_seconds() {
+  local d="${1:-}"
+  if [[ "${d}" =~ ^([0-9]+)([smh]?)$ ]]; then
+    local n=$((10#${BASH_REMATCH[1]}))
+    case "${BASH_REMATCH[2]}" in
+      ''|s) printf '%s' "${n}" ;;
+      m) printf '%s' "$((n * 60))" ;;
+      h) printf '%s' "$((n * 3600))" ;;
+    esac
+    return 0
+  fi
+  return 1
+}
+
+# 하드 타임아웃 상한 (초) = --print-timeout + GRACE. 값이 틀리면 agy 호출 전에 즉시 종료한다.
+# --print-timeout 0 (agy 의 「무제한」) 은 하드 상한을 정의할 수 없으므로 거부한다.
+resolve_hard_timeout_seconds() {
+  local print_timeout="$1" print_seconds
+  if ! print_seconds=$(duration_to_seconds "${print_timeout}") || [ "${print_seconds}" -eq 0 ]; then
+    return 1
+  fi
+  printf '%s' "$((print_seconds + EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS))"
+}
+
+for _grace_var in EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS; do
+  if ! [[ "${!_grace_var}" =~ ^[0-9]+$ ]]; then
+    echo "에러: ${_grace_var} 는 0 이상의 정수 (초) 여야 합니다: '${!_grace_var}'" >&2
+    exit 1
+  fi
+done
+unset _grace_var
+if ! EXTERNAL_VALIDATOR_HARD_TIMEOUT_SECONDS=$(resolve_hard_timeout_seconds "${EXTERNAL_VALIDATOR_PRINT_TIMEOUT}"); then
+  echo "에러: EXTERNAL_VALIDATOR_PRINT_TIMEOUT 형식 오류 또는 0: '${EXTERNAL_VALIDATOR_PRINT_TIMEOUT}' (정수 + s/m/h, 0 초과)" >&2
+  exit 1
+fi
+if ! CAPACITY_PROBE_HARD_TIMEOUT_SECONDS=$(resolve_hard_timeout_seconds "${CAPACITY_PROBE_PRINT_TIMEOUT}"); then
+  echo "에러: CAPACITY_PROBE_PRINT_TIMEOUT 형식 오류 또는 0: '${CAPACITY_PROBE_PRINT_TIMEOUT}' (정수 + s/m/h, 0 초과)" >&2
+  exit 1
+fi
+# 전체 상한 (구성상 최악) — 본 호출 MAX_EXTERNAL_VALIDATOR_RETRIES 회 + 그 사이 probe 1회 + 재시도 sleep 1회:
+#   MAX_RETRIES × (HARD + KILL_GRACE + 1) + (PROBE_HARD + KILL_GRACE + 1) + MIN(SLEEP_CAP, 2 × SLEEP_BASE)
+#   (+1 은 watchdog 의 1 초 폴링 단위). 기본값: 2 × (360+5+1) + (90+5+1) + 10 = 838 초 ≈ 14 분.
+#   probe 는 재시도 사이에만 돈다 (MAX_RETRIES - 1 = 1 회).
+
+# 현재 실행 중인 agy / watchdog PID — EXIT/INT/TERM trap 이 정리한다 (빈 값 = 실행 중 아님)
+ACTIVE_AGY_PID=""
+ACTIVE_WATCHDOG_PID=""
+
+# 주어진 PID 의 자손 PID 를 전부 출력 (재귀). pgrep 0 매칭은 exit 1 이라 흡수한다 —
+# 여기서 흡수하는 것은 「자식 없음」 하나뿐이다 (pgrep 의 다른 실패는 자손 누락으로 이어지지만,
+# 뒤따르는 kill 대상에 루트 PID 는 항상 포함되므로 최소한 agy 본체는 끊긴다).
+collect_descendant_pids() {
+  local parent="$1" child
+  for child in $(pgrep -P "${parent}" 2>/dev/null || true); do
+    printf '%s\n' "${child}"
+    collect_descendant_pids "${child}"
+  done
+}
+
+# 프로세스 트리 종료 — TERM → KILL_GRACE 초 동안 1 초 간격 생존 확인 → 남은 것에 KILL.
+# 자손 목록은 TERM 전에 수집한다 (부모가 먼저 죽으면 자식이 launchd 로 재부모화돼 추적이 끊긴다).
+terminate_process_tree() {
+  local root="$1" pids remaining p waited=0
+  pids="$(collect_descendant_pids "${root}") ${root}"
+  # shellcheck disable=SC2086 # PID 목록 단어 분리 의도
+  kill -s TERM ${pids} 2>/dev/null || true
+  while :; do
+    remaining=""
+    for p in ${pids}; do
+      if kill -0 "${p}" 2>/dev/null; then
+        remaining="${remaining} ${p}"
+      fi
+    done
+    if [ -z "${remaining}" ]; then
+      return 0
+    fi
+    if [ "${waited}" -ge "${EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS}" ]; then
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  # TERM 무시 (#1363 실측) — 남은 것 + 그 사이 생긴 자손에 KILL
+  # shellcheck disable=SC2086
+  kill -s KILL ${remaining} $(collect_descendant_pids "${root}") 2>/dev/null || true
+}
+
+# watchdog — 대상이 limit 초 안에 끝나지 않으면 트리를 종료하고 RC_HARD_TIMEOUT 반환.
+# 별도 백그라운드 프로세스로 돈다: 스크립트 본체가 SIGKILL 로 죽어도 (trap 불가) 상한에서 agy 를 끊는다.
+hard_timeout_watchdog() {
+  local target="$1" limit="$2" started="${SECONDS}"
+  while kill -0 "${target}" 2>/dev/null; do
+    if [ $((SECONDS - started)) -ge "${limit}" ]; then
+      terminate_process_tree "${target}"
+      return "${RC_HARD_TIMEOUT}"
+    fi
+    sleep 1
+  done
+  return 0
+}
+
+# agy 를 하드 타임아웃 하에 실행. 사용: run_agy_with_hard_timeout <상한초> <stdout파일> <stderr파일> <agy 인자...>
+# 반환: agy 종료 코드 (agy 는 실패에도 0 을 낼 수 있어 보조 신호), 상한 도달 시 RC_HARD_TIMEOUT.
+# 호출 측은 `|| rc=$?` 로 받는다 (set -e 하에서 0 이 아닌 반환이 스크립트를 끝내지 않도록).
+run_agy_with_hard_timeout() {
+  local limit="$1" out="$2" err="$3"
+  shift 3
+  local agy_rc=0 watchdog_rc=0
+  agy "$@" >"${out}" 2>"${err}" &
+  ACTIVE_AGY_PID=$!
+  hard_timeout_watchdog "${ACTIVE_AGY_PID}" "${limit}" &
+  ACTIVE_WATCHDOG_PID=$!
+  # 2>/dev/null — watchdog 가 KILL 한 경우 bash 가 찍는 "Killed: 9" 작업 알림 억제 (사실은 log 로 남긴다)
+  wait "${ACTIVE_AGY_PID}" 2>/dev/null || agy_rc=$?
+  # watchdog 는 대상 종료를 1 초 폴링으로 감지하고 스스로 끝난다 (kill 하면 sleep 자식이 고아로 남는다)
+  wait "${ACTIVE_WATCHDOG_PID}" || watchdog_rc=$?
+  ACTIVE_AGY_PID=""
+  ACTIVE_WATCHDOG_PID=""
+  if [ "${watchdog_rc}" -eq "${RC_HARD_TIMEOUT}" ]; then
+    return "${RC_HARD_TIMEOUT}"
+  fi
+  return "${agy_rc}"
+}
+
+# EXIT/INT/TERM trap — 실행 중인 agy 트리와 watchdog 를 정리한다 (#1363: 고아 agy 0 보장).
+cleanup_active_agy() {
+  if [ -n "${ACTIVE_WATCHDOG_PID}" ]; then
+    terminate_process_tree "${ACTIVE_WATCHDOG_PID}"
+    ACTIVE_WATCHDOG_PID=""
+  fi
+  if [ -n "${ACTIVE_AGY_PID}" ]; then
+    terminate_process_tree "${ACTIVE_AGY_PID}"
+    ACTIVE_AGY_PID=""
+  fi
+}
+trap 'cleanup_active_agy' EXIT
+trap 'cleanup_active_agy; trap - EXIT; exit 130' INT
+trap 'cleanup_active_agy; trap - EXIT; exit 143' TERM
 
 # check_external_capacity 반환 코드 규약 (reviewer 권고 2, #131 Phase A — gemini 시점부터 유지)
 # 0 = capacity 복구 (probe 성공)
@@ -338,15 +500,29 @@ CAPACITY_OTHER_ERROR=1
 # Phase 1A (#269): agy 는 timeout/capacity 실패 시에도 exit 0 반환 (PoC T2 실측) —
 # stderr 의 `^Error: ` 패턴 매칭으로 판정. exit code 는 보조 신호.
 check_external_capacity() {
-  local probe_stdout probe_stderr probe_rc
-  local probe_stderr_file
+  local probe_stdout probe_stderr probe_rc=0
+  local probe_stdout_file probe_stderr_file
+  probe_stdout_file=$(mktemp)
   probe_stderr_file=$(mktemp)
   # agy 권고 제안 1 수용 (PR #275 dogfooding): SIGINT/SIGTERM 또는 set -e 조기 이탈 시 임시 파일 누수 차단
   # RETURN trap 은 함수 종료 시점에 호출되며 호출자로 전파 안 됨 (bash 기본 INHERITRC 비활성)
-  trap "rm -f '${probe_stderr_file}'" RETURN
-  # capacity probe — 빠른 응답 (30s) timeout, 정상 응답은 1~3s 안에 옴
-  probe_stdout=$(agy --print-timeout 30s -p "hello" 2>"${probe_stderr_file}") && probe_rc=0 || probe_rc=$?
+  trap "rm -f '${probe_stdout_file}' '${probe_stderr_file}'" RETURN
+  # capacity probe — CAPACITY_PROBE_PRINT_TIMEOUT + 하드 타임아웃 (#1363: probe 도 같은 정체에 걸릴 수 있다)
+  run_agy_with_hard_timeout "${CAPACITY_PROBE_HARD_TIMEOUT_SECONDS}" "${probe_stdout_file}" "${probe_stderr_file}" \
+    --print-timeout "${CAPACITY_PROBE_PRINT_TIMEOUT}" -p "hello" || probe_rc=$?
+  probe_stdout=$(cat "${probe_stdout_file}")
   probe_stderr=$(cat "${probe_stderr_file}")
+
+  # 하드 타임아웃 / agy 자체 print timeout — 응답성 부족이므로 capacity 부족으로 분류 (stdout 은 부분 출력일 수 있어 무시)
+  if [ "${probe_rc}" -eq "${RC_HARD_TIMEOUT}" ]; then
+    log "capacity 체크 결과: probe 하드 타임아웃 ${CAPACITY_PROBE_HARD_TIMEOUT_SECONDS}s 도달 — agy 트리 강제 종료 (code=${CAPACITY_EXHAUSTED})"
+    return "${CAPACITY_EXHAUSTED}"
+  fi
+  # 파일을 직접 grep — `printf | grep -q` 는 pipefail 하에서 조기 종료 SIGPIPE 로 조건이 뒤집힐 수 있다
+  if grep -qE "${AGY_PRINT_TIMEOUT_PATTERN}" "${probe_stderr_file}"; then
+    log "capacity 체크 결과: agy print timeout (code=${CAPACITY_EXHAUSTED}) — $(grep -m1 -E "${AGY_PRINT_TIMEOUT_PATTERN}" "${probe_stderr_file}")"
+    return "${CAPACITY_EXHAUSTED}"
+  fi
 
   # 정상 응답: 비어있지 않은 stdout + stderr Error 없음 (exit code 무관 — agy 는 항상 0)
   # agy 권고 제안 2 수용: echo "${var}" 는 `-e/-n` 시작 문자열에서 옵션 파싱 오동작 가능 → printf '%s\n' 사용
@@ -450,16 +626,38 @@ run_external_validator() {
   trap "rm -f \"\${stdout_file:-}\" \"\${stderr_file:-}\"" RETURN
 
   while [ "${attempt}" -le "${MAX_EXTERNAL_VALIDATOR_RETRIES}" ]; do
-    log "외부 검증 모델 (agy) 실행 중 (시도: ${attempt}/${MAX_EXTERNAL_VALIDATOR_RETRIES}, timeout: ${EXTERNAL_VALIDATOR_PRINT_TIMEOUT})..."
+    log "외부 검증 모델 (agy) 실행 중 (시도: ${attempt}/${MAX_EXTERNAL_VALIDATOR_RETRIES}, timeout: ${EXTERNAL_VALIDATOR_PRINT_TIMEOUT}, 하드 상한: ${EXTERNAL_VALIDATOR_HARD_TIMEOUT_SECONDS}s)..."
     local stdout_content stderr_content
+    local agy_rc=0
+    local timed_out_reason=""
     stdout_file=$(mktemp)
     stderr_file=$(mktemp)
-    # agy 호출 — stdout/stderr 분리, --print-timeout 으로 wait 한계 설정
-    # `|| true` 는 set -e 회피 (agy 는 exit code 신뢰 불가 — stderr 패턴으로 판정)
-    agy --print-timeout "${EXTERNAL_VALIDATOR_PRINT_TIMEOUT}" -p "${guarded_prompt}" >"${stdout_file}" 2>"${stderr_file}" || true
+    # agy 호출 — stdout/stderr 분리, --print-timeout + 스크립트 하드 타임아웃 (#1363)
+    # agy exit code 는 판정에 쓰지 않는다 (실패에도 0 — stderr 패턴으로 판정). RC_HARD_TIMEOUT 만 예외.
+    run_agy_with_hard_timeout "${EXTERNAL_VALIDATOR_HARD_TIMEOUT_SECONDS}" "${stdout_file}" "${stderr_file}" \
+      --print-timeout "${EXTERNAL_VALIDATOR_PRINT_TIMEOUT}" -p "${guarded_prompt}" || agy_rc=$?
+    if [ "${agy_rc}" -eq "${RC_HARD_TIMEOUT}" ]; then
+      timed_out_reason="하드 타임아웃 ${EXTERNAL_VALIDATOR_HARD_TIMEOUT_SECONDS}s 도달 — agy 트리 강제 종료"
+    elif grep -qE "${AGY_PRINT_TIMEOUT_PATTERN}" "${stderr_file}"; then
+      timed_out_reason="agy print timeout — $(grep -m1 -E "${AGY_PRINT_TIMEOUT_PATTERN}" "${stderr_file}")"
+    fi
     stdout_content=$(cat "${stdout_file}")
     stderr_content=$(cat "${stderr_file}")
     rm -f "${stdout_file}" "${stderr_file}"
+
+    # timeout (하드 / agy 자체) — stdout 은 부분 출력일 수 있으므로 정상 응답 판정보다 먼저 분기한다.
+    # 경로는 기존 capacity 실패와 같다 (재시도 → 최종 claude-only exit 77). stdout 은 판정에 쓰지 않고
+    # 로그에만 남긴다 — 턴 완료 후 정체였는지 (응답이 이미 다 나왔는지) 사후 관찰용 (#1363).
+    if [ -n "${timed_out_reason}" ]; then
+      log "경고: agy timeout (시도 ${attempt}/${MAX_EXTERNAL_VALIDATOR_RETRIES}) — ${timed_out_reason} (stdout ${#stdout_content}자, 미채택)"
+      {
+        printf '%s\n' "--- [timeout 미채택 stdout 시작 — 시도 ${attempt}] ---"
+        printf '%s\n' "${stdout_content}"
+        printf '%s\n' "--- [timeout 미채택 stdout 끝] --- stderr:"
+        printf '%s\n' "${stderr_content}"
+      } >> "${LOG_FILE}"
+      stderr_content="Error: timed out (${timed_out_reason})"
+    fi
 
     # 정상 응답 판정: 비어있지 않은 stdout + stderr Error 패턴 없음
     # agy 권고 제안 2 수용: echo "${var}" 는 `-e/-n` 시작 문자열에서 옵션 파싱 오동작 가능 → printf '%s\n' 사용

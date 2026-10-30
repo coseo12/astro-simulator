@@ -46,6 +46,8 @@
 
 호출 측이 `CROSS_VALIDATE_ANCHOR` 환경변수 (`MINOR-behavior-change` / `ADR-new-or-amendment` / `CRITICAL-directive-revision`) 를 설정하면 **reminder 이슈 생성** (기본 dry-run, `REMINDER_ISSUE_DRYRUN=0` 으로 실제 생성). **재시도 sleep 은 지수 증가 (2^attempt × BASE)** 로 v2.20.0 부터 변경 (이전: linear attempt × BASE). `check_external_capacity()` 는 v2.20.0 부터 **capacity 부족 2 / 비-capacity probe 실패 1 / 정상 0** 으로 exit code 분리 (호출 측 로그 차별화). Phase 1A (#269) 부터 capacity 판정은 **stderr `^Error: (timed out|rate limit|quota|not logged|unauthorized|forbidden)` 패턴 매칭** — agy 는 timeout 시에도 exit 0 반환 (이전 gemini-cli 는 exit 1 + `RESOURCE_EXHAUSTED` 패턴). 스모크 테스트는 `test/cross-validate-fallback.test.js` 가 mock agy 바이너리로 각 분기 + **stateful 복구 분기(1차 capacity 실패 → 2차 정상)** 를 검증.
 
+**하드 타임아웃 (#1363)** — agy 가 턴을 마친 뒤 종료하지 않고 멈추는 사례 (실피해 5회, 7시간 30분 · 8시간 40분 포함) 가 있어 `--print-timeout` 만으로는 끝나지 않는다. 스크립트는 agy 호출 (본 호출 · capacity probe) 을 `--print-timeout + EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS` 초에서 직접 끊고 (agy 와 자손에 TERM → 유예 후 KILL), capacity 실패와 같은 경로 (재시도 → exit 77, outcome `429-fallback-claude-only`) 로 보낸다. agy 자체 timeout (stderr `[agy] print timeout after …`) 도 같은 경로다 — 이전에는 이 경우의 부분 stdout 이 정상 응답 (`applied`) 으로 채택됐다. 환경변수와 상한 식은 [SKILL.md](../../.claude/skills/cross-validate/SKILL.md) §환경변수 와 스크립트 주석.
+
 ### 2.3 outcome JSON 자동 매핑 (v2.19.0~, Phase 3)
 
 스크립트는 종료 시 `${LOG_DIR}/cross-validate-<type>-<timestamp>-outcome.json` 파일을 생성한다. 필드: `outcome` (`"applied"` / `"429-fallback-claude-only"` / `"fatal-error"`) / `exit_code` / `anchor` / `pr_ref` / `context` / `log_file` / `reminder_issue` (`"none"` / `"dryrun"` / `"created"`) / `timestamp`. architect 에이전트는 step 8 에서 이 파일을 bash 스니펫으로 파싱해 `extends.cross_validate_outcome` 에 **자동 매핑** — 선언/프롬프트/스크립트 3층 방어의 수동 연결점 제거.
