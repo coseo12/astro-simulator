@@ -50,6 +50,10 @@ const SETTLE_MS = 2500;
 // 암전 판정 임계 (0~255 luminance). 수정 전 실측 (2026-07-09, PR #790 본문 대조표):
 // 침범 상태 sun 중앙 crop 평균 = 9.2 (backface culling — 잔존 glow/starfield 만).
 // 정상 상태 실측: jupiter 36.6 / saturn 42.2 / sun 150+. 20 은 두 상태를 양방향 마진으로 분리.
+// ⚠️ #1419 (2026-10-31) — saturn 이 절차 표면 (IceGiant · albedo 0.50) 이 된 뒤 S3 는 로컬 macOS ·
+// bundled chromium headless 2회 실측 `21.5` · `22.5` 다 (여유 1.5 ~ 2.5 — 위 42.2 는 단색 시절 값).
+// 최대 줌인 화면은 밤면이라 휘도가 albedo 에 비례한다 (ADR 20261030-1419 §3 M7). 임계 단독 완화 금지 —
+// 미달 시 saturn albedo 와 함께 재합의한다 (ADR 20261030-1419 §12 조건 5).
 const DARK_THRESHOLD = 20;
 // 중앙 crop 크기 — 화면 중앙 정사각 (짧은 축의 1/3). focus body 는 항상 화면 중앙.
 const CROP_RATIO = 1 / 3;

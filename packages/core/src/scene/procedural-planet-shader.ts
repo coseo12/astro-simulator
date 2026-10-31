@@ -95,11 +95,14 @@
  *   인자로 주입받아 uniform 으로 설정한다 (단방향 의존). soft terminator / 육지색 등 rendering-only
  *   미학 상수는 본 셰이더 모듈이 SSoT.
  *
- * **표면 타입 4종 (§결정 5)**:
+ * **표면 타입 7종 (§결정 5 의 4종 + Amendment 12 의 1종 + #1419 의 2종)**:
  *   - rocky (지구) — base 위 대륙/해양 대비 (저주파 noise) + 미세 명암.
  *   - desert (화성) — base 위 dust/협곡 결 (fbm) + 산화철 톤 변조.
  *   - gas-bands (목성) — base 위 위도 밴드 (latitude 변조) + 난류 결.
- *   - cratered (달) — base 위 크레이터 (cell noise 점 분포) + 명암.
+ *   - cratered (달 · 수성 · 칼리스토 · 가니메데) — base 위 크레이터 (cell noise 점 분포) + 명암.
+ *     body 별 파라미터는 `SURFACE_CRATER_PARAMS_BY_BODY` (#1419).
+ *   - ice-giant (천왕성 · 해왕성 · 토성) — 저대비 위도 밴드 + albedo 배율 (Amendment 12 · #1419).
+ *   - volcanic (이오) · icy (유로파) — #1419 (ADR `20261030-1419` §5-4).
  *
  * **WebGPU↔WebGL parity**: ShaderMaterial GLSL 은 양 백엔드 동작 (ring/starfield 선례 — Babylon
  *   GLSL→WGSL 변환). WGSL 별도 작성 불필요. WebGL1 미지원 (tier 시스템 전제, ring/starfield 정합).
@@ -157,10 +160,16 @@ export enum SurfaceType {
   /** 크레이터형 — 점 분포 크레이터 + 명암 (달). */
   Cratered = 3,
   /**
-   * 얼음 거성형 — 저대비 위도 밴드 (천왕성 · 해왕성). Amendment 12 (#1274) §A12.5 — GasBands 와
-   * **별도 GLSL 분기** (형태 격리 — jupiter 픽셀 불변의 구조적 보장), 밴드 uniform 3종은 공유.
+   * 얼음 거성형 — 저대비 위도 밴드 + albedo 배율 (천왕성 · 해왕성 · 토성). Amendment 12 (#1274) §A12.5 —
+   * GasBands 와 **별도 GLSL 분기** (형태 격리 — jupiter 픽셀 불변의 구조적 보장), 밴드 uniform 3종은 공유.
+   * 토성은 #1419 (ADR `20261030-1419` §4 Q3 (i)) 가 이 분기를 재사용한다 — 이름의 「얼음 거성」 은 유래이고,
+   * 분기의 실제 의미는 「저대비 위도 밴드 + albedo 배율」 이다.
    */
   IceGiant = 4,
+  /** 화산형 — 황 패치 + 칼데라 점 · 후광 (이오). #1419 (ADR `20261030-1419` §5-2). */
+  Volcanic = 5,
+  /** 얼음 지각형 — 얼룩 + 대원 계열 lineae (유로파). #1419 (ADR `20261030-1419` §5-2). */
+  Icy = 6,
 }
 
 /**
@@ -168,10 +177,11 @@ export enum SurfaceType {
  *
  * "표면 타입" 은 물리 데이터가 아니라 **rendering 분류** 다 (principles.md §적용 위치).
  * `solar-system.json` 은 NASA/JPL 실측 (반경/색상/궤도) 의 SSoT 이므로 rendering 관심사를
- * 누수시키지 않는다. 테이블 미등록 body 는 자동으로 단색 (StandardMaterial) — 23개 비-범위
- * body 무회귀가 **테이블 부재로 자동 보장** (명시적 opt-in).
+ * 누수시키지 않는다. 테이블 미등록 body 는 자동으로 단색 (StandardMaterial) — 비-범위 body
+ * 무회귀가 **테이블 부재로 자동 보장** (명시적 opt-in).
  *
- * 등록 집합 = 아래 테이블의 키 (#756 의 earth · mars · jupiter · moon + #1274 의 uranus · neptune).
+ * 등록 집합 = 아래 테이블의 키 (#756 의 earth · mars · jupiter · moon + #1274 의 uranus · neptune +
+ * #1419 의 mercury · callisto · ganymede · io · europa · saturn).
  * 확장 = 데이터 추가가 아닌 **상수 1줄 추가** (R-Phase). 밴드 타입 (`BAND_SURFACE_TYPES`) 으로
  * 등록하면 `SURFACE_BAND_PARAMS_BY_BODY` 행도 함께 있어야 한다 (불변식 — 없으면 throw).
  */
@@ -183,6 +193,14 @@ export const SURFACE_TYPE_BY_BODY: Readonly<Record<string, SurfaceType>> = {
   // Amendment 12 (#1274) — 얼음 거성 2 body. 밴드 값은 `SURFACE_BAND_PARAMS_BY_BODY` 가 body 별로 정한다.
   uranus: SurfaceType.IceGiant,
   neptune: SurfaceType.IceGiant,
+  // #1419 (ADR `20261030-1419` §5-1) — 지구 밖 6 body. 토성은 IceGiant 분기 재사용 (§4 Q3 (i)).
+  // 파라미터는 `SURFACE_CRATER_PARAMS_BY_BODY` · `SURFACE_PATTERN_PARAMS_BY_BODY` · 밴드 · albedo 테이블.
+  mercury: SurfaceType.Cratered,
+  callisto: SurfaceType.Cratered,
+  ganymede: SurfaceType.Cratered,
+  io: SurfaceType.Volcanic,
+  europa: SurfaceType.Icy,
+  saturn: SurfaceType.IceGiant,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +236,12 @@ export const CRATER_DEPTH = 0.4;
 
 /** cratered 크레이터 격자 밀도 (셀/방향). 클수록 크레이터가 촘촘. */
 export const CRATER_DENSITY = 14;
+
+/**
+ * cratered 저주파 결 (mare/highland 명암) 진폭. #1419 이전에는 GLSL 리터럴 `0.15` 였다 — body 별
+ * 파라미터 (`SURFACE_CRATER_PARAMS_BY_BODY`) 로 옮기면서 달 행이 참조할 상수로 추출했다 (값 불변).
+ */
+export const CRATER_TERRAIN_AMP = 0.15;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Amendment 12 (#1274) §A12.4 결정 1 — 밴드 파라미터 body 별 테이블.
@@ -264,6 +288,8 @@ export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandPar
   // 미학 파라미터이며 임계가 아니다. 값의 유일한 출처가 이 행이다 (사본 없음 — 단위 테스트가 박제값 단언).
   uranus: { amplitude: 0.12, count: 6, turbulence: 0.06 }, // 2차 r2b (밴드 = 1차 후보 c)
   neptune: { amplitude: 0.1, count: 6, turbulence: 0.06 }, // 1차 후보 a
+  // #1419 ADR `20261030-1419` §5-A 동결값 (안 1 — 사용자 육안 결정 2026-10-30). IceGiant 분기 재사용.
+  saturn: { amplitude: 0.08, count: 10, turbulence: 0.05 },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -284,6 +310,9 @@ export const SURFACE_BAND_PARAMS_BY_BODY: Readonly<Record<string, SurfaceBandPar
 export const ICE_GIANT_ALBEDO_BY_BODY: Readonly<Record<string, number>> = {
   uranus: 0.45,
   neptune: 1,
+  // #1419 ADR `20261030-1419` §4 Q4 saturn 예외 — 안 1 의 `0.43` 은 `verify:790-focus-zoom` S3 (임계 20)
+  // 를 FAIL 해 (ADR §3 M7) `0.50` 으로 동결했다 (사용자 승인). 790 여유가 얇다 — 낮추지 말 것.
+  saturn: 0.5,
 };
 
 /** 비-`IceGiant` 타입이 바인딩하는 값 — `iceGiantAlbedo` 를 읽는 GLSL 이 분기 4 뿐이라 픽셀 영향이 없다. */
@@ -350,6 +379,255 @@ export function resolveSurfaceBandParams(
   }
   return NO_BAND_PARAMS;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #1419 (ADR `20261030-1419` §5-3) — 크레이터 · 패턴 파라미터 body 별 테이블.
+//
+// 종전 `craterDepth` · `craterDensity` 는 body 분기 없이 전 표면 body 에 달 상수로 바인딩됐고 결 진폭
+// `0.15` 는 GLSL 리터럴이었다 (#1274 이전 밴드 uniform 과 같은 구조). 소비 타입 body 만 행을 가진다
+// (ADR 756 §A8.9 결정 5 · `SURFACE_BAND_PARAMS_BY_BODY` 선례). 행 누락 · 초과는 throw (기본값 fallback 금지).
+// 불변식 (단위 테스트 가드):
+//   keys(SURFACE_CRATER_PARAMS_BY_BODY) == { id | SURFACE_TYPE_BY_BODY[id] == Cratered }
+//   keys(SURFACE_PATTERN_PARAMS_BY_BODY) == { id | SURFACE_TYPE_BY_BODY[id] ∈ PATTERN_SURFACE_TYPES }
+// 수치는 ADR §5-A 동결값이다 (사용자 육안 결정 2026-10-30 — 안 1). 이 파일에서 튜닝하지 않는다 — 바꾸려면
+// ADR 에 dated 부기를 먼저 단다 (§5-A).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 크레이터 분기 (3) 파라미터 — GLSL uniform 과 1:1. */
+export interface SurfaceCraterParams {
+  /** 크레이터 격자 밀도 → `craterDensity`. */
+  readonly density: number;
+  /**
+   * 크레이터 명암 깊이 → `craterDepth`. 허용 범위 `−1 ≤ depth < 1` (§5-3) — 음수는 크레이터를 **밝힌다**
+   * (`1 − crater × depth` 가 `1 + |depth| × crater` 가 된다). 상한은 색 반전 방지, 하한은 배율 상한 `2`.
+   */
+  readonly depth: number;
+  /** 저주파 결 진폭 → `craterTerrainAmp`. */
+  readonly terrainAmp: number;
+  /** 저주파 2톤 지역 (`valueNoise`) 진폭 → `craterRegionAmp`. `0` 이면 지역 항이 정확히 `0`. */
+  readonly regionAmp: number;
+  /** 2톤 지역 주파수 → `craterRegionFreq`. */
+  readonly regionFreq: number;
+  /** 렌더 albedo 배율 → `surfaceAlbedo` (물리 알베도 아님 — ADR §2 ⚠️). */
+  readonly albedo: number;
+}
+
+/** `depth` 허용 범위 (§5-3) — 하한 포함 · 상한 미포함. 단위 테스트가 테이블 전 행에 단언한다. */
+export const CRATER_DEPTH_MIN = -1;
+export const CRATER_DEPTH_MAX_EXCLUSIVE = 1;
+
+/**
+ * 달 행 = 기존 상수 참조 (값 사본 금지 — volt #69). 비-Cratered 타입도 이 값을 바인딩한다 (§5-3 중립값 —
+ * #1419 이전 바인딩과 같은 값이라 비-Cratered draw 의 크레이터 uniform 이 바뀌지 않는다).
+ * `regionAmp 0` 이라 지역 항이 `0` 이고 `albedo 1` 이라 달 픽셀이 불변이다 (ADR §3 M1).
+ * `regionFreq` 는 M1 실측 구성 값이다 (`regionAmp 0` 이라 픽셀에 기여하지 않는다).
+ */
+export const MOON_CRATER_PARAMS: SurfaceCraterParams = Object.freeze({
+  density: CRATER_DENSITY,
+  depth: CRATER_DEPTH,
+  terrainAmp: CRATER_TERRAIN_AMP,
+  regionAmp: 0,
+  regionFreq: 2.0,
+  albedo: 1,
+});
+
+/** body id → 크레이터 파라미터 (`Cratered` body 만). ADR §5-A 동결값. */
+export const SURFACE_CRATER_PARAMS_BY_BODY: Readonly<Record<string, SurfaceCraterParams>> = {
+  moon: MOON_CRATER_PARAMS,
+  // density · depth · terrainAmp 는 달 상수와 같은 값이지만 수성 고유 동결값이다 (참조하지 않는다 — 달
+  // 상수를 바꿔도 수성이 따라 바뀌지 않게).
+  mercury: {
+    density: 14,
+    depth: 0.4,
+    terrainAmp: 0.15,
+    regionAmp: 0.12,
+    regionFreq: 2.0,
+    albedo: 0.68,
+  },
+  // 음수 depth = 「어두운 표면 위 밝은 흉터」 (ADR §2). 밝은 크레이터 중심의 1채널 clip 은 허용 (§5-3 R1).
+  callisto: {
+    density: 22,
+    depth: -0.7,
+    terrainAmp: 0.12,
+    regionAmp: 0,
+    regionFreq: 2.0,
+    albedo: 0.69,
+  },
+  ganymede: {
+    density: 12,
+    depth: -0.4,
+    terrainAmp: 0.12,
+    regionAmp: 0.3,
+    regionFreq: 2.0,
+    albedo: 0.61,
+  },
+};
+
+/**
+ * #1419 — body 의 크레이터 파라미터를 해석한다 (불변식의 런타임 사본, 기본값 fallback 없음).
+ * `Cratered` 인데 행이 없으면 throw / 비-`Cratered` 인데 행이 있으면 throw / 비-`Cratered` 는 달 값.
+ *
+ * @param table 주입용 (단위 테스트) — 미전달 시 `SURFACE_CRATER_PARAMS_BY_BODY`
+ */
+export function resolveSurfaceCraterParams(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  table: Readonly<Record<string, SurfaceCraterParams>> = SURFACE_CRATER_PARAMS_BY_BODY,
+): SurfaceCraterParams {
+  const row = Object.prototype.hasOwnProperty.call(table, bodyId) ? table[bodyId] : undefined;
+  if (surfaceType === SurfaceType.Cratered) {
+    if (row === undefined) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 는 Cratered 인데 SURFACE_CRATER_PARAMS_BY_BODY 행이 없다 (#1419 — 기본값 fallback 금지)`,
+      );
+    }
+    return row;
+  }
+  if (row !== undefined) {
+    throw new Error(
+      `[procedural-planet-shader] '${bodyId}' 는 비-Cratered (${surfaceType}) 인데 SURFACE_CRATER_PARAMS_BY_BODY 행이 있다 (#1419 — 소비자 없는 행)`,
+    );
+  }
+  return MOON_CRATER_PARAMS;
+}
+
+/**
+ * 보조색 — `{ r, g, b }`, 각 성분 `[0, 1]` (선례 `LAND_COLOR_RGB`). 색공간은 `baseColor` 와 **같다** —
+ * `hexToColor3` 는 8비트 값을 `/255` 할 뿐 감마 변환을 하지 않고, 셰이더는 두 값을 그대로 `mix` 한다.
+ * 선형화 · sRGB 변환을 어느 한쪽에만 넣지 않는다 (§5-3).
+ */
+export interface SurfaceAccentRgb {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+/** Icy lineae 개수의 상한 — GLSL `for` 의 **상수** 상한과 같은 값이다 (아래 FRAGMENT_SHADER 가 보간). */
+export const ICY_MAX_LINE_COUNT = 12;
+
+/** Volcanic 분기 (5) 파라미터. `.x/.y/.z/.w` 는 `packPatternParams` 가 정한다 (§5-3 표). */
+export interface VolcanicPatternParams {
+  readonly type: SurfaceType.Volcanic;
+  /** 황 패치 fbm 주파수 → `.x`. */
+  readonly sulfurFreq: number;
+  /** 패치 → `accentA` 혼합 강도 → `.y`. */
+  readonly sulfurAmp: number;
+  /** 칼데라 셀 격자 주파수 → `.z`. */
+  readonly calderaFreq: number;
+  /** 칼데라 (`accentB`) · 후광 (`accentA`) 강도 → `.w`. */
+  readonly calderaAmp: number;
+  readonly accentA: SurfaceAccentRgb;
+  readonly accentB: SurfaceAccentRgb;
+  /** 렌더 albedo 배율 → `surfaceAlbedo`. */
+  readonly albedo: number;
+}
+
+/** Icy 분기 (6) 파라미터. `.x/.y/.z/.w` 는 `packPatternParams` 가 정한다 (§5-3 표). */
+export interface IcyPatternParams {
+  readonly type: SurfaceType.Icy;
+  /** 얼룩 · 워프 fbm 주파수 → `.x`. */
+  readonly mottleFreq: number;
+  /** 얼룩 → `accentA` 혼합 강도 → `.y`. */
+  readonly mottleAmp: number;
+  /** lineae smoothstep 폭 → `.z`. */
+  readonly lineWidth: number;
+  /** lineae 개수 → `.w`. 정수 `0 ≤ n ≤ ICY_MAX_LINE_COUNT` (GLSL 은 이 값을 `break` 조건에만 쓴다). */
+  readonly lineCount: number;
+  readonly accentA: SurfaceAccentRgb;
+  readonly accentB: SurfaceAccentRgb;
+  /** 렌더 albedo 배율 → `surfaceAlbedo`. */
+  readonly albedo: number;
+}
+
+export type SurfacePatternParams = VolcanicPatternParams | IcyPatternParams;
+
+/** 패턴 파라미터를 소비하는 표면 타입 집합 — GLSL 에서 `patternParams` 를 읽는 분기의 타입과 같아야 한다. */
+export const PATTERN_SURFACE_TYPES: ReadonlySet<SurfaceType> = new Set([
+  SurfaceType.Volcanic,
+  SurfaceType.Icy,
+]);
+
+/** body id → 패턴 파라미터 (`Volcanic` · `Icy` body 만). ADR §5-A 동결값. */
+export const SURFACE_PATTERN_PARAMS_BY_BODY: Readonly<Record<string, SurfacePatternParams>> = {
+  io: {
+    type: SurfaceType.Volcanic,
+    sulfurFreq: 3.0,
+    sulfurAmp: 0.45,
+    calderaFreq: 9.0,
+    calderaAmp: 0.9,
+    accentA: { r: 0.85, g: 0.45, b: 0.15 },
+    accentB: { r: 0.12, g: 0.08, b: 0.05 },
+    albedo: 0.4,
+  },
+  europa: {
+    type: SurfaceType.Icy,
+    mottleFreq: 2.5,
+    mottleAmp: 0.35,
+    lineWidth: 0.01,
+    lineCount: 10,
+    accentA: { r: 0.62, g: 0.42, b: 0.3 },
+    accentB: { r: 0.55, g: 0.32, b: 0.22 },
+    albedo: 0.45,
+  },
+};
+
+/**
+ * #1419 — body 의 패턴 파라미터를 해석한다 (기본값 fallback 없음).
+ * 패턴 타입인데 행이 없거나 행의 `type` 이 등록 타입과 다르면 throw / 비-패턴 타입인데 행이 있으면
+ * throw / 비-패턴 타입은 `null` (바인딩은 중립값 — `packPatternParams` 미호출).
+ *
+ * @param table 주입용 (단위 테스트) — 미전달 시 `SURFACE_PATTERN_PARAMS_BY_BODY`
+ */
+export function resolveSurfacePatternParams(
+  bodyId: string,
+  surfaceType: SurfaceType,
+  table: Readonly<Record<string, SurfacePatternParams>> = SURFACE_PATTERN_PARAMS_BY_BODY,
+): SurfacePatternParams | null {
+  const row = Object.prototype.hasOwnProperty.call(table, bodyId) ? table[bodyId] : undefined;
+  if (PATTERN_SURFACE_TYPES.has(surfaceType)) {
+    if (row === undefined) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 는 패턴 타입 (${surfaceType}) 인데 SURFACE_PATTERN_PARAMS_BY_BODY 행이 없다 (#1419 — 기본값 fallback 금지)`,
+      );
+    }
+    if (row.type !== surfaceType) {
+      throw new Error(
+        `[procedural-planet-shader] '${bodyId}' 의 패턴 행 type (${row.type}) 이 등록 타입 (${surfaceType}) 과 다르다 (#1419)`,
+      );
+    }
+    return row;
+  }
+  if (row !== undefined) {
+    throw new Error(
+      `[procedural-planet-shader] '${bodyId}' 는 비-패턴 타입 (${surfaceType}) 인데 SURFACE_PATTERN_PARAMS_BY_BODY 행이 있다 (#1419 — 소비자 없는 행)`,
+    );
+  }
+  return null;
+}
+
+/**
+ * #1419 §5-3 — 명명 필드를 GLSL `vec4 patternParams` 로 패킹한다 (매핑의 유일한 출처).
+ * Icy `lineCount` 가 정수 `[0, ICY_MAX_LINE_COUNT]` 밖이면 throw — GLSL 루프 상한은 상수라 초과분이
+ * 조용히 잘리는 경로를 막는다.
+ */
+export function packPatternParams(
+  params: SurfacePatternParams,
+): readonly [number, number, number, number] {
+  if (params.type === SurfaceType.Volcanic) {
+    return [params.sulfurFreq, params.sulfurAmp, params.calderaFreq, params.calderaAmp];
+  }
+  const n = params.lineCount;
+  if (!Number.isInteger(n) || n < 0 || n > ICY_MAX_LINE_COUNT) {
+    throw new Error(
+      `[procedural-planet-shader] Icy lineCount ${n} 이 정수 [0, ${ICY_MAX_LINE_COUNT}] 밖이다 (#1419 §5-4)`,
+    );
+  }
+  return [params.mottleFreq, params.mottleAmp, params.lineWidth, n];
+}
+
+/** 비-패턴 타입이 바인딩하는 값 — `patternParams` · 보조색을 읽는 GLSL 이 분기 5 · 6 뿐이라 픽셀 영향이 없다. */
+const NO_PATTERN_VEC4: readonly [number, number, number, number] = [0, 0, 0, 0];
+const NO_ACCENT_RGB: SurfaceAccentRgb = Object.freeze({ r: 0, g: 0, b: 0 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Amendment 1 (#773/#775) — 광원 모델 + 대륙 mix rendering-only 미학 상수 SSoT.
@@ -920,6 +1198,16 @@ uniform float gasTurbulence;
 uniform float iceGiantAlbedo;
 uniform float craterDepth;
 uniform float craterDensity;
+// #1419 — cratered (3) 의 body 별 결 · 2톤 지역 (달은 결 0.15 · 지역 0 — 픽셀 불변).
+uniform float craterTerrainAmp;
+uniform float craterRegionAmp;
+uniform float craterRegionFreq;
+// #1419 — cratered (3) · volcanic (5) · icy (6) 의 렌더 albedo 배율 (비소비 타입 1).
+uniform float surfaceAlbedo;
+// #1419 — volcanic (5) · icy (6) 전용 보조색 2 + 패턴 vec4 (매핑 = packPatternParams). 비소비 타입 0.
+uniform vec3 patternAccentA;
+uniform vec3 patternAccentB;
+uniform vec4 patternParams;
 uniform float logDepthConstant;
 
 // Amendment 1 (#773) — 광원 모델 uniform (HemisphericLight + PointLight 재현, scene SSoT 주입).
@@ -1229,9 +1517,43 @@ void main(void) {
     // 크레이터 = 가까운 셀에서 어둡게 (smoothstep falloff). rnd.x 로 크레이터 유무/크기 변조.
     float craterSize = 0.18 + rnd.x * 0.22;
     float crater = (1.0 - smoothstep(0.0, craterSize, dist)) * step(0.35, rnd.x);
-    // 저주파 결 (mare/highland 명암) + 크레이터 음영.
-    float terrain = (fbm(p * 5.0) - 0.5) * 2.0 * 0.15;
-    col = baseColor * (1.0 + terrain) * (1.0 - crater * craterDepth);
+    // 저주파 결 (mare/highland 명암) + 저주파 2톤 지역 (#1419) + 크레이터 음영.
+    // 음수 craterDepth 는 크레이터를 밝힌다 (칼리스토 · 가니메데 — ADR 20261030-1419 §5-3).
+    float terrain = (fbm(p * 5.0) - 0.5) * 2.0 * craterTerrainAmp;
+    float region = (valueNoise(p * craterRegionFreq) - 0.5) * 2.0 * craterRegionAmp;
+    col = baseColor * surfaceAlbedo * (1.0 + terrain + region) * (1.0 - crater * craterDepth);
+  } else if (uSurfaceType == 5) {
+    // ── volcanic (이오) — 황 패치 + 칼데라 점 · 후광 (#1419 §5-4) ─────────────
+    // 반사율 (col) 만 정한다 — 밤면 자체 발광 없음 (아래 col *= shade 가 밤면을 어둡게 한다).
+    float sulfur = fbm(p * patternParams.x);
+    vec3 vc = mix(baseColor, patternAccentA, smoothstep(0.45, 0.72, sulfur) * patternParams.y);
+    vec3 vcell = p * patternParams.z;
+    vec3 vrnd = hash33(floor(vcell));
+    float vdist = length(fract(vcell) - vrnd);
+    // 셀의 45% 에만 칼데라 (step(0.55, rnd.x)).
+    float spot = (1.0 - smoothstep(0.0, 0.10 + vrnd.y * 0.14, vdist)) * step(0.55, vrnd.x);
+    float halo = (1.0 - smoothstep(0.0, 0.30 + vrnd.y * 0.14, vdist)) * step(0.55, vrnd.x) - spot;
+    vc = mix(vc, patternAccentA, clamp(halo, 0.0, 1.0) * 0.6 * patternParams.w);
+    vc = mix(vc, patternAccentB, spot * patternParams.w);
+    col = vc * surfaceAlbedo;
+  } else if (uSurfaceType == 6) {
+    // ── icy (유로파) — 얼룩 + 대원 계열 lineae (#1419 §5-4) ──────────────────
+    // ⚠️ 루프 상한은 **상수** (ICY_MAX_LINE_COUNT). uniform (patternParams.w = lineCount) 은 break 조건에만
+    // 쓴다 — 무한 루프 · TDR 경로 없음. 지역 변수명은 GLSL 예약어 (patch · sample · filter 등) 를 피한다.
+    float warp = fbm(p * patternParams.x);
+    float mottle = smoothstep(0.42, 0.72, fbm(p * patternParams.x * 1.7 + 7.0));
+    vec3 ic = mix(baseColor, patternAccentA, mottle * patternParams.y);
+    float lineae = 0.0;
+    for (int i = 0; i < ${ICY_MAX_LINE_COUNT}; i++) {
+      if (float(i) >= patternParams.w) break;
+      vec3 lh = hash33(vec3(float(i) * 7.13, 3.1, 1.7));
+      vec3 ldir = normalize(lh - 0.5);
+      float loff = (hash33(vec3(1.9, float(i) * 3.7, 5.3)).x - 0.5) * 1.2;
+      float ldist = abs(dot(p, ldir) - loff + (warp - 0.5) * 0.25);
+      lineae = max(lineae, 1.0 - smoothstep(0.0, patternParams.z, ldist));
+    }
+    ic = mix(ic, patternAccentB, lineae * 0.85);
+    col = ic * surfaceAlbedo;
   }
   // 미등록 타입 (테이블 미적용) 은 여기 도달하지 않음 (호출부에서 셰이더 자체 미생성).
 
@@ -1495,6 +1817,14 @@ export function createProceduralPlanetMaterial(
         'iceGiantAlbedo',
         'craterDepth',
         'craterDensity',
+        // #1419 — 크레이터 결 · 지역 3 + 표면 albedo 1 + 패턴 보조색 2 + 패턴 vec4 1 (+7).
+        'craterTerrainAmp',
+        'craterRegionAmp',
+        'craterRegionFreq',
+        'surfaceAlbedo',
+        'patternAccentA',
+        'patternAccentB',
+        'patternParams',
         'logDepthConstant',
         // Amendment 1 (#773) — 광원 모델 uniform.
         'uSunDirection',
@@ -1575,8 +1905,28 @@ export function createProceduralPlanetMaterial(
   // #1274 U1 (b) — IceGiant 전용 albedo 배율. 비-IceGiant 는 1 (분기 4 밖에서 읽지 않아 픽셀 영향 없음 —
   // 바인딩을 0.5 로 바꾼 변이에서도 verify:1274-invariance 4 body diff 0, PR #1278 코멘트).
   material.setFloat('iceGiantAlbedo', resolveIceGiantAlbedo(body.id, surfaceType));
-  material.setFloat('craterDepth', CRATER_DEPTH);
-  material.setFloat('craterDensity', CRATER_DENSITY);
+  // #1419 §5-3 — 크레이터 · 패턴 파라미터는 body 별 테이블에서 해석한다 (누락 · 초과 시 throw).
+  // 비-Cratered 는 달 값 (#1419 이전 바인딩과 같은 값) · 비-패턴 타입은 0 을 받는다 — 이 uniform 을 읽는
+  // GLSL 이 해당 분기뿐이라 픽셀 영향이 없어야 하고, 그 명제를 `verify:1274-invariance` 가 잰다.
+  // high · mid 가 같은 이 함수를 부르므로 두 variant 의 값은 같다 (§5-5).
+  const crater = resolveSurfaceCraterParams(body.id, surfaceType);
+  const pattern = resolveSurfacePatternParams(body.id, surfaceType);
+  material.setFloat('craterDepth', crater.depth);
+  material.setFloat('craterDensity', crater.density);
+  material.setFloat('craterTerrainAmp', crater.terrainAmp);
+  material.setFloat('craterRegionAmp', crater.regionAmp);
+  material.setFloat('craterRegionFreq', crater.regionFreq);
+  // 패턴 타입은 패턴 행의 albedo, 그 밖은 크레이터 행 (비-Cratered 는 달 값 `1`). 토성 (IceGiant) 의
+  // albedo 는 `iceGiantAlbedo` 축이다 — 이 uniform 은 분기 3 · 5 · 6 만 읽는다.
+  material.setFloat('surfaceAlbedo', pattern?.albedo ?? crater.albedo);
+  const accentA = pattern?.accentA ?? NO_ACCENT_RGB;
+  const accentB = pattern?.accentB ?? NO_ACCENT_RGB;
+  material.setColor3('patternAccentA', new Color3(accentA.r, accentA.g, accentA.b));
+  material.setColor3('patternAccentB', new Color3(accentB.r, accentB.g, accentB.b));
+  material.setVector4(
+    'patternParams',
+    new Vector4(...(pattern ? packPatternParams(pattern) : NO_PATTERN_VEC4)),
+  );
 
   // ADR §결정 3 — detailLevel 예약 (1차 미사용, 셰이더 uniform 미선언이라 setFloat 생략).
   // options.detailLevel 은 인터페이스 예약 — 후속 활성화 시 uniform 추가 + 셰이더 배선.
@@ -1975,6 +2325,10 @@ export function surfaceColorMirror(
     g = by * albedo * (1 + mod);
     b = bz * albedo * (1 + mod);
   } else if (surfaceType === SurfaceType.Cratered) {
+    // #1419 — 이 미러는 **달 행** (`MOON_CRATER_PARAMS` — regionAmp 0 · albedo 1) 의 식이다. 그 행에서
+    // GLSL 의 지역 항은 `0`, albedo 곱은 `1` 이라 아래 식과 같다. 미러는 bodyId 를 받지 않으므로
+    // 수성 · 칼리스토 · 가니메데 색으로 불러도 throw 하지 않고 **달 식**을 돌려준다 — 그 body 들의 GLSL
+    // 출력과는 다르다. throw 는 패턴 타입 (volcanic 5 · icy 6) 에서만 난다 (아래 분기).
     const fract = (n: number): number => n - Math.floor(n);
     const cellX = Math.floor(px * CRATER_DENSITY),
       cellY = Math.floor(py * CRATER_DENSITY),
@@ -1990,10 +2344,15 @@ export function surfaceColorMirror(
       return t * t * (3 - 2 * t);
     };
     const crater = (1 - sm(0, craterSize, dist)) * (rnd[0] >= 0.35 ? 1 : 0);
-    const terrain = (fbmMirror(px * 5, py * 5, pz * 5) - 0.5) * 2 * 0.15;
+    const terrain = (fbmMirror(px * 5, py * 5, pz * 5) - 0.5) * 2 * CRATER_TERRAIN_AMP;
     r = bx * (1 + terrain) * (1 - crater * CRATER_DEPTH);
     g = by * (1 + terrain) * (1 - crater * CRATER_DEPTH);
     b = bz * (1 + terrain) * (1 - crater * CRATER_DEPTH);
+  } else if (PATTERN_SURFACE_TYPES.has(surfaceType)) {
+    // 조용히 baseColor 를 돌려주면 「미러 = GLSL」 로 오독된다 — 범위 밖임을 명시한다.
+    throw new Error(
+      `[surfaceColorMirror] 패턴 타입 (${surfaceType}) 은 미러 범위 밖이다 (#1419 — GLSL 분기 5 · 6 미러 없음)`,
+    );
   }
 
   const clamp01 = (n: number): number => Math.min(Math.max(n, 0), 1);

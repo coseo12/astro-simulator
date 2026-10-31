@@ -5,6 +5,13 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Added
+
+- **[#1419] 수성 · 칼리스토 · 가니메데 · 이오 · 유로파 · 토성에 절차 표면을 그린다** ([#1419](https://github.com/coseo12/astro-simulator/issues/1419)). 6 body 를 `SURFACE_TYPE_BY_BODY` 에 등록했다. 수성 · 칼리스토 · 가니메데는 Cratered, 이오는 신규 `Volcanic` (5 — 황 패치 + 칼데라 점 · 후광), 유로파는 신규 `Icy` (6 — 얼룩 + 대원 계열 lineae) 이고, 토성은 IceGiant 분기를 재사용한다 (셰이더 0행). 수치는 ADR [`20261030-1419`](docs/decisions/20261030-1419-body-surface-catalog.md) §5-A 동결값 (안 1, 사용자 육안 결정) 이고, 토성 albedo 만 `verify:790` S3 때문에 `0.43` 대신 `0.50` 이다.
+  - body 별 테이블 2종 — `SURFACE_CRATER_PARAMS_BY_BODY` (`density` · `depth` · `terrainAmp` · `regionAmp` · `regionFreq` · `albedo`) 와 `SURFACE_PATTERN_PARAMS_BY_BODY` (타입별 명명 필드 → `packPatternParams` 가 `vec4` 로 패킹). 소비 타입 body 만 행을 갖고, 해석 함수는 누락 · 초과 · 타입 불일치에서 throw 한다. 달 행은 기존 상수를 참조하고 종전 GLSL 리터럴 `0.15` 는 `CRATER_TERRAIN_AMP` 로 추출했다.
+  - uniform 7개 추가 (`craterTerrainAmp` · `craterRegionAmp` · `craterRegionFreq` · `surfaceAlbedo` · `patternAccentA` · `patternAccentB` · `patternParams`). 칼리스토 · 가니메데의 음수 `depth` 는 크레이터를 밝힌다 (허용 범위 `−1 ≤ depth < 1`). Icy 의 GLSL 루프 상한은 상수 `12` 이고 `lineCount` 는 `break` 조건에만 쓴다.
+  - 표시 근사: albedo 배율은 물리 알베도가 아니라 낮면 포화를 막는 렌더 배율이다. 패턴 · 보조색은 관측 사진의 특징을 절차 노이즈로 흉내 낸 것이라 실제 지형 위치와 같지 않다.
+
 ### Fixed
 
 - **[#1363] `cross_validate.sh` 의 agy 호출에 스크립트 하드 타임아웃을 건다** ([#1363](https://github.com/coseo12/astro-simulator/issues/1363)). agy 가 `--print-timeout` (300 s) 을 넘겨 끝나지 않던 문제다 (실피해 5회 — `10~26` 분 수동 종료 3회, 7시간 30분 · 8시간 40분 각 1회). agy 로그 5건 모두 시작 `1~2` 분에 「CLI store manager shutting down」 이 찍힌 뒤, 외부 SIGTERM 을 받기 전까지 「Language server shutting down」 이 기록되지 않았다 (외부 신호 없이 끝난 실행은 marker 후 10 ms 안에 찍힌다). 그중 10-17 · 10-18 의 3건은 SIGTERM 뒤 「Waiting for migrations to complete」 를 남기고 5일 넘게 살아 있었다. 턴을 마친 뒤라 `--print-timeout` 이 걸리지 않았다는 것은 추론이다.
@@ -14,6 +21,9 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
+- **수성 · 칼리스토 · 가니메데 · 이오 · 유로파 · 토성이 단색 대신 절차 표면으로 보인다** (#1419). LOD high · mid 에 적용되고 (목성 포커스에서 갈릴레이 4 위성의 mid 도 포함), LOD low · `?surface=off` 는 종전 단색 그대로다. 기존 6 body (지구 · 화성 · 목성 · 달 · 천왕성 · 해왕성) 는 `verify:1274-invariance` base ↔ feature 12 시나리오에서 diff 0 이다 (disk `0.95R` 표본 · 로컬 macOS · swiftshader).
+- **토성 최대 줌인 화면이 더 어둡다** (#1419). 최대 줌인은 밤면이 화면을 채우고 밤면 휘도가 albedo `0.50` 에 비례한다. `verify:790-focus-zoom` S3 는 로컬 macOS · bundled chromium headless 2회 `21.5` · `22.5` (임계 `20`, 단색 시절 develop 실측 `42.4` — ADR §3 M7) 다. 790 은 CI 밖 로컬 가드다.
+- `verify:756-surface` 의 `SURFACE_BODIES` 에 6 body 를, `verify:773-light` 의 `SURFACE_BODIES` 에 io · europa 를 더했다. 두 가드의 단색 대조군 (`PLAIN_BODIES`) 은 `[venus, triton]` 이 된다. 판정식 · 임계는 그대로이고 새 가드는 없다.
 - **cross-validate 가 agy 정체에 무기한 매달리지 않는다** (#1363). 기본값에서 agy 호출 구간이 853 초를 넘지 않고, 넘으면 claude-only 폴백 (exit 77) 으로 끝난다. agy 자체 timeout 의 부분 출력도 이제 `applied` 가 아니라 exit 77 이다.
 
 ## [0.107.0] - 2026-10-26
