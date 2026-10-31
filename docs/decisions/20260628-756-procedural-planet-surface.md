@@ -167,6 +167,7 @@
 2. **gas-bands 위도 밴드 부정확** — 자전축 기울기 (axialTiltDeg, ring-shader #647 인프라) 미반영으로 목성 밴드가 공전면 기준일 수 있음. 1차는 mesh local Y 기준 근사 (Visual Fidelity rendering-only) — 사실성 요구 시 후속.
 3. **표면 타입 확장 요구** (ice giant / 위성 추가) — `SURFACE_TYPE_BY_BODY` 테이블 + surfaceType enum 추가 (R-Phase). 데이터 변경 0 예측 재현.
    > ⏩ **발동 (2026-10-02, #1274 — Amendment 12, Accepted)**: ice giant 만 (uranus · neptune → 신규 `IceGiant`). 위성 · Cratered 확장은 비-범위 (사용자 Q2). 「테이블 + enum 추가」 외에 **밴드 파라미터의 body 별 테이블** 이 선행된다 — 상수 1줄로는 uranus 와 neptune 의 값을 가를 수 없기 때문이다 (§A12.4). 위 원문은 소급 수정하지 않는다.
+   > ⏩ **재발동 (2026-10-30, #1419 — 별도 ADR [20261030-1419](20261030-1419-body-surface-catalog.md), Accepted 2026-10-30)**: 위성 · 암석 행성 (Cratered 파라미터화 · 신규 `Volcanic` · `Icy` · saturn). §A12.16 조건 5 에 따라 표면 타입 카탈로그를 별도 ADR 로 분리했다. 위 원문은 소급 수정하지 않는다.
 4. **WebGPU↔WebGL parity 결함** — ring/starfield 가 실증했으나, 표면 셰이더 특정 함수 (cell noise / fbm) 의 백엔드 차이 발견 시 qa 실 Chrome (WebGPU) + CI swiftshader (WebGL) 양 경로 박제.
 
 ---
@@ -3365,6 +3366,7 @@ R4 의 「WebGPU uniform 한도」 는 저장소 안에 수치로 박제된 적�
 3. **U1 (b) 채택** — albedo 배율 축의 Visual Fidelity 4항목 재판정 (§A12.14 4항).
 4. **다른 body 가 `BAND_SURFACE_TYPES` 타입으로 등록** (예: saturn) — 밴드 테이블 행 추가가 불변식으로 강제된다. 코드 변경은 행 1개 + 타입 테이블 1줄이어야 하고, 넘으면 결정 1 의 추상화를 재검토한다.
 5. **본 ADR 에 Amendment 13 이 필요해짐** — 「표면 타입 카탈로그」 (타입 · body · 파라미터 테이블의 결정) 를 별도 ADR 로 분리할지 판정한다 (§A12.2 비용).
+   > ⏩ **결과 (2026-10-30, #1419)**: Amendment 13 (#1362 — 지구 자전축) 은 카탈로그와 무관해 이 판정을 하지 않았다. 카탈로그를 바꾸는 첫 변경인 #1419 에서 **분리**로 판정 — [ADR 20261030-1419](20261030-1419-body-surface-catalog.md) §0. 위 원문은 소급 수정하지 않는다.
 6. **`fbm` 사본이 5벌째가 됨** — §A10.14 조건 6 동형 재판단.
 
 ### A12.17 계약 조정 — **C1~C5 전건 수용 (사용자 2026-10-02)**
