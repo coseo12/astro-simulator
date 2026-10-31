@@ -82,7 +82,7 @@
  * (`#1146` 이 756 에서 같은 손실을 기록한 것과 동형).
  *
  * 판정 (#759 — shader-pixel-guard CI 상시 가드, ADR 20260705-759 결정 3 + **Amendment 2**):
- *   4 body 각각 (1) dayMean > nightMean × 2 (2) contrastMean 상대 낙차
+ *   `SURFACE_BODIES` 각각 (#1419 이후 6 body) (1) dayMean > nightMean × 2 (2) contrastMean 상대 낙차
  *   `1 − OFF/ON ≥ CONTRAST_ON_OFF_MARGIN` (#1159 Amendment 2 — 그 전에는 결정 3 원문이 선언한
  *   마진 없는 `ON > OFF`. 원문 라인은 기록 보존을 위해 소급 편집하지 않았으므로 **판정 SSoT 는
  *   Amendment 2** 다)
@@ -202,6 +202,9 @@ const SURFACE_BODIES = [
   { id: 'mars', type: 'desert' },
   { id: 'jupiter', type: 'gas-bands' },
   { id: 'moon', type: 'cratered' },
+  // #1419 — Volcanic · Icy 대표 (밤면 누설 축, ADR 20261030-1419 §6). 판정식 · 임계 무변경.
+  { id: 'io', type: 'volcanic' },
+  { id: 'europa', type: 'icy' },
 ];
 // 단색 행성 (회귀만 확인 — terminator/밤면 대조 baseline).
 // #1274 D6 (iii) — neptune 은 IceGiant 로 등록돼 단색 대조군에서 뺐다 (기존 mercury 는 유지 — 선정 기준은 대체분에만). 대체 body = triton. 선정 기준
@@ -209,7 +212,8 @@ const SURFACE_BODIES = [
 // 미등록 ② 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) 밖 — 다음 표면
 // 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트). ⚠️ ③ 은 선정 시점에
 // 확인한 기준이고 런타임에 강제되지 않는다 — plain 측정이 실패하거나 area 0 이어도 이 가드는 PASS 한다.
-const PLAIN_BODIES = [{ id: 'venus' }, { id: 'mercury' }, { id: 'saturn' }, { id: 'triton' }];
+// #1419 — mercury · saturn 은 절차 표면으로 등록돼 단색 대조군에서 뺐다 (대체 없음 — venus · triton 2개).
+const PLAIN_BODIES = [{ id: 'venus' }, { id: 'triton' }];
 
 /**
  * #1274 D6 (iii) — 두 목록이 비어 있지 않음만 묻는다 (새 임계 0). `SURFACE_BODIES` 가 비면 표면 판정

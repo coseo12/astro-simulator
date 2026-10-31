@@ -43,11 +43,12 @@ describe('#1274 D1 — 밴드 테이블 ↔ 밴드 타입 body 불변식 (양방
     expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual(sorted(derived));
   });
 
-  it('정확한 집합 — 밴드 타입 {GasBands, IceGiant} · 밴드 행 {jupiter, neptune, uranus} (#1274 PR2)', () => {
+  it('정확한 집합 — 밴드 타입 {GasBands, IceGiant} · 밴드 행 {jupiter, neptune, saturn, uranus} (#1274 PR2 · #1419)', () => {
     expect([...BAND_SURFACE_TYPES].sort()).toEqual([SurfaceType.GasBands, SurfaceType.IceGiant]);
     expect(sorted(Object.keys(SURFACE_BAND_PARAMS_BY_BODY))).toEqual([
       'jupiter',
       'neptune',
+      'saturn',
       'uranus',
     ]);
   });
@@ -262,7 +263,20 @@ describe('#1274 D13 — IceGiant 승인값 박제 + 바인딩', () => {
       count: 6,
       turbulence: 0.06,
     });
-    expect(ICE_GIANT_ALBEDO_BY_BODY).toEqual({ uranus: 0.45, neptune: 1 });
+    expect(ICE_GIANT_ALBEDO_BY_BODY).toEqual({ uranus: 0.45, neptune: 1, saturn: 0.5 });
+  });
+
+  // #1419 ADR `20261030-1419` §5-A — saturn 동결값 (안 1 밴드 + albedo 0.50 — §4 Q4 saturn 예외).
+  it('saturn = #1419 §5-A 동결값 (밴드 0.08 / 10 / 0.05 · albedo 0.50) — 테이블 · 바인딩', () => {
+    expect(SURFACE_BAND_PARAMS_BY_BODY.saturn).toEqual({
+      amplitude: 0.08,
+      count: 10,
+      turbulence: 0.05,
+    });
+    expect(bound('saturn')).toEqual({
+      band: { amplitude: 0.08, count: 10, turbulence: 0.05 },
+      albedo: 0.5,
+    });
   });
 
   it('바인딩이 승인값을 따른다 (NullEngine — uniform 이 실제로 읽힌다)', () => {
