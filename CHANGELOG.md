@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.108.0] - 2026-10-31
+
 ### Added
 
 - **[#1419] 수성 · 칼리스토 · 가니메데 · 이오 · 유로파 · 토성에 절차 표면을 그린다** ([#1419](https://github.com/coseo12/astro-simulator/issues/1419)). 6 body 를 `SURFACE_TYPE_BY_BODY` 에 등록했다. 수성 · 칼리스토 · 가니메데는 Cratered, 이오는 신규 `Volcanic` (5 — 황 패치 + 칼데라 점 · 후광), 유로파는 신규 `Icy` (6 — 얼룩 + 대원 계열 lineae) 이고, 토성은 IceGiant 분기를 재사용한다 (셰이더 0행). 수치는 ADR [`20261030-1419`](docs/decisions/20261030-1419-body-surface-catalog.md) §5-A 동결값 (안 1, 사용자 육안 결정) 이고, 토성 albedo 만 `verify:790` S3 때문에 `0.43` 대신 `0.50` 이다.
