@@ -7,12 +7,14 @@
  *   3. 누락 · 초과 · 타입 불일치 시 throw (기본값 fallback 금지).
  *   4. Icy `lineCount` 정수 `0 ≤ n ≤ 12` (GLSL 루프 상한 상수와 같은 값).
  *   5. 정적 분석 — GLSL 루프 상수 상한 · uniform 4중 SSoT · 예약어 · 분기 수식 · 밤면 자체 발광 없음.
- *   6. 바인딩 (NullEngine) — 등록 body 전건의 uniform == 해석 함수 결과 (high · mid 동일 함수 — §5-5).
+ *   6. 바인딩 (NullEngine) — 등록 body 전건의 uniform == 해석 함수 결과 + high · mid variant 의 uniform
+ *      동일 (§5-5 — `createBodyMesh` · `createBodyMeshMid` 경유).
  */
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, Vector3, type ShaderMaterial } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
+import { createBodyMesh, createBodyMeshMid } from './body-mesh-factory.js';
 import {
   CRATER_DENSITY,
   CRATER_DEPTH,
@@ -370,9 +372,14 @@ describe('#1419 정적 분석 — GLSL 분기 계약 (§5-4)', () => {
       expect(b).not.toMatch(/\blights\s*=/);
       expect(b).not.toContain('shade');
     }
-    // 분기 사슬 뒤 공통 합성이 col 에 shade 를 곱한다 (보조색은 shade 곱 앞에만 들어간다).
+    // 분기 사슬 뒤 공통 합성이 col 에 shade 를 **무조건** 곱한다 (보조색은 shade 곱 앞에만 들어간다).
+    // 위치만 보면 `if (uSurfaceType < 5) col *= shade;` 변이를 놓친다 (PR #1421 리뷰 권고 1) — main()
+    // 최상위 들여쓰기 (2칸) 의 조건 없는 단독 1줄이고, 정확히 1회임을 단언한다.
+    const shadeLines = FRAGMENT_CODE.match(/^ {2}col \*= shade;$/gm) ?? [];
+    expect(shadeLines).toHaveLength(1);
+    expect(FRAGMENT_CODE.match(/col \*= shade/g) ?? []).toHaveLength(1);
     const chainEnd = FRAGMENT_CODE.indexOf('} else if (uSurfaceType == 6) {');
-    const shadeMul = FRAGMENT_CODE.indexOf('col *= shade;');
+    const shadeMul = FRAGMENT_CODE.search(/^ {2}col \*= shade;$/m);
     expect(chainEnd).toBeGreaterThan(0);
     expect(shadeMul).toBeGreaterThan(chainEnd);
   });
@@ -499,6 +506,49 @@ describe('#1419 바인딩 — 등록 body 전건의 uniform == 해석 함수 결
         expect(s._floats.craterDepth, id).toBe(CRATER_DEPTH);
         expect(s._floats.craterDensity, id).toBe(CRATER_DENSITY);
         expect(s._floats.surfaceAlbedo, id).toBe(1);
+      }
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+
+  // §5-5 — high · mid 는 같은 생성 함수를 부른다는 구조 판독을 실행으로 확인한다 (PR #1421 리뷰 권고 2).
+  // mid 에 다른 body 를 넘기는 변이 (`{ ...body, id: 'moon' }`) 는 여기서 FAIL 한다.
+  it('high · mid variant 의 표면 uniform 이 같다 (createBodyMesh · createBodyMeshMid 경유)', () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    scene.activeCamera = new ArcRotateCamera('cam', 0, Math.PI / 2, 50, Vector3.Zero(), scene);
+    try {
+      const ids = Object.keys(SURFACE_TYPE_BY_BODY);
+      expect(ids.length).toBeGreaterThan(0);
+      const snapshot = (mat: unknown) => {
+        const s = mat as BoundStores & { _ints: Record<string, number>; getClassName(): string };
+        expect(s.getClassName()).toBe('ShaderMaterial');
+        const vec = (v: { x: number; y: number; z: number; w: number }) => [v.x, v.y, v.z, v.w];
+        const rgb = (c: { r: number; g: number; b: number }) => [c.r, c.g, c.b];
+        return {
+          floats: { ...s._floats },
+          ints: { ...s._ints },
+          colors3: Object.fromEntries(Object.entries(s._colors3).map(([k, c]) => [k, rgb(c)])),
+          vectors4: Object.fromEntries(Object.entries(s._vectors4).map(([k, v]) => [k, vec(v)])),
+        };
+      };
+      for (const id of ids) {
+        const body = {
+          id,
+          kind: 'planet',
+          radius: 1000,
+          colorHint: { hex: '#808080' },
+        } as unknown as LoadedCelestialBody;
+        const high = createBodyMesh(body, scene, 'solar', () => 1, true);
+        const mid = createBodyMeshMid(body, scene, 'solar', high, () => 1, true);
+        const h = snapshot(high.material);
+        const m = snapshot(mid.material);
+        // 공허 통과 차단 — 신규 uniform 이 실제로 바인딩돼 있다.
+        expect(h.floats.surfaceAlbedo, id).toBeTypeOf('number');
+        expect(h.vectors4.patternParams, id).toHaveLength(4);
+        expect(m, id).toEqual(h);
       }
     } finally {
       scene.dispose();

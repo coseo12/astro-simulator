@@ -22,7 +22,7 @@ Semantic Versioning을 따른다.
 ### Behavior Changes
 
 - **수성 · 칼리스토 · 가니메데 · 이오 · 유로파 · 토성이 단색 대신 절차 표면으로 보인다** (#1419). LOD high · mid 에 적용되고 (목성 포커스에서 갈릴레이 4 위성의 mid 도 포함), LOD low · `?surface=off` 는 종전 단색 그대로다. 기존 6 body (지구 · 화성 · 목성 · 달 · 천왕성 · 해왕성) 는 `verify:1274-invariance` base ↔ feature 12 시나리오에서 diff 0 이다 (disk `0.95R` 표본 · 로컬 macOS · swiftshader).
-- **토성 최대 줌인 화면이 더 어둡다** (#1419). 최대 줌인은 밤면이 화면을 채우고 밤면 휘도가 albedo `0.50` 에 비례한다. `verify:790-focus-zoom` S3 는 로컬 macOS · bundled chromium headless 2회 `21.5` · `22.5` (임계 `20`, 단색 시절 `42.2`) 다. 790 은 CI 밖 로컬 가드다.
+- **토성 최대 줌인 화면이 더 어둡다** (#1419). 최대 줌인은 밤면이 화면을 채우고 밤면 휘도가 albedo `0.50` 에 비례한다. `verify:790-focus-zoom` S3 는 로컬 macOS · bundled chromium headless 2회 `21.5` · `22.5` (임계 `20`, 단색 시절 develop 실측 `42.4` — ADR §3 M7) 다. 790 은 CI 밖 로컬 가드다.
 - `verify:756-surface` 의 `SURFACE_BODIES` 에 6 body 를, `verify:773-light` 의 `SURFACE_BODIES` 에 io · europa 를 더했다. 두 가드의 단색 대조군 (`PLAIN_BODIES`) 은 `[venus, triton]` 이 된다. 판정식 · 임계는 그대로이고 새 가드는 없다.
 - **cross-validate 가 agy 정체에 무기한 매달리지 않는다** (#1363). 기본값에서 agy 호출 구간이 853 초를 넘지 않고, 넘으면 claude-only 폴백 (exit 77) 으로 끝난다. agy 자체 timeout 의 부분 출력도 이제 `applied` 가 아니라 exit 77 이다.
 

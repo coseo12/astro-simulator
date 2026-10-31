@@ -2326,8 +2326,9 @@ export function surfaceColorMirror(
     b = bz * albedo * (1 + mod);
   } else if (surfaceType === SurfaceType.Cratered) {
     // #1419 — 이 미러는 **달 행** (`MOON_CRATER_PARAMS` — regionAmp 0 · albedo 1) 의 식이다. 그 행에서
-    // GLSL 의 지역 항은 `0`, albedo 곱은 `1` 이라 아래 식과 같다. 수성 · 칼리스토 · 가니메데 행과
-    // volcanic · icy 분기는 미러 범위 밖이다 (호출하면 아래에서 throw).
+    // GLSL 의 지역 항은 `0`, albedo 곱은 `1` 이라 아래 식과 같다. 미러는 bodyId 를 받지 않으므로
+    // 수성 · 칼리스토 · 가니메데 색으로 불러도 throw 하지 않고 **달 식**을 돌려준다 — 그 body 들의 GLSL
+    // 출력과는 다르다. throw 는 패턴 타입 (volcanic 5 · icy 6) 에서만 난다 (아래 분기).
     const fract = (n: number): number => n - Math.floor(n);
     const cellX = Math.floor(px * CRATER_DENSITY),
       cellY = Math.floor(py * CRATER_DENSITY),
