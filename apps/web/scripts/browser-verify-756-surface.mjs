@@ -142,13 +142,21 @@ const SURFACE_BODIES = [
   // #1274 D4 — 얼음 거성 (ADR 756 Amendment 12). 판정식 · HF_ENTROPY_MARGIN 무변경 (새 임계 0).
   { id: 'uranus', type: 'ice-giant' },
   { id: 'neptune', type: 'ice-giant' },
+  // #1419 — 지구 밖 6 body (ADR 20261030-1419 §6). 판정식 · HF_ENTROPY_MARGIN 무변경 (새 임계 0).
+  { id: 'mercury', type: 'cratered' },
+  { id: 'callisto', type: 'cratered' },
+  { id: 'ganymede', type: 'cratered' },
+  { id: 'io', type: 'volcanic' },
+  { id: 'europa', type: 'icy' },
+  { id: 'saturn', type: 'ice-giant' },
 ];
 // #1274 D6 (iii) — neptune 은 IceGiant 로 등록돼 단색 대조군에서 뺐다. 대체 body = triton. 선정 기준
 // (ADR 756 §A12.9 · 계약 조정 C4 — 두 가드의 배경 배제는 기하라 휘도 임계와 무관): ① SURFACE_TYPE_BY_BODY
 // 미등록 ② 로드맵 Cratered 후보 (mercury · callisto · rhea · titania · oberon · ceres) 밖 — 다음 표면
 // 확장에서 대조군이 다시 사라지지 않게 ③ 첫 실행 로그 disk area > 0 (PR #1278 코멘트). ⚠️ ③ 은 선정 시점에
 // 확인한 기준이고 런타임에 강제되지 않는다 — plain 측정이 실패하거나 area 0 이어도 이 가드는 PASS 한다.
-const PLAIN_BODIES = [{ id: 'venus' }, { id: 'saturn' }, { id: 'triton' }];
+// #1419 — saturn 은 IceGiant 로 등록돼 단색 대조군에서 뺐다 (대체 없음 — venus · triton 2개가 남는다).
+const PLAIN_BODIES = [{ id: 'venus' }, { id: 'triton' }];
 
 /**
  * #1274 D6 (iii) — 두 목록이 비어 있지 않음만 묻는다 (새 임계 0). `SURFACE_BODIES` 가 비면 표면 판정

@@ -238,6 +238,7 @@ harness #89 (post-apply 게이트) 교차검증에서 Gemini (당시 백엔드) 
 - 민감한 정보(시크릿, 인증 토큰)가 포함된 파일은 외부 모델에 전달하지 않는다 (`is_sensitive()` 자동 필터).
 - 두 모델의 합의된 문제는 우선적으로 해결한다.
 - capacity 실패 시 cross_validate.sh 가 자동 폴백 (재시도 → claude-only fallback exit 77). stderr 패턴: `^Error: (timed out|rate limit|quota|not logged|unauthorized|forbidden)`
+- **하드 타임아웃 (#1363)**: agy 호출 (본 호출 · capacity probe) 은 `--print-timeout + EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS` 초에서 스크립트가 직접 끊는다 (agy 와 자손에 TERM → `EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS` 후 KILL). 하드 타임아웃과 agy 자체 timeout (stderr `[agy] print timeout after …`) 은 capacity 실패와 같은 경로 (재시도 → exit 77) 로 가며, 부분 stdout 은 채택하지 않고 로그에만 남긴다. 기본값에서 agy 호출 구간의 구성상 상한은 853 초 (약 14 분 — 스크립트 주석의 식, plan-bypass snapshot 시간 제외)
 
 ## 환경변수 (cross_validate.sh)
 
@@ -246,6 +247,9 @@ harness #89 (post-apply 게이트) 교차검증에서 Gemini (당시 백엔드) 
 | `EXTERNAL_VALIDATOR_RETRY_SLEEP_SECONDS` | 5 | 재시도 sleep 단위 (테스트는 0) |
 | `EXTERNAL_VALIDATOR_RETRY_SLEEP_CAP` | 300 | sleep 상한 (지수 backoff cap) |
 | `EXTERNAL_VALIDATOR_PRINT_TIMEOUT` | 300s | agy `--print-timeout` 값 |
+| `CAPACITY_PROBE_PRINT_TIMEOUT` | 30s | capacity probe 의 `--print-timeout` 값 |
+| `EXTERNAL_VALIDATOR_HARD_TIMEOUT_GRACE_SECONDS` | 60 | 하드 타임아웃 = `--print-timeout` + 이 값 (초) |
+| `EXTERNAL_VALIDATOR_KILL_GRACE_SECONDS` | 10 | 하드 타임아웃 TERM 후 KILL 까지 유예 (초). agy 자체 shutdown 상한 5.0 s 보다 크게 둔다 |
 | `SKIP_CAPACITY_PROBE` | 0 | 1 이면 capacity probe 생략 (free tier quota 보존) |
 | `LOG_DIR` | `${PROJECT_DIR}/.claude/logs` | 로그 출력 디렉토리 (테스트 격리) |
 | `CROSS_VALIDATE_ANCHOR` | (없음) | 폴백 시 reminder 이슈 생성 트리거 |
