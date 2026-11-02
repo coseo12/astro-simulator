@@ -130,7 +130,7 @@ import type { EclipseShadowUniforms } from '../events/eclipse-shadow-uniforms.js
 // 모듈을 import 하지 않으므로 순환 없음 (`tier-transition.ts` 가 같은 방향으로 이미 의존한다).
 import { resolveMeshWorldVisualRadius } from './camera-controller.js';
 import { hexToColor3 } from './color-utils.js';
-import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL, LOG_DEPTH_VERTEX_Z_GLSL } from './log-depth.js';
 import {
   getOrCreateSurfaceMaskPlaceholder,
   getOrCreateSurfaceMaskTexture,
@@ -1088,6 +1088,8 @@ void main(void) {
   vWorldPos = (world * vec4(position, 1.0)).xyz;
   vec4 clip = worldViewProjection * vec4(position, 1.0);
   gl_Position = clip;
+  // #1422 — far clip 평면 위 (clip.z == clip.w) 정점이 WebGL2 에서 잘리는 것을 막는다 (log-depth.ts).
+  ${LOG_DEPTH_VERTEX_Z_GLSL}
   vFragmentDepth = 1.0 + clip.w;
 }
 `;

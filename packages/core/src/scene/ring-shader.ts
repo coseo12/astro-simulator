@@ -37,7 +37,7 @@ import {
   type Scene,
 } from '@babylonjs/core';
 import type { LoadedRingLayer } from '../ephemeris/solar-system-loader.js';
-import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL, LOG_DEPTH_VERTEX_Z_GLSL } from './log-depth.js';
 import { renderScaleForTier, type Tier } from './tier.js';
 
 // P12-A #298 B1 — `SCENE_UNIT_PER_METER = 1/AU` 하드코딩 제거. 생성 시점의 tier 로 반경을 계산한다.
@@ -103,6 +103,8 @@ varying float vFragmentDepth;
 
 void main(void) {
   gl_Position = worldViewProjection * vec4(position, 1.0);
+  // #1422 — far clip 평면 위 (clip.z == clip.w) 정점이 WebGL2 에서 잘리는 것을 막는다 (log-depth.ts).
+  ${LOG_DEPTH_VERTEX_Z_GLSL}
   vUV = uv;
   vFragmentDepth = 1.0 + gl_Position.w;
 }
@@ -801,4 +803,6 @@ export {
   // GLSL 소스 — log-depth 공용 조각 (`LOG_DEPTH_FRAGMENT_WRITE_GLSL`) 포함 여부를
   // `log-depth-glsl.test.ts` 가 정적 검증 (텍스트 동일성 = 픽셀 불변 전제).
   FRAGMENT_SHADER as RING_FRAGMENT_SHADER,
+  // #1422 — vertex clip z 보정 (`LOG_DEPTH_VERTEX_Z_GLSL`) 포함 여부 정적 검증용.
+  VERTEX_SHADER as RING_VERTEX_SHADER,
 };

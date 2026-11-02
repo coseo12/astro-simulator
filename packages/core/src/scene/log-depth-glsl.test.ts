@@ -10,11 +10,15 @@
  * 픽셀 레벨 회귀 없음의 SSoT 는 shader-pixel-guard CI (완료 조건 4).
  */
 import { describe, expect, it } from 'vitest';
-import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
-import { RING_FRAGMENT_SHADER } from './ring-shader.js';
-import { SUN_FRAGMENT_SHADER } from './sun-shader.js';
-import { PLANET_FRAGMENT_SHADER } from './procedural-planet-shader.js';
-import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
+import {
+  LOG_DEPTH_FRAGMENT_WRITE_GLSL,
+  LOG_DEPTH_VERTEX_Z_GLSL,
+  LOG_DEPTH_VERTEX_Z_INSET,
+} from './log-depth.js';
+import { RING_FRAGMENT_SHADER, RING_VERTEX_SHADER } from './ring-shader.js';
+import { SUN_FRAGMENT_SHADER, SUN_VERTEX_SHADER } from './sun-shader.js';
+import { PLANET_FRAGMENT_SHADER, PLANET_VERTEX_SHADER } from './procedural-planet-shader.js';
+import { CLOUD_FRAGMENT_SHADER, CLOUD_VERTEX_SHADER } from './cloud-layer.js';
 import { BELT_FRAGMENT_SHADER } from './belt-particles.js';
 import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
 
@@ -52,6 +56,39 @@ describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조�
     it(`${name} fragment 가 공용 조각의 사용 전제 선언을 보유 (varying + uniform)`, () => {
       expect(fragment).toContain('varying float vFragmentDepth;');
       expect(fragment).toContain('uniform float logDepthConstant;');
+    });
+  }
+});
+
+describe('#1422 LOG_DEPTH_VERTEX_Z_GLSL — vertex clip z 보정 (WebGL2 far clip 구멍)', () => {
+  // 적용 대상 = WebGL2 노출이 실측된 셰이더만 (#1422 PR 본문 노출 측정 표). sun-corona · comet-tail ·
+  // belt-particles 는 같은 패턴이나 측정 시점에서 보정 전후 픽셀 차이가 0 이라 범위 밖이다.
+  const SHADERS: ReadonlyArray<readonly [string, string]> = [
+    ['procedural-planet-shader', PLANET_VERTEX_SHADER],
+    ['ring-shader', RING_VERTEX_SHADER],
+    ['sun-shader', SUN_VERTEX_SHADER],
+    ['cloud-layer', CLOUD_VERTEX_SHADER],
+  ];
+
+  it('공용 조각이 clip z 를 w 의 선형 비율만큼 안쪽으로 당긴다 (log 식 회귀 차단)', () => {
+    expect(LOG_DEPTH_VERTEX_Z_GLSL).toBe('gl_Position.z -= gl_Position.w * 1e-5;');
+    expect(LOG_DEPTH_VERTEX_Z_INSET).toBe(1e-5);
+    // Babylon logDepthVertex 동형 (비선형) 식은 WebGPU 고리 픽셀을 바꿔 기각됐다 (#1422).
+    expect(LOG_DEPTH_VERTEX_Z_GLSL).not.toContain('log2');
+  });
+
+  for (const [name, vertex] of SHADERS) {
+    it(`${name} vertex 가 공용 조각을 정확히 1회 포함`, () => {
+      expect(vertex.split(LOG_DEPTH_VERTEX_Z_GLSL).length - 1).toBe(1);
+    });
+
+    it(`${name} vertex 의 보정이 gl_Position 대입 뒤에 온다 (앞이면 대입이 보정을 덮는다)`, () => {
+      const assign = vertex.search(/gl_Position\s*=\s*[^;]*;/);
+      const fix = vertex.indexOf(LOG_DEPTH_VERTEX_Z_GLSL);
+      expect(assign).toBeGreaterThanOrEqual(0);
+      expect(fix).toBeGreaterThan(assign);
+      // 보정 뒤에 gl_Position 전체를 다시 대입하는 문장이 없어야 한다.
+      expect(vertex.slice(fix + LOG_DEPTH_VERTEX_Z_GLSL.length)).not.toMatch(/gl_Position\s*=/);
     });
   }
 });
