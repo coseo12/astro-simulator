@@ -60,9 +60,19 @@ describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조�
   }
 });
 
+/** GLSL 블록 · 줄 주석 제거 (판정 전처리). */
+function stripGlslComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+}
+
+/** `gl_Position` 쓰기 — 전체 · 성분 대입과 복합 대입. 비교 연산 `==` 는 제외한다. */
+const GL_POSITION_WRITE = /gl_Position(\.[xyzw]+)?\s*[-+*/]?=(?!=)/g;
+
 describe('#1422 LOG_DEPTH_VERTEX_Z_GLSL — vertex clip z 보정 (WebGL2 far clip 구멍)', () => {
   // 적용 대상 = WebGL2 노출이 실측된 셰이더만 (#1422 PR 본문 노출 측정 표). sun-corona · comet-tail ·
   // belt-particles 는 같은 패턴이나 측정 시점에서 보정 전후 픽셀 차이가 0 이라 범위 밖이다.
+  // starfield · star-catalog 는 노출을 재지 않았고, fragment 가 gl_FragDepth 를 쓰지 않아 이 보정을 넣으면
+  // depth 값도 바뀐다 (log-depth.ts 사용 전제) — PR #1425 코멘트 기록.
   const SHADERS: ReadonlyArray<readonly [string, string]> = [
     ['procedural-planet-shader', PLANET_VERTEX_SHADER],
     ['ring-shader', RING_VERTEX_SHADER],
@@ -78,17 +88,22 @@ describe('#1422 LOG_DEPTH_VERTEX_Z_GLSL — vertex clip z 보정 (WebGL2 far cli
   });
 
   for (const [name, vertex] of SHADERS) {
-    it(`${name} vertex 가 공용 조각을 정확히 1회 포함`, () => {
-      expect(vertex.split(LOG_DEPTH_VERTEX_Z_GLSL).length - 1).toBe(1);
+    // 주석을 지운 GLSL 로 판정한다 — 보정 줄을 `//` 로 막아도 텍스트 포함 검사는 통과하기 때문 (PR #1425 리뷰 변이 M2).
+    const code = stripGlslComments(vertex);
+
+    it(`${name} vertex 가 공용 조각을 정확히 1회 포함 (주석 제외)`, () => {
+      expect(code.split(LOG_DEPTH_VERTEX_Z_GLSL).length - 1).toBe(1);
     });
 
-    it(`${name} vertex 의 보정이 gl_Position 대입 뒤에 온다 (앞이면 대입이 보정을 덮는다)`, () => {
-      const assign = vertex.search(/gl_Position\s*=\s*[^;]*;/);
-      const fix = vertex.indexOf(LOG_DEPTH_VERTEX_Z_GLSL);
-      expect(assign).toBeGreaterThanOrEqual(0);
-      expect(fix).toBeGreaterThan(assign);
-      // 보정 뒤에 gl_Position 전체를 다시 대입하는 문장이 없어야 한다.
-      expect(vertex.slice(fix + LOG_DEPTH_VERTEX_Z_GLSL.length)).not.toMatch(/gl_Position\s*=/);
+    it(`${name} vertex 의 gl_Position 쓰기는 「전체 대입 1회 → 보정 1회」 뿐이다`, () => {
+      // 성분 대입 (`gl_Position.z =`) · 복합 대입 (`-=` 등) 까지 잡는다. 보정 앞뒤 어디에 다른 쓰기가 끼어도
+      // (기각된 log 식 재도입 포함 — 변이 M3 · M4 · M6) 개수가 2 를 넘거나 순서가 어긋난다.
+      const writes = [...code.matchAll(GL_POSITION_WRITE)];
+      expect(writes.map((m) => m[0].replace(/\s+/g, ''))).toEqual([
+        'gl_Position=',
+        'gl_Position.z-=',
+      ]);
+      expect(writes[1]?.index).toBe(code.indexOf(LOG_DEPTH_VERTEX_Z_GLSL));
     });
   }
 });

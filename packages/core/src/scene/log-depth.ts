@@ -40,7 +40,8 @@ export const LOG_DEPTH_FRAGMENT_WRITE_GLSL =
 /**
  * #1422 — 커스텀 ShaderMaterial vertex 의 clip z 를 far clip 평면 안쪽으로 당기는 비율.
  * `LOG_DEPTH_VERTEX_Z_GLSL` 이 `gl_Position.z -= gl_Position.w * <이 값>` 으로 쓴다.
- * 1e-4 · 1e-5 둘 다 #1422 측정 시나리오에서 구멍 0 이었다. 1e-5 는 float32 상대 ulp (2^-23 ≈ 1.19e-7) 의 약 84 배다.
+ * PR #1425 본문 「보정식 비교」 표의 6 장면에서 1e-4 와 1e-5 의 결과가 같았다 (그중 magenta 구멍 술어로 잰
+ * 5 장면은 둘 다 0). 1e-5 는 float32 상대 ulp (2^-23 ≈ 1.19e-7) 의 약 84 배다.
  */
 export const LOG_DEPTH_VERTEX_Z_INSET = 1e-5;
 
@@ -49,23 +50,26 @@ export const LOG_DEPTH_VERTEX_Z_INSET = 1e-5;
  *
  * **왜 필요한가**: 카메라가 `minZ = 0.01` · `maxZ = 1e14` 라 투영행렬 z 행의 `A = (f+n)/(f-n)` 가 float32
  * 에서 정확히 `1` 이다. 장면 좌표가 크면 (위성 focus 시 카메라 절대좌표 ~2e6 ~ 5e6 실측) 오프셋
- * `B ≈ −0.02` 가 Babylon CPU 행렬 (Float32Array) 곱셈에서 소실된다. 그러면 world-view-projection 의 z 행과
+ * `B` (WebGL [-1, 1] 투영에서 `≈ −0.02`, WebGPU half-Z 변환 후 `≈ −0.01`) 가 Babylon CPU 행렬 (Float32Array) 곱셈에서 소실된다. 그러면 world-view-projection 의 z 행과
  * w 행이 float32 비트 동일이 되어 모든 정점이 `clip.z == clip.w`, 즉 far clip 평면 위에 놓인다.
  * WebGL2 (ANGLE Metal Renderer: Apple M1 Pro 실측) 는 이 상태에서 삼각형 일부를 잘라 표면에 구멍을 낸다.
  * 같은 조건의 WebGPU 는 보정 전에도 구멍이 0 이었다.
  *
  * **이 줄이 바꾸는 것은 clip 통과 여부뿐이다.** depth 값은 fragment 의 `LOG_DEPTH_FRAGMENT_WRITE_GLSL`
- * (`gl_FragDepth`) 이 정한다. #1422 Phase 0 에서 z 를 Babylon log 식 · `0` · `0.9999 w` 로 바꾼 세 변형의
- * WebGL2 프레임이 서로 픽셀 동일했다.
+ * (`gl_FragDepth`) 이 정한다. #1422 Phase 0 에서 z 를 Babylon log 식 · `0` · `0.9999 w` 로 바꾼 세 변형은
+ * WebGL2 전체 프레임의 baseline 대비 변화 픽셀 수가 모두 71645 로 같았다
+ * (https://github.com/coseo12/astro-simulator/issues/1422#issuecomment-6574985707).
  *
  * 실측 (#1422 PR, 위성 근접 시나리오): WebGL2 구멍 0. WebGPU 는 보정 전 대비 전체 프레임 diff 0 (고리 고립 장면 포함).
  *
  * ⚠️ Babylon `logDepthVertex` 동형 식 (`gl_Position.z = log2(1 + w) * C`) 으로 바꾸지 말 것. 그 식은 z 가 w 에
- * 비선형이라 카메라 평면을 가로지르는 고리 삼각형의 near clip 교차점이 밀린다 — WebGPU 목성 고리
- * 가장자리 diff 23 px (자연 장면) · 12242 px (고리 고립 장면) 로 기각했다 (#1422).
+ * 비선형이라 카메라 평면을 가로지르는 고리 삼각형의 WebGPU near clip (`z ≥ 0`) 교차점이 밀린다 — 고리 bbox
+ * w 끝값 `1.414e6 / −5.165e5` 에서 교차 파라미터 `t ≈ 0.732` (선형) → `≈ 0.506` (log) (PR #1425 리뷰 정적 유도).
+ * 실측 WebGPU 목성 고리 가장자리 diff 23 px (자연 장면) · 12242 px (고리 고립 장면) 로 기각했다 (#1422).
  *
  * 사용 전제: vertex 에서 `gl_Position` 대입 **뒤** 에 본 문장 (uniform 불요).
+ * 사용 전제: fragment 가 `gl_FragDepth` 를 쓰는 셰이더에만 적용한다 — 아니면 clip 뿐 아니라 depth 값도 바뀐다.
  * ⚠️ 텍스트 동일성이 픽셀 불변의 전제 — 수정 시 shader-pixel-guard 재실측 의무.
- * 정합 가드: `log-depth-glsl.test.ts` (적용 셰이더 vertex toContain).
+ * 정합 가드: `log-depth-glsl.test.ts` (적용 셰이더 vertex — 주석 제거 후 보정 1회 · `gl_Position` 쓰기 2회).
  */
 export const LOG_DEPTH_VERTEX_Z_GLSL = `gl_Position.z -= gl_Position.w * ${LOG_DEPTH_VERTEX_Z_INSET.toExponential()};`;
