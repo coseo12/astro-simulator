@@ -111,6 +111,8 @@ export interface SunFlareList {
   /** 군 중심 위도 · 경도 [°] — 군 성분 (선행 · 후행) 의 현재 면적 가중 평균. */
   latDeg: Float64Array;
   lonDeg: Float64Array;
+  /** 군 성분 중 가장 큰 물리 각반경 [rad] (흑점 배율 전 — 화면 크기는 `sun-shader.ts` 가 정한다, ADR Amendment 1). */
+  radiusRad: Float64Array;
   /** 세기 0~1 = 광도 곡선 × 면적 게이트 (감쇠 가시도 전 — 그건 셰이더 uniform 이 곱한다). */
   strength: Float64Array;
   /** 발생 시각 [JD]. */
@@ -125,6 +127,7 @@ export function createSunFlareList(capacity: number = MAX_SUN_FLARES): SunFlareL
   return {
     latDeg: new Float64Array(capacity),
     lonDeg: new Float64Array(capacity),
+    radiusRad: new Float64Array(capacity),
     strength: new Float64Array(capacity),
     onsetJd: new Float64Array(capacity),
     idSlot: new Int32Array(capacity),
@@ -158,6 +161,7 @@ function compareFlares(a: number, b: number): number {
 function copyCandidate(i: number, out: SunFlareList, dst: number): void {
   out.latDeg[dst] = candidates.latDeg[i]!;
   out.lonDeg[dst] = candidates.lonDeg[i]!;
+  out.radiusRad[dst] = candidates.radiusRad[i]!;
   out.strength[dst] = candidates.strength[i]!;
   out.onsetJd[dst] = candidates.onsetJd[i]!;
   out.idSlot[dst] = candidates.idSlot[i]!;
@@ -206,12 +210,14 @@ export function generateSunFlares(
     let area = 0;
     let latSum = 0;
     let lonSum = 0;
+    let radius = 0;
     for (let k = i; k < n; k++) {
       if (spots.idSlot[k] !== gSlot || spots.idGroup[k] !== gIndex) continue;
       const a = spots.areaMsh[k]!;
       area += a;
       latSum += a * spots.latDeg[k]!;
       lonSum += a * spots.lonDeg[k]!;
+      radius = Math.max(radius, spots.radiusRad[k]!);
     }
     if (!(area > 0)) continue;
 
@@ -227,6 +233,7 @@ export function generateSunFlares(
       if (!(strength > 0)) continue;
       candidates.latDeg[m] = latSum / area;
       candidates.lonDeg[m] = lonSum / area;
+      candidates.radiusRad[m] = radius;
       candidates.strength[m] = strength;
       candidates.onsetJd[m] = onset;
       candidates.idSlot[m] = gSlot;

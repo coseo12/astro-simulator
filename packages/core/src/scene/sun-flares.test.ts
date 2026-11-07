@@ -247,7 +247,7 @@ describe('#1428 플레어 — 흑점 공유 계약 (합의 4)', () => {
     expect(found).toBeGreaterThan(0);
   });
 
-  it('양극 군 — 위치는 두 성분의 현재 면적 가중 중심, 군 1 개 = 플레어 자리 1 개', () => {
+  it('양극 군 — 위치는 두 성분의 현재 면적 가중 중심, 크기는 큰 성분의 각반경, 군 1 개 = 플레어 자리 1 개', () => {
     const spots = createHeliographicSpots();
     const parts = [
       { lat: 10, lon: 30, area: 360 },
@@ -257,6 +257,7 @@ describe('#1428 플레어 — 흑점 공유 계약 (합의 4)', () => {
       spots.latDeg[k] = p.lat;
       spots.lonDeg[k] = p.lon;
       spots.areaMsh[k] = p.area;
+      spots.radiusRad[k] = Math.sqrt(2e-6 * p.area);
       spots.idSlot[k] = 5000;
       spots.idGroup[k] = 3;
       spots.idPart[k] = k;
@@ -269,6 +270,7 @@ describe('#1428 플레어 — 흑점 공유 계약 (합의 4)', () => {
       for (let i = 0; i < n; i++) {
         expect(out.latDeg[i]).toBeCloseTo((10 * 360 + 12 * 240) / 600, 12);
         expect(out.lonDeg[i]).toBeCloseTo((30 * 360 + 36 * 240) / 600, 12);
+        expect(out.radiusRad[i]).toBe(Math.sqrt(2e-6 * 360));
         checked++;
       }
     }

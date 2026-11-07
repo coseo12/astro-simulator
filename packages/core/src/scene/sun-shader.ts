@@ -175,16 +175,17 @@ export const FILAMENT_SEED_SCALE = 17.0;
 
 /**
  * #1428 플레어 화면 모양 (ADR 20261107-1428 결정 4 · 7 — 반경 · 리본 형태는 본 모듈 소유, 발생률 · 광도 곡선은 `sun-flares.ts`).
- * 반경은 단위 구 위 현 거리 — 0.06 R 은 표시 과장이다 (Visual Fidelity, ADR 1-E). 아래 리본 · 핵 치수는 반경 단위
- * (`q = (동서, 남북) 성분 / 반경`). 2-리본은 군 중심을 사이에 두고 동서로 갈라진 남북 방향 띠 2 개, 핵은 중심 원형 — 출발값,
- * 최종값은 사용자 D-T2.
+ * 반경 (단위 구 위 현 거리) 은 **그 군의 화면 반영 반경**에 비례한다 — 사용자 D1 (2026-11-08) 「반영까지 덮게 키우기」 · ADR
+ * Amendment 1. 반영 반경 = 군 성분 중 가장 큰 물리 각반경 × 흑점 배율 {@link SUNSPOT_SIZE_EXAGGERATION} (흑점 셰이더의 `w` 와 같은 값).
+ * 고정 R (PR2 첫 판본 0.06 R) 이면 큰 군에서는 섬광이 본영 안에 갇히고 작은 군에서는 흑점보다 커진다. 아래 리본 · 핵 치수는 반경 단위
+ * (`q = (동서, 남북) 성분 / 반경`). 2-리본은 군 중심을 사이에 두고 동서로 갈라진 남북 방향 띠 2 개, 핵은 중심 원형.
  */
-export const FLARE_RADIUS = 0.06;
-/** 리본 중심선의 동서 오프셋 (반경 단위). */
-export const FLARE_RIBBON_OFFSET = 0.35;
+export const FLARE_PENUMBRA_SCALE = 1.0;
+/** 리본 중심선의 동서 오프셋 (반경 단위) — 본영 반경비 1/√5.5 = 0.426 [계산] 근처라 리본이 본영 가장자리 · 반영 위에 놓인다. */
+export const FLARE_RIBBON_OFFSET = 0.45;
 /** 리본 단면 (동서) · 길이 (남북) 가우시안 σ (반경 단위). */
-export const FLARE_RIBBON_SIGMA_ACROSS = 0.12;
-export const FLARE_RIBBON_SIGMA_ALONG = 0.45;
+export const FLARE_RIBBON_SIGMA_ACROSS = 0.15;
+export const FLARE_RIBBON_SIGMA_ALONG = 0.55;
 /** 중심 핵 가우시안 σ (반경 단위). */
 export const FLARE_CORE_SIGMA = 0.2;
 /** 반경 바깥 경계 페더 시작 (반경 단위) — `1 − smoothstep(0.75, 1, |q|)`. 반경 밖은 0 이다. */
@@ -601,7 +602,7 @@ const writerFlares = createSunFlareList();
 
 /**
  * #1428 플레어 기록기 — 장면 시계 jd 와 그 jd 의 흑점 목록에서 플레어를 `flaresOut` (`vec4` × {@link MAX_SUN_FLARES}: xyz 장면
- * 단위벡터 중심 · w = {@link FLARE_RADIUS}) · `paramsOut` (`vec4` × 같은 수: x = 세기 0~1, yzw = 0) 에 쓰고 개수를 반환한다
+ * 단위벡터 중심 · w = {@link FLARE_PENUMBRA_SCALE} × 흑점 배율 × 군 최대 성분 각반경) · `paramsOut` (`vec4` × 같은 수: x = 세기 0~1, yzw = 0) 에 쓰고 개수를 반환한다
  * (할당 0). 흑점 생성기는 부르지 않는다 (§교차검증 합의 4). 개수 뒤는 0 으로 채운다.
  */
 export function writeSunFlareUniforms(
@@ -614,7 +615,8 @@ export function writeSunFlareUniforms(
   const n = generateSunFlares(jd, spots, spotCount, writerFlares);
   for (let i = 0; i < n; i++) {
     heliographicToScene(writerFlares.latDeg[i]!, writerFlares.lonDeg[i]!, flaresOut, 4 * i);
-    flaresOut[4 * i + 3] = FLARE_RADIUS;
+    flaresOut[4 * i + 3] =
+      FLARE_PENUMBRA_SCALE * SUNSPOT_SIZE_EXAGGERATION * writerFlares.radiusRad[i]!;
     paramsOut[4 * i] = writerFlares.strength[i]!;
     paramsOut[4 * i + 1] = 0;
     paramsOut[4 * i + 2] = 0;

@@ -56,7 +56,7 @@ import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
 import {
   FLARE_CORE_SIGMA,
   FLARE_EDGE_INNER,
-  FLARE_RADIUS,
+  FLARE_PENUMBRA_SCALE,
   FLARE_RIBBON_OFFSET,
   sunFlareShapeMirror,
   writeSunFlareUniforms,
@@ -583,7 +583,7 @@ describe('#1428 sun-shader 흑점 · 플레어 기록기 — 흑점 목록 공�
     expect(nonEmpty, '전제: 흑점이 있는 표본').toBeGreaterThan(0);
   });
 
-  it('writeSunFlareUniforms — xyz 장면 단위벡터 · w = 반경 0.06 · params.x = 세기 · 개수 뒤 0', () => {
+  it('writeSunFlareUniforms — xyz 장면 단위벡터 · w = 군 반영 반경 (배율 × 최대 성분 각반경) · params.x = 세기 · 개수 뒤 0', () => {
     const jd = 2_456_749.14;
     const spots = createHeliographicSpots();
     const spotCount = generateHeliographicSunspots(jd, spots);
@@ -593,14 +593,18 @@ describe('#1428 sun-shader 흑점 · 플레어 기록기 — 흑점 목록 공�
     const flares = new Array<number>(4 * MAX_SUN_FLARES).fill(7);
     const params = new Array<number>(4 * MAX_SUN_FLARES).fill(7);
     expect(writeSunFlareUniforms(jd, spots, spotCount, flares, params)).toBe(n);
-    expect(FLARE_RADIUS).toBe(0.06);
+    expect(FLARE_PENUMBRA_SCALE).toBe(1);
     for (let i = 0; i < n; i++) {
       const v = flares.slice(4 * i, 4 * i + 3);
       expect(Math.hypot(v[0]!, v[1]!, v[2]!)).toBeCloseTo(1, 12);
       const sinLat =
         v[0]! * SUN_AXIS_SCENE[0] + v[1]! * SUN_AXIS_SCENE[1] + v[2]! * SUN_AXIS_SCENE[2];
       expect(sinLat).toBeCloseTo(Math.sin((list.latDeg[i]! * Math.PI) / 180), 12);
-      expect(flares[4 * i + 3]).toBe(FLARE_RADIUS);
+      // 흑점 셰이더의 반영 반경 w (= 2.5 × 물리 각반경) 와 같은 식 — 사용자 D1 「반영까지 덮게」 (ADR Amendment 1).
+      expect(list.radiusRad[i]).toBeGreaterThan(0);
+      expect(flares[4 * i + 3]).toBe(
+        FLARE_PENUMBRA_SCALE * SUNSPOT_SIZE_EXAGGERATION * list.radiusRad[i]!,
+      );
       expect(params[4 * i]).toBe(list.strength[i]);
       expect(params.slice(4 * i + 1, 4 * i + 4)).toEqual([0, 0, 0]);
     }
