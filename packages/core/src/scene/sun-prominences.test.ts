@@ -301,6 +301,23 @@ describe('#1428 sun-prominences — GLSL 정적 계약 (D9 · §교차검증 이
   const vs = stripGlslComments(SUN_PROMINENCE_VERTEX_SHADER);
   const fs = stripGlslComments(SUN_PROMINENCE_FRAGMENT_SHADER);
 
+  it('정점 셰이더 리본 측 방향 — 평행 특이점 대체 기저 · 안전 정규화 (합의 1, JS 미러와 같은 식)', () => {
+    // 주석을 지운 텍스트로 판정한다 — 분기를 주석으로 막아도 포함 검사가 통과하지 않게.
+    expect(vs).toMatch(/vec3 side = cross\(t, v\);/);
+    expect(vs).toMatch(
+      /if \(dot\(side, side\) < SIDE_EPS\) \{\s*side = cross\(safeNormalize\(position\), v\);\s*\}/,
+    );
+    expect(vs).toMatch(/side = safeNormalize\(side\);/);
+    expect(vs).toMatch(/return v \* inversesqrt\(max\(dot\(v, v\), SIDE_EPS_MIN\)\);/);
+    // 대체 기저 분기가 측 방향 계산과 리본 펼침 사이에 있다 (순서).
+    const iCross = vs.indexOf('vec3 side = cross(t, v);');
+    const iBranch = vs.indexOf('if (dot(side, side) < SIDE_EPS)');
+    const iSpread = vs.indexOf('vec3 p = center + side');
+    expect(iCross).toBeGreaterThanOrEqual(0);
+    expect(iBranch).toBeGreaterThan(iCross);
+    expect(iSpread).toBeGreaterThan(iBranch);
+  });
+
   it('switch 부재 (WGSL 변환) · 시간 · jd uniform 부재 (#782 규약)', () => {
     for (const src of [vs, fs]) {
       expect(src).not.toMatch(/\bswitch\b/);

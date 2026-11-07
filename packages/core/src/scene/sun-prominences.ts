@@ -130,7 +130,7 @@ export const PROMINENCE_ACROSS_FALLOFF = 2.5;
 export const PROMINENCE_LIMB_FEATHER_RHO = 0.015;
 
 /**
- * 리본 측 방향 평행 특이점 문턱 (§교차검증 합의 1) — 단위 접선 × 단위 시선의 제곱 길이가 이 값보다 작으면 (사잇각 약 0.06° 이하)
+ * 리본 측 방향 평행 특이점 문턱 (§교차검증 합의 1) — 단위 접선 × 단위 시선의 제곱 길이가 이 값보다 작으면 (사잇각 약 0.06° 이하 [계산] — `asin(√1e-6)`)
  * 대체 기저 `cross(radial, v)` 로 바꾼다. 정규화 하한 {@link PROMINENCE_SIDE_EPS_MIN} 은 0 벡터를 NaN 대신 0 으로 만든다.
  */
 export const PROMINENCE_SIDE_EPS = 1e-6;
@@ -160,7 +160,7 @@ export const PROMINENCE_VERTEX_COUNT = PROMINENCE_MAX * PROMINENCE_VERTICES_PER_
 
 /**
  * 생성기 출력 (struct of arrays, 길이 {@link PROMINENCE_MAX}). 호출자 소유.
- * id = `(slot, index)` — 생성 일 슬롯 · 그 슬롯 안 순번. 사전순 = 생성 순서.
+ * id = `(slot, index)` — 생성 일 슬롯 · 그 슬롯 안 순번. 사전순은 슬롯 단위로만 생성 순서다 (슬롯 안 생성 시각 `birth` 는 순번과 무관).
  */
 export interface ProminenceList {
   /** 첫 발자국 위도 [°] (두 번째 발자국은 `+ 기울기 × 4°`). */
@@ -263,7 +263,8 @@ export function lastProminenceCandidateCount(): number {
  *   8. 발자국 간격 · 9. 꼭대기 높이 · 10. 기울기 (`(2r − 1) · MAX`) · 11. 분출 `r < P` · 12~13. 가닥 위상 2 개
  * 모든 소비는 생존 판정 **전**에 끝난다 — 슬롯의 난수열이 조회 jd 와 무관해 같은 개체가 자정 경계를 넘어 이어진다 (D9).
  *
- * 활성 수가 {@link PROMINENCE_MAX} 를 넘으면 생성 순서 (id 사전순) 앞쪽부터 자른다 — 상한은 실측 최대보다 크게 둔다.
+ * 활성 수가 {@link PROMINENCE_MAX} 를 넘으면 id 사전순으로 앞의 `PROMINENCE_MAX` 개를 남긴다 (오래된 슬롯 우선 — 이미 보이는
+ * 루프가 새 루프 때문에 사라지지 않는다). 상한은 실측 최대보다 크게 둔다.
  */
 export function generateProminences(jd: number, out: ProminenceList): number {
   lastUncappedCount = 0;
