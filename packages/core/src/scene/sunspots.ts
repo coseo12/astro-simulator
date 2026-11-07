@@ -4,8 +4,10 @@
  * **설계 근거**: ADR `docs/decisions/20261025-1412-sunspots.md`
  *   - 결정 1 — CPU 해석적 흑점 목록. 셰이더는 결과 단위벡터 · 각반경만 받는다 (`sun-shader.ts`).
  *   - 결정 2 — 차등 자전 + 생성 · 소멸 + 11년 주기. **jd 순수 함수**. jd 는 셰이더로 가지 않는다 (#782 규약).
- *   - 결정 3 — 실효 자전 주파수 감쇠 (WCAG 2.2 SC 2.3.1, 3 Hz) — {@link stepSunspotVisibility}.
- *   - 결정 7 — 출처 계수 · 극소 표 · 신생률 · 크기 분포 · 감쇠 주파수의 상수 SSoT 는 본 모듈이다.
+ *   - 결정 3 — 실효 자전 주파수 감쇠 (WCAG 2.2 SC 2.3.1, 3 Hz) — {@link stepSunspotVisibility}. 상태기계는 #1428 에서
+ *     공용 모듈 `activity-visibility.ts` 로 옮겼고, 여기는 흑점 계수를 넘기는 래퍼만 남는다 (동작 불변 — ADR 1428 D4).
+ *   - 결정 7 — 출처 계수 · 극소 표 · 신생률 · 크기 분포 · 흑점 감쇠 계수 `c` (`SUNSPOT_CYCLES_PER_DAY`) 의 상수 SSoT 는 본
+ *     모듈이다. 감쇠 문턱 (3 Hz) · 판정 창 · 변화율의 SSoT 는 #1428 부터 `activity-visibility.ts` 다 (여기는 별칭).
  *     색 · 반경비 · 필라멘트 · 크기 배율 (×2.5) 은 `sun-shader.ts` 가 소유한다.
  *
  * 함수 셋으로 나눈다 (결정 2 시그니처):
@@ -23,6 +25,15 @@
 import { J2000_JD } from '@astro-simulator/shared';
 import { equatorialJ2000ToEcliptic } from '../coords/equatorial.js';
 import { toSceneZ } from '../coords/scene-handedness.js';
+import {
+  ACTIVITY_MAX_FLICKER_HZ,
+  ACTIVITY_VISIBILITY_PERSIST_S,
+  ACTIVITY_VISIBILITY_RATE_PER_S,
+  activityEffectiveHz,
+  createActivityVisibilityState,
+  stepActivityVisibility,
+  type ActivityVisibilityState,
+} from './activity-visibility.js';
 
 const DEG = Math.PI / 180;
 
@@ -79,6 +90,8 @@ const CYCLE_ACTIVE_TAU_MAX_MONTHS = 220;
  * 220 개월을 넘으므로 τ ∈ (0, 220] 에 드는 사이클은 최대 2 개다 (`sunspots.test.ts` 가 단언).
  */
 const MAX_ACTIVE_CYCLES = 2;
+/** 한 날에 동시에 활동하는 사이클 수 상한 (scratch 크기) — {@link activeSolarCycles} 출력 버퍼 길이. #1428 홍염 생성기가 쓴다. */
+export const SOLAR_CYCLE_MAX_ACTIVE = MAX_ACTIVE_CYCLES;
 
 /** 흑점대 중심 위도 Eq. 8 `λ̄(τ) = 28° exp(−τ/90)` (Hathaway 2015 §4.10). */
 const CENTROID_LAT_START_DEG = 28;
@@ -136,15 +149,12 @@ const SEED_MULTIPLIER = 0x9e3779b1;
 /** 범위 가드 [일] — `|jd − J2000| > 1e7` 이면 흑점 0 개 (`d` 를 int32 안에 · 슬롯 루프가 float 정밀도에서 멈추지 않게). */
 export const SUNSPOT_JD_RANGE_DAYS = 1e7;
 
-/** 광과민성 문턱 [Hz] — WCAG 2.2 SC 2.3.1 「1 초에 3 회를 넘는 섬광 금지」 (결정 3). */
-export const SUNSPOT_MAX_FLICKER_HZ = 3;
-/**
- * 목표 전환 지속 시간 [s] = `1/(2·3)` — 같은 3 Hz 에서 나온다 (새 시상수 0, 결정 3). 실효 주파수 판정 창의 길이도 이 값이다
- * (ADR 1412 Amendment 1). 점프 하나 = 흑점 무늬 변화 1 회라 창 안에 점프가 끊기지 않는 열 (1 초 6 회 = WCAG 섬광 3 쌍 초과) 이 걸린다.
- */
-export const SUNSPOT_VISIBILITY_PERSIST_S = 1 / (2 * SUNSPOT_MAX_FLICKER_HZ);
-/** 가시도 최대 변화율 [1/s] = `2·3` — 켜짐↔꺼짐 1 왕복이 1/3 s 이상 (결정 3). */
-export const SUNSPOT_VISIBILITY_RATE_PER_S = 2 * SUNSPOT_MAX_FLICKER_HZ;
+/** 광과민성 문턱 [Hz] — WCAG 2.2 SC 2.3.1 (결정 3). 값의 SSoT 는 `activity-visibility.ts` (#1428 결정 7) — 같은 값의 별칭. */
+export const SUNSPOT_MAX_FLICKER_HZ = ACTIVITY_MAX_FLICKER_HZ;
+/** 목표 전환 지속 시간 · 판정 창 [s] = `1/(2·3)` (ADR 1412 Amendment 1) — 공용 상수의 별칭. */
+export const SUNSPOT_VISIBILITY_PERSIST_S = ACTIVITY_VISIBILITY_PERSIST_S;
+/** 가시도 최대 변화율 [1/s] = `2·3` (결정 3) — 공용 상수의 별칭. */
+export const SUNSPOT_VISIBILITY_RATE_PER_S = ACTIVITY_VISIBILITY_RATE_PER_S;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 태양 자전축 · 태양면 기저 (데이터 = 오른손 황도 J2000)
@@ -274,6 +284,45 @@ export function cycleShape(tauMonths: number): number {
   return cycleShapeRaw(tauMonths) / CYCLE_SHAPE_MAX;
 }
 
+/**
+ * 그날 (`dayJd`) 흑점 · 활동을 내는 사이클 — index 오름차순으로 τ [월] 와 정규화 모양을 `tauOut` · `shapeOut` 에 쓰고 개수를 반환한다
+ * (할당 0, 최대 {@link SOLAR_CYCLE_MAX_ACTIVE}). τ ∈ (0, 220] 개월인 사이클만 (그 뒤 꼬리는 무시 — POC).
+ * 흑점 생성기 본문에서 꺼낸 것이다 (#1428 — 홍염 생성기가 같은 사이클 모양을 재사용, ADR 1428 결정 1). 식 · 순서는 그대로다.
+ */
+export function activeSolarCycles(
+  dayJd: number,
+  tauOut: Float64Array,
+  shapeOut: Float64Array,
+): number {
+  let kLo = latestCycleBefore(dayJd);
+  const tauFloorJd = dayJd - CYCLE_ACTIVE_TAU_MAX_MONTHS * DAYS_PER_MONTH;
+  let found = 0;
+  while (found < MAX_ACTIVE_CYCLES && cycleStartJd(kLo) >= tauFloorJd) {
+    found++;
+    kLo--;
+  }
+  let nc = 0;
+  for (let k = kLo + 1; nc < found; k++, nc++) {
+    const tau = (dayJd - cycleStartJd(k)) / DAYS_PER_MONTH;
+    tauOut[nc] = tau;
+    shapeOut[nc] = cycleShape(tau);
+  }
+  return nc;
+}
+
+/** 흑점대 중심 위도 [°] Eq. 8 `λ̄(τ) = 28° exp(−τ/90)` — τ [월]. 흑점 · 홍염 (#1428) 이 같은 활동대를 쓴다. */
+export function activityBandCentroidDeg(tauMonths: number): number {
+  return CENTROID_LAT_START_DEG * Math.exp(-tauMonths / CENTROID_LAT_DECAY_MONTHS);
+}
+
+/** 흑점대 폭 [°] Eq. 9 `σλ = 1.5° + 3.8° [1 − exp(−A/400)]`, A = 정규화 사이클 모양 × 1500 (대리값). 흑점 · 홍염 공용. */
+export function activityBandWidthDeg(shape: number): number {
+  return (
+    WIDTH_BASE_DEG +
+    WIDTH_SPAN_DEG * (1 - Math.exp(-(shape * WIDTH_ACTIVITY_PROXY) / WIDTH_AREA_SCALE))
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 결정적 난수 — mulberry32 (결정 2 결정성 계약)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,8 +330,26 @@ export function cycleShape(tauMonths: number): number {
 /** mulberry32 상태 (모듈 재사용 — 할당 0). */
 let rngState = 0;
 
+/**
+ * 일 슬롯 난수열 시드 — `(Math.imul(d, 0x9E3779B1) ^ salt) >>> 0`. 효과마다 salt 만 다르다 (#1428 홍염 — ADR 1428 결정 1).
+ * 상태는 모듈 하나를 공유한다 — 생성기는 동기 호출 하나 안에서 시드 → 소비를 끝내므로 서로 끼어들지 않는다.
+ */
+export function seedActivityRng(d: number, salt: number): void {
+  rngState = (Math.imul(d, SEED_MULTIPLIER) ^ salt) >>> 0;
+}
+
 function seedSlot(d: number): void {
-  rngState = (Math.imul(d, SEED_MULTIPLIER) ^ SUNSPOT_SEED_SALT) >>> 0;
+  seedActivityRng(d, SUNSPOT_SEED_SALT);
+}
+
+/** mulberry32 다음 값 [0, 1) — {@link seedActivityRng} 로 시드한 열. */
+export function activityRand(): number {
+  return rand();
+}
+
+/** Box–Muller 정규 난수 (난수 2 개 소비) — {@link seedActivityRng} 로 시드한 열. */
+export function activityGauss(): number {
+  return gauss();
 }
 
 function rand(): number {
@@ -434,23 +501,10 @@ export function generateHeliographicSunspots(jd: number, out: HeliographicSpots)
   for (let d = today - SLOT_LOOKBACK_DAYS; d <= today; d++) {
     const dayJd = J2000_JD + d;
 
-    // 그날 흑점을 내는 사이클 (index 오름차순) 과 신생률.
-    let kLo = latestCycleBefore(dayJd);
-    const tauFloorJd = dayJd - CYCLE_ACTIVE_TAU_MAX_MONTHS * DAYS_PER_MONTH;
-    let found = 0;
-    while (found < MAX_ACTIVE_CYCLES && cycleStartJd(kLo) >= tauFloorJd) {
-      found++;
-      kLo--;
-    }
-    let nc = 0;
+    // 그날 흑점을 내는 사이클 (index 오름차순) 과 신생률. 누적 순서는 사이클 index 오름차순 그대로 (골든 값 불변).
+    const nc = activeSolarCycles(dayJd, cycleTau, cycleS);
     let total = 0;
-    for (let k = kLo + 1; nc < found; k++, nc++) {
-      const tau = (dayJd - cycleStartJd(k)) / DAYS_PER_MONTH;
-      const s = cycleShape(tau);
-      cycleTau[nc] = tau;
-      cycleS[nc] = s;
-      total += GROUPS_PER_DAY_AT_MAX * s;
-    }
+    for (let q = 0; q < nc; q++) total += GROUPS_PER_DAY_AT_MAX * cycleS[q]!;
 
     seedSlot(d);
     const n = Math.floor(total + rand());
@@ -473,10 +527,8 @@ export function generateHeliographicSunspots(jd: number, out: HeliographicSpots)
       const aMax = Math.min(SUNSPOT_AREA_MAX_MSH, Math.max(SUNSPOT_AREA_MIN_MSH, Math.exp(lnA)));
       const life = Math.max(LIFE_MIN_DAYS, aMax / DECAY_MSH_PER_DAY);
       const hemi = rand() < 0.5 ? 1 : -1;
-      const sigma =
-        WIDTH_BASE_DEG +
-        WIDTH_SPAN_DEG * (1 - Math.exp(-(shape * WIDTH_ACTIVITY_PROXY) / WIDTH_AREA_SCALE));
-      const centroid = CENTROID_LAT_START_DEG * Math.exp(-tau / CENTROID_LAT_DECAY_MONTHS);
+      const sigma = activityBandWidthDeg(shape);
+      const centroid = activityBandCentroidDeg(tau);
       const lat0 = Math.max(0, centroid + sigma * gauss());
       const lon0 = rand() * 360;
       const bipolar = aMax > BIPOLAR_MIN_AREA_MSH && rand() < BIPOLAR_PROBABILITY;
@@ -525,119 +577,35 @@ export function generateHeliographicSunspots(jd: number, out: HeliographicSpots)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 광과민성 감쇠 (결정 3) — 프레임 위상에서 매 프레임 1회
+// 광과민성 감쇠 (결정 3) — 프레임 위상에서 매 프레임 1회. 상태기계는 공용 모듈 (#1428 ADR 결정 3).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** 흑점의 실효 주파수 계수 `c` [cycles/일] = 적도 자전 주파수 `ω(0)/360` (ADR 1412 결정 3 — #1428 축 4 표 0.04034). */
+export const SUNSPOT_CYCLES_PER_DAY = SUNSPOT_ROTATION_A_DEG_PER_DAY / 360;
 
 /**
  * 실효 자전 주파수 [Hz] = `|Δjd| / Δt × ω(0) / 360` — 흑점이 한 자리를 지나 다시 오는 빈도 (결정 3). 역재생은 `|Δjd|` 라 같다.
- *
- * {@link stepSunspotVisibility} 는 이 식을 **프레임 하나가 아니라 직전 `1/6 s` 창** (Δt = 창 길이, Δjd = 창 양 끝 jd 차) 에
- * 적용한다 (ADR 1412 Amendment 1). 재생은 프레임마다 jd 가 움직여 창 평균 = 프레임 값이다. 스크러버 드래그 · 키 반복은
- * 입력 이벤트가 프레임보다 드물어 (실측 14~30 회/s) jd 가 움직이는 프레임과 멈춘 프레임이 섞이는데, 창 평균이 그 둘을
- * 묶어 지속 조건을 채운다. 창보다 짧게 끝나는 **단발 점프**는 지속 조건을 채우지 못해 무시하는 대상이다.
+ * 공용 {@link activityEffectiveHz} 에 흑점 계수를 넘기는 래퍼다 — 창 판정 서술은 그쪽 (ADR 1412 Amendment 1).
  */
 export function sunspotEffectiveHz(deltaJd: number, deltaSec: number): number {
-  return (Math.abs(deltaJd) / deltaSec) * (SUNSPOT_ROTATION_A_DEG_PER_DAY / 360);
+  return activityEffectiveHz(deltaJd, deltaSec, SUNSPOT_CYCLES_PER_DAY);
 }
 
-/**
- * 판정 창 표본 이력 용량. 창 `1/6 s` 를 덮으려면 프레임률 × 1/6 + 1 개가 필요하다 — 64 는 약 380 fps 까지.
- * 그보다 빠르면 가장 오래된 표본까지만 보아 창이 짧아진다 (단발 점프는 여전히 지속 조건 미달 — 보수 쪽).
- */
-const VISIBILITY_HISTORY = 64;
-/** 판정 창 = 지속 시간 [ms] (같은 값 — 창 경계와 지속 조건을 한 식으로 비교하려고 ms 로 한 번만 만든다). */
-const VISIBILITY_WINDOW_MS = SUNSPOT_VISIBILITY_PERSIST_S * 1000;
-
-/** 감쇠 상태 — 호출자 소유 (장면 1 개당 1 개). 표본 이력은 고정 길이 링 버퍼 (할당 0). */
-export interface SunspotVisibilityState {
-  /** 표본 시각 [ms] · 장면 시계 jd 링 버퍼. */
-  sampleMs: Float64Array;
-  sampleJd: Float64Array;
-  /** 다음에 쓸 index · 채워진 표본 수. */
-  head: number;
-  count: number;
-  /** 현재 연속 구간의 판정 (창 평균 `f > 3`). */
-  fast: boolean;
-  /** 그 판정이 처음 나온 표본 시각 [ms]. */
-  fastSinceMs: number;
-  /** 목표 가시도 (0 · 1). */
-  target: number;
-  /** 실제 가시도 0~1 — 셰이더 `spotVisibility`. */
-  visibility: number;
-}
+/** 감쇠 상태 — 공용 상태와 같은 형태 (흑점 1 개당 장면 1 개). */
+export type SunspotVisibilityState = ActivityVisibilityState;
 
 export function createSunspotVisibilityState(): SunspotVisibilityState {
-  return {
-    sampleMs: new Float64Array(VISIBILITY_HISTORY),
-    sampleJd: new Float64Array(VISIBILITY_HISTORY),
-    head: 0,
-    count: 0,
-    fast: false,
-    fastSinceMs: Number.NaN,
-    target: 1,
-    visibility: 1,
-  };
+  return createActivityVisibilityState();
 }
 
 /**
- * 감쇠 한 걸음 — 장면 시계 jd 와 실시간 `nowMs` (performance.now) 로 가시도를 갱신해 반환한다 (할당 0).
- *
- * - 판정량: 직전 `W = 1/6 s` 창의 실효 주파수 {@link sunspotEffectiveHz}. 기준 표본 = `nowMs − W` 이전의 가장 최근 표본
- *   (없으면 가장 오래된 표본). 재생은 창 평균 = 순간값이고, 스크러버처럼 jd 가 멈춘 프레임이 섞인 입력도 창 안에서 묶인다.
- * - 목표: 그 판정이 연속 `W` 이상 「빠름」 이면 0, 「느림」 이 같은 시간 이어지면 1, 그 사이는 직전 목표 유지. 연속 구간의
- *   시작은 그 판정이 **처음 나온 표본 시각**이다 (프레임 간격을 소급하지 않는다 — 긴 프레임 하나가 혼자 지속 조건을 채우지 않게).
- * - 단발 점프 (날짜 입력 · 스크러버 1회): 점프 표본이 창 안에 있는 동안만 「빠름」 이고, 그 기간은 `W` 보다 짧다 → 목표 불변.
- *   점프 프레임이 길어도 (무거운 점프) 같다. 점프 둘이 `W` 안에 이어지면 「빠름」 이 `W` 를 넘겨 감쇠한다 — 점프 하나가 흑점
- *   무늬를 한 번 바꾸므로, 1 초 6 회 (= 3 쌍) 를 넘는 점프 열이 여기에 걸린다.
- * - 실제 값은 목표를 향해 초당 최대 `6` 으로만 움직인다 → 켜짐↔꺼짐 1 왕복 ≥ 1/3 s (1 초에 3 회 이하).
- * - 일시정지 (`Δjd = 0`): 창이 비워진 뒤 (`W`) 「느림」 이 `W` 이어져 목표 1, 다시 1/6 s 에 걸쳐 1 로 돌아온다.
- * - `Δt ≤ 0` (같은 시각의 재호출 · 시계 역행) 표본은 버린다. 같은 프레임의 2회째 호출은 같은 jd 의 표본 하나를 더할 뿐이라
- *   창 평균이 바뀌지 않는다.
- * - 탭 복귀: `TimeController.tick` 이 실시간 dt 를 자르지 않아 복귀 프레임의 Δjd/Δt 는 재생 속도와 같다 — 급등이 아니다.
+ * 감쇠 한 걸음 — 공용 {@link stepActivityVisibility} 에 흑점 계수 {@link SUNSPOT_CYCLES_PER_DAY} 를 넘기는 래퍼 (할당 0).
+ * 동작 계약 (창 판정 · 지속 · 변화율 · 일시정지 복귀 · 단발 점프 무시) 은 공용 함수 문서가 정본이다.
  */
 export function stepSunspotVisibility(
   state: SunspotVisibilityState,
   jd: number,
   nowMs: number,
 ): number {
-  const cap = state.sampleMs.length;
-  const lastIdx = (state.head - 1 + cap) % cap;
-  if (state.count > 0 && !(nowMs > state.sampleMs[lastIdx]!)) return state.visibility;
-  const prevMs = state.count > 0 ? state.sampleMs[lastIdx]! : Number.NaN;
-  // 비유한 jd 는 직전 표본 jd 로 대신한다 (Δjd 0 — 판정에 기여하지 않음).
-  const sampleJd = Number.isFinite(jd) ? jd : state.count > 0 ? state.sampleJd[lastIdx]! : 0;
-  state.sampleMs[state.head] = nowMs;
-  state.sampleJd[state.head] = sampleJd;
-  state.head = (state.head + 1) % cap;
-  if (state.count < cap) state.count++;
-  if (state.count === 1) {
-    state.fastSinceMs = nowMs;
-    return state.visibility;
-  }
-
-  // 기준 표본 — `nowMs − W` 이전의 가장 최근 표본, 없으면 가장 오래된 표본.
-  // ⚠️ 창 경계와 지속 조건은 **같은 식** (`nowMs − 표본 시각 >= W`) 으로 잰다. 둘을 다른 식으로 반올림하면 단발 점프의 「빠름」
-  // 마지막 표본에서 지속 조건만 먼저 참이 되는 경계가 생긴다 (183 ms 간격 점프 열 테스트가 그 경계를 잡았다).
-  let ref = (state.head - state.count + cap) % cap;
-  for (let k = 2; k <= state.count; k++) {
-    const idx = (state.head - k + cap) % cap;
-    if (nowMs - state.sampleMs[idx]! >= VISIBILITY_WINDOW_MS) {
-      ref = idx;
-      break;
-    }
-  }
-  const spanSec = (nowMs - state.sampleMs[ref]!) / 1000;
-  const fast =
-    sunspotEffectiveHz(sampleJd - state.sampleJd[ref]!, spanSec) > SUNSPOT_MAX_FLICKER_HZ;
-  if (fast !== state.fast) {
-    state.fast = fast;
-    state.fastSinceMs = nowMs;
-  }
-  if (nowMs - state.fastSinceMs >= VISIBILITY_WINDOW_MS) {
-    state.target = fast ? 0 : 1;
-  }
-  const maxStep = SUNSPOT_VISIBILITY_RATE_PER_S * ((nowMs - prevMs) / 1000);
-  const diff = state.target - state.visibility;
-  state.visibility += Math.max(-maxStep, Math.min(maxStep, diff));
-  return state.visibility;
+  return stepActivityVisibility(state, SUNSPOT_CYCLES_PER_DAY, jd, nowMs);
 }

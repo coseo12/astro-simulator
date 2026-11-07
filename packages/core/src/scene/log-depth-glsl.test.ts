@@ -21,6 +21,7 @@ import { PLANET_FRAGMENT_SHADER, PLANET_VERTEX_SHADER } from './procedural-plane
 import { CLOUD_FRAGMENT_SHADER, CLOUD_VERTEX_SHADER } from './cloud-layer.js';
 import { BELT_FRAGMENT_SHADER } from './belt-particles.js';
 import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
+import { SUN_PROMINENCE_FRAGMENT_SHADER } from './sun-prominences.js';
 
 describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조각 정합', () => {
   // #1215 — 구름 셰이더 추가로 3 → 4 (ADR 20260628-756 §A10.4 — 없으면 shell 이 표면에 depth 거부된다).
@@ -33,6 +34,8 @@ describe('#845 LOG_DEPTH_FRAGMENT_WRITE_GLSL — 커스텀 셰이더 공용 조�
     ['belt-particles', BELT_FRAGMENT_SHADER],
     // #1335 — 코로나 셰이더 (ADR 20261014-1335 결정 1 — 코로나 구 뒷면 평면의 깊이가 수성 · 앞쪽 천체와 같은 공간이어야 한다).
     ['sun-corona', SUN_CORONA_FRAGMENT_SHADER],
+    // #1428 — 홍염 셰이더 (ADR 20261107-1428 결정 1 — 실제 3D 위치에 depth test on 이라 달 · 앞쪽 천체 깊이가 가린다).
+    ['sun-prominences', SUN_PROMINENCE_FRAGMENT_SHADER],
   ];
 
   it('공용 조각 텍스트 자체가 Babylon logDepth 공식 형태를 유지한다', () => {
@@ -71,6 +74,8 @@ const GL_POSITION_WRITE = /gl_Position(\.[xyzw]+)?\s*[-+*/]?=(?!=)/g;
 describe('#1422 LOG_DEPTH_VERTEX_Z_GLSL — vertex clip z 보정 (WebGL2 far clip 구멍)', () => {
   // 적용 대상 = WebGL2 노출이 실측된 셰이더만 (#1422 PR 본문 노출 측정 표). sun-corona · comet-tail ·
   // belt-particles 는 같은 패턴이나 측정 시점에서 보정 전후 픽셀 차이가 0 이라 범위 밖이다.
+  // sun-prominences (ADR 20261107-1428 결정 2) 도 같은 패턴이나 위성 focus 후 시간 점프 시나리오에서 보정 전후 픽셀
+  // 차이가 0 이라 범위 밖이다 (하드웨어 WebGL2 · 같은 장면의 sun-shader 대조군 노출 37612 px — PR #1430 본문 D10 표).
   // starfield · star-catalog 는 노출을 재지 않았고, fragment 가 gl_FragDepth 를 쓰지 않아 이 보정을 넣으면
   // depth 값도 바뀐다 (log-depth.ts 사용 전제) — PR #1425 코멘트 기록.
   const SHADERS: ReadonlyArray<readonly [string, string]> = [

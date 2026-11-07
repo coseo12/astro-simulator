@@ -96,6 +96,16 @@ export {
 } from './sunspots.js';
 export type { HeliographicSpots } from './sunspots.js';
 export { SUNSPOT_SIZE_EXAGGERATION, writeSunspotUniforms } from './sun-shader.js';
+// #1428 — 태양 홍염 (ADR 20261107-1428). 생성기 · 기하 기록기는 Babylon 비의존. 감쇠 상태기계는 효과 공용.
+export {
+  PROMINENCE_MAX,
+  SUN_PROMINENCES_MESH_NAME,
+  createProminenceList,
+  generateProminences,
+  prominenceApex,
+} from './sun-prominences.js';
+export type { ProminenceList, SunProminencesHandles } from './sun-prominences.js';
+export { activityEffectiveHz } from './activity-visibility.js';
 // #1341 — 궤적 trail (ADR 20261015-1341). 샘플러는 Babylon 비의존.
 export { TRAIL_LINES_MESH_NAME } from './trail-lines.js';
 export type { TrailLinesHandles } from './trail-lines.js';
