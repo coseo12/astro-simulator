@@ -27,7 +27,7 @@ import {
 } from '@babylonjs/core';
 import type { LoadedCelestialBody } from '../ephemeris/solar-system-loader.js';
 import type { SurfaceLightingArgs } from './body-mesh-factory.js';
-import { LOG_DEPTH_FRAGMENT_WRITE_GLSL } from './log-depth.js';
+import { LOG_DEPTH_FRAGMENT_WRITE_GLSL, LOG_DEPTH_VERTEX_Z_GLSL } from './log-depth.js';
 import {
   ECLIPSE_SHADOW_GLSL,
   ECLIPSE_SHADOW_UNIFORM_NAMES,
@@ -132,7 +132,7 @@ const SHADER_NAME = 'cloudLayer';
  * clip.w = log-depth). vLocalPos 가 **구름 mesh 의 local** 이므로 상대 자전을 받으면 패턴이 표면에 대해
  * 흐른다 — 그것이 차등의 시각 기전이다.
  */
-const CLOUD_VERTEX_SHADER = /* glsl */ `
+export const CLOUD_VERTEX_SHADER = /* glsl */ `
 precision highp float;
 
 attribute vec3 position;
@@ -150,6 +150,8 @@ void main(void) {
   vNormal = normalize((world * vec4(normal, 0.0)).xyz);
   vec4 clip = worldViewProjection * vec4(position, 1.0);
   gl_Position = clip;
+  // #1422 — far clip 평면 위 (clip.z == clip.w) 정점이 WebGL2 에서 잘리는 것을 막는다 (log-depth.ts).
+  ${LOG_DEPTH_VERTEX_Z_GLSL}
   vFragmentDepth = 1.0 + clip.w;
 }
 `;
