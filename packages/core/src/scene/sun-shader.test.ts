@@ -52,6 +52,17 @@ import {
 } from './procedural-planet-shader.js';
 import { CLOUD_FRAGMENT_SHADER } from './cloud-layer.js';
 import { SUN_CORONA_FRAGMENT_SHADER } from './sun-corona.js';
+// #1428 플레어 (PR2) — 기존 import 블록은 건드리지 않고 따로 가져온다 (흑점 테스트 무수정).
+import {
+  FLARE_CORE_SIGMA,
+  FLARE_EDGE_INNER,
+  FLARE_RADIUS,
+  FLARE_RIBBON_OFFSET,
+  sunFlareShapeMirror,
+  writeSunFlareUniforms,
+  writeSunspotUniformsFromSpots,
+} from './sun-shader.js';
+import { MAX_SUN_FLARES, createSunFlareList, generateSunFlares } from './sun-flares.js';
 
 /** 태양 실측 base 발광색 (colorHint.hex #FFE9A8 — 데이터 SSoT read-only). */
 const SUN_BASE: readonly [number, number, number] = [1.0, 233 / 255, 168 / 255];
@@ -472,5 +483,115 @@ describe('#1412 sun-shader 흑점 — 기록기 writeSunspotUniforms (결정 1 �
     const buf = new Array<number>(4 * SUNSPOT_MAX).fill(3);
     expect(writeSunspotUniforms(Number.NaN, buf)).toBe(0);
     expect(buf.every((v) => v === 0)).toBe(true);
+  });
+});
+
+describe('#1428 sun-shader 플레어 — GLSL 정적 계약 (ADR 20261107-1428 결정 4 · 합의 7 · D9)', () => {
+  it('uniform vec4 flares[MAX_SUN_FLARES] · flareParams[MAX_SUN_FLARES] · flareCount · flareVisibility 선언', () => {
+    expect(MAX_SUN_FLARES).toBe(4);
+    expect(SUN_FRAGMENT_SHADER).toContain(`uniform vec4 flares[${MAX_SUN_FLARES}];`);
+    expect(SUN_FRAGMENT_SHADER).toContain(`uniform vec4 flareParams[${MAX_SUN_FLARES}];`);
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform float flareCount;');
+    expect(SUN_FRAGMENT_SHADER).toContain('uniform float flareVisibility;');
+    // 시간 · jd uniform 은 여전히 없다 (#782 규약 · 결정 3).
+    expect(SUN_FRAGMENT_SHADER).not.toMatch(/uniform\s+float\s+\w*(jd|julian|time)\w*\s*;/i);
+  });
+
+  it('상수 상한 루프 + flareCount 조기 탈출 (흑점 루프와 같은 형태) · switch 없음', () => {
+    expect(SUN_FRAGMENT_SHADER).toContain(`for (int i = 0; i < ${MAX_SUN_FLARES}; i++) {`);
+    expect(SUN_FRAGMENT_SHADER).toContain('if (float(i) >= flareCount) break;');
+    expect(SUN_FRAGMENT_SHADER).not.toMatch(/\bswitch\b/);
+  });
+
+  it('리본 기저는 흑점 필라멘트와 같은 자전축 기저 (sunAxis 재사용)', () => {
+    expect(SUN_FRAGMENT_SHADER).toContain('vec3 ft = normalize(cross(sunAxis, fc));');
+    expect(SUN_FRAGMENT_SHADER).toContain('vec3 fb = cross(fc, ft);');
+  });
+
+  it('합성은 흑점 · limb 뒤 백색 혼합 · clamp 앞 — mix(col, vec3(1.0), fl × 가시도)', () => {
+    const base = SUN_FRAGMENT_SHADER.indexOf(
+      'vec3 col = baseColor * granulation * spotFactor * limb;',
+    );
+    const flareMix = SUN_FRAGMENT_SHADER.indexOf(
+      'col = mix(col, vec3(1.0), fl * flareVisibility);',
+    );
+    const clampAt = SUN_FRAGMENT_SHADER.indexOf('col = clamp(col, 0.0, 1.0);');
+    expect(base).toBeGreaterThan(-1);
+    expect(flareMix).toBeGreaterThan(base);
+    expect(clampAt).toBeGreaterThan(flareMix);
+    // fl 의 시작값 0 — flareCount = 0 이면 루프가 fl 을 건드리지 않아 mix(col, 1, 0) = col (D5).
+    expect(SUN_FRAGMENT_SHADER).toContain('float fl = 0.0;');
+  });
+});
+
+describe('#1428 sun-shader 플레어 — 모양 미러', () => {
+  it('중심 = 1 (핵) · 반경 밖 = 0 · 리본 중심선이 핵 바깥에서 밝다 · 동서 대칭', () => {
+    expect(sunFlareShapeMirror(0, 0)).toBe(1);
+    expect(sunFlareShapeMirror(1, 0)).toBe(0);
+    expect(sunFlareShapeMirror(0, -1.2)).toBe(0);
+    const ribbon = sunFlareShapeMirror(FLARE_RIBBON_OFFSET, 0);
+    const between = sunFlareShapeMirror(FLARE_RIBBON_OFFSET + 3 * FLARE_CORE_SIGMA, 0);
+    expect(ribbon).toBeGreaterThan(0.9);
+    expect(between).toBeLessThan(ribbon);
+    for (const [x, y] of [
+      [0.2, 0.1],
+      [0.5, -0.3],
+      [0.3, 0.6],
+    ] as const) {
+      expect(sunFlareShapeMirror(-x, y)).toBe(sunFlareShapeMirror(x, y));
+    }
+    // 경계 페더 — 0.75 R 안쪽은 페더 없음, 1 R 에서 0 으로.
+    expect(FLARE_EDGE_INNER).toBe(0.75);
+    expect(sunFlareShapeMirror(0, 0.999)).toBeLessThan(1e-3);
+  });
+});
+
+describe('#1428 sun-shader 흑점 · 플레어 기록기 — 흑점 목록 공유 (합의 4)', () => {
+  it('writeSunspotUniformsFromSpots = writeSunspotUniforms (같은 jd 의 생성 목록이면 비트 동일)', () => {
+    const spots = createHeliographicSpots();
+    for (let jd = 2_415_020.5; jd < 2_488_070.5; jd += 731.3) {
+      const a = new Array<number>(4 * SUNSPOT_MAX).fill(9);
+      const b = new Array<number>(4 * SUNSPOT_MAX).fill(9);
+      const n = generateHeliographicSunspots(jd, spots);
+      expect(writeSunspotUniformsFromSpots(spots, n, a)).toBe(writeSunspotUniforms(jd, b));
+      for (let k = 0; k < a.length; k++) expect(Object.is(a[k], b[k])).toBe(true);
+    }
+  });
+
+  it('writeSunFlareUniforms — xyz 장면 단위벡터 · w = 반경 0.06 · params.x = 세기 · 개수 뒤 0', () => {
+    const jd = 2_456_749.14;
+    const spots = createHeliographicSpots();
+    const spotCount = generateHeliographicSunspots(jd, spots);
+    const list = createSunFlareList();
+    const n = generateSunFlares(jd, spots, spotCount, list);
+    expect(n).toBe(2);
+    const flares = new Array<number>(4 * MAX_SUN_FLARES).fill(7);
+    const params = new Array<number>(4 * MAX_SUN_FLARES).fill(7);
+    expect(writeSunFlareUniforms(jd, spots, spotCount, flares, params)).toBe(n);
+    expect(FLARE_RADIUS).toBe(0.06);
+    for (let i = 0; i < n; i++) {
+      const v = flares.slice(4 * i, 4 * i + 3);
+      expect(Math.hypot(v[0]!, v[1]!, v[2]!)).toBeCloseTo(1, 12);
+      const sinLat =
+        v[0]! * SUN_AXIS_SCENE[0] + v[1]! * SUN_AXIS_SCENE[1] + v[2]! * SUN_AXIS_SCENE[2];
+      expect(sinLat).toBeCloseTo(Math.sin((list.latDeg[i]! * Math.PI) / 180), 12);
+      expect(flares[4 * i + 3]).toBe(FLARE_RADIUS);
+      expect(params[4 * i]).toBe(list.strength[i]);
+      expect(params.slice(4 * i + 1, 4 * i + 4)).toEqual([0, 0, 0]);
+    }
+    for (let k = 4 * n; k < 4 * MAX_SUN_FLARES; k++) {
+      expect(flares[k]).toBe(0);
+      expect(params[k]).toBe(0);
+    }
+  });
+
+  it('범위 밖 jd → 0 개 · 배열 전부 0', () => {
+    const spots = createHeliographicSpots();
+    const spotCount = generateHeliographicSunspots(2_456_749.14, spots);
+    const flares = new Array<number>(4 * MAX_SUN_FLARES).fill(3);
+    const params = new Array<number>(4 * MAX_SUN_FLARES).fill(3);
+    expect(writeSunFlareUniforms(Number.NaN, spots, spotCount, flares, params)).toBe(0);
+    expect(flares.every((v) => v === 0)).toBe(true);
+    expect(params.every((v) => v === 0)).toBe(true);
   });
 });

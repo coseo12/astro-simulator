@@ -46,6 +46,12 @@
  *   만 받아 상수 상한 루프로 원판 판정한다 (결정 1). jd 는 셰이더로 가지 않는다 (#782 규약). 합성은
  *   `baseColor × granulation′ × spotFactor × limb` (결정 4). `spotCount = 0` 이면 흑점 도입 전과 같은 식이 된다
  *   (`mix(x, y, 0) = x`, `× 1` — 소프트웨어 렌더 게이트 · `?sunspots=off` 의 경로).
+ *
+ * **#1428 플레어** (ADR `docs/decisions/20261107-1428-solar-flares-prominences.md` 결정 4): 목록은 CPU 가 만든다 (`sun-flares.ts`
+ *   — 흑점 군 위치 · jd 순수 함수). 셰이더는 `uniform vec4 flares[4]` (`xyz` 장면 단위벡터 중심 · `w` 반경) · `flareParams[4]`
+ *   (`x` 세기) · `flareCount` · `flareVisibility` (감쇠) 만 받아 흑점 루프와 같은 상수 상한 루프로 국소 백색을 만든다. 합성은
+ *   흑점 · limb 뒤 `mix(col, vec3(1.0), fl)` — `flareCount = 0` 이면 루프 첫 반복에서 빠져 `fl = 0` 이고 `col` 이 그대로다
+ *   (`?flares=off` · 소프트웨어 렌더 게이트의 경로, DoD D5).
  */
 
 import { Effect, ShaderMaterial, Vector3, type Scene } from '@babylonjs/core';
@@ -59,7 +65,9 @@ import {
   createHeliographicSpots,
   generateHeliographicSunspots,
   heliographicToScene,
+  type HeliographicSpots,
 } from './sunspots.js';
+import { MAX_SUN_FLARES, createSunFlareList, generateSunFlares } from './sun-flares.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rendering-only 미학 상수 SSoT (#69 숨은 상수 drift 차단 — sun-shader.test.ts 가드 대상).
@@ -165,6 +173,23 @@ export const FILAMENT_AZIMUTH_FREQUENCY = 9.0;
 /** 필라멘트 noise 시드 배율 — `dot(c, sunAxis) × 17` (흑점마다 다른 noise 단면, 시안 C 의 17). */
 export const FILAMENT_SEED_SCALE = 17.0;
 
+/**
+ * #1428 플레어 화면 모양 (ADR 20261107-1428 결정 4 · 7 — 반경 · 리본 형태는 본 모듈 소유, 발생률 · 광도 곡선은 `sun-flares.ts`).
+ * 반경은 단위 구 위 현 거리 — 0.06 R 은 표시 과장이다 (Visual Fidelity, ADR 1-E). 아래 리본 · 핵 치수는 반경 단위
+ * (`q = (동서, 남북) 성분 / 반경`). 2-리본은 군 중심을 사이에 두고 동서로 갈라진 남북 방향 띠 2 개, 핵은 중심 원형 — 출발값,
+ * 최종값은 사용자 D-T2.
+ */
+export const FLARE_RADIUS = 0.06;
+/** 리본 중심선의 동서 오프셋 (반경 단위). */
+export const FLARE_RIBBON_OFFSET = 0.35;
+/** 리본 단면 (동서) · 길이 (남북) 가우시안 σ (반경 단위). */
+export const FLARE_RIBBON_SIGMA_ACROSS = 0.12;
+export const FLARE_RIBBON_SIGMA_ALONG = 0.45;
+/** 중심 핵 가우시안 σ (반경 단위). */
+export const FLARE_CORE_SIGMA = 0.2;
+/** 반경 바깥 경계 페더 시작 (반경 단위) — `1 − smoothstep(0.75, 1, |q|)`. 반경 밖은 0 이다. */
+export const FLARE_EDGE_INNER = 0.75;
+
 /** GLSL 실수 리터럴 (정수값도 `.0` 을 붙인다 — GLSL ES 는 int → float 암묵 변환이 없다). */
 function glslFloat(n: number): string {
   return Number.isInteger(n) ? `${n}.0` : `${n}`;
@@ -269,6 +294,12 @@ uniform vec3 umbraRgb;
 uniform vec3 penumbraRgb;
 uniform float umbraRadiusRatio;
 uniform float filamentContrast;
+// #1428 플레어 (ADR 20261107-1428 결정 4). xyz = 장면 단위벡터 중심 · w = 반경 (단위 구 현 거리). flareParams.x = 세기 0~1.
+uniform vec4 flares[${MAX_SUN_FLARES}];
+uniform vec4 flareParams[${MAX_SUN_FLARES}];
+uniform float flareCount;
+// 결정 3 — 플레어 감쇠 가시도 0~1 (프레임 위상이 매 프레임 쓴다).
+uniform float flareVisibility;
 
 // 3D hash — sin-free fract-mix (procedural-planet-shader.ts 와 동일 텍스트 — JS 미러 fbmMirror
 // 재사용 계약. 한쪽 수정 시 양쪽 + 미러 동기화 의무, sun-shader.test.ts 정적 가드).
@@ -365,6 +396,32 @@ void main(void) {
 
   // emissive 합성 — 광원 shade 없음 (ADR §결정 4). 출력이 곧 발광색. 흑점도 limb darkening 을 받는다 (#1412 결정 4).
   vec3 col = baseColor * granulation * spotFactor * limb;
+
+  // ── #1428 플레어 (ADR 20261107-1428 결정 4) — 흑점 루프와 같은 상수 상한 루프 · 조기 탈출 ──
+  // 2-리본 + 핵. 접선 기저는 흑점 필라멘트와 같은 자전축 기저 (t = 동서, b = 남북). 겹치면 큰 쪽.
+  // flareCount = 0 이면 첫 반복에서 빠져 fl = 0 → mix(col, 1, 0) = col (끈 상태 = 플레어 도입 전과 같은 식).
+  float fl = 0.0;
+  for (int i = 0; i < ${MAX_SUN_FLARES}; i++) {
+    if (float(i) >= flareCount) break;
+    vec4 flare = flares[i];
+    vec3 fc = flare.xyz;
+    float rF = flare.w;
+    vec3 fdv = p - fc;
+    if (length(fdv) < rF) {
+      vec3 ft = normalize(cross(sunAxis, fc));
+      vec3 fb = cross(fc, ft);
+      vec2 q = vec2(dot(fdv, ft), dot(fdv, fb)) / rF;
+      float across = (abs(q.x) - ${glslFloat(FLARE_RIBBON_OFFSET)}) / ${glslFloat(FLARE_RIBBON_SIGMA_ACROSS)};
+      float along = q.y / ${glslFloat(FLARE_RIBBON_SIGMA_ALONG)};
+      float ribbon = exp(-0.5 * (across * across + along * along));
+      float coreR = length(q) / ${glslFloat(FLARE_CORE_SIGMA)};
+      float core = exp(-0.5 * coreR * coreR);
+      float shape = max(ribbon, core) * (1.0 - smoothstep(${glslFloat(FLARE_EDGE_INNER)}, 1.0, length(q)));
+      fl = max(fl, shape * flareParams[i].x);
+    }
+  }
+  // 결정 3 — 감쇠 가시도를 세기에 곱한다. 합성은 흑점 · limb 뒤 백색 혼합.
+  col = mix(col, vec3(1.0), fl * flareVisibility);
   // 안전 clamp — u ≤ 1 이라 limb ≥ 0 구조 보장이지만 granulation 상향 변조 (>1) 의 [0,1]
   // 이탈만 보정 (흰색 saturate — warm 색역 유지, 테스트 가드).
   col = clamp(col, 0.0, 1.0);
@@ -448,6 +505,11 @@ export function createSunSurfaceMaterial(
         'penumbraRgb',
         'umbraRadiusRatio',
         'filamentContrast',
+        // #1428 플레어 (ADR 20261107-1428 결정 4).
+        'flares',
+        'flareParams',
+        'flareCount',
+        'flareVisibility',
       ],
     },
   );
@@ -487,6 +549,11 @@ export function createSunSurfaceMaterial(
   );
   material.setFloat('umbraRadiusRatio', UMBRA_RADIUS_RATIO);
   material.setFloat('filamentContrast', FILAMENT_CONTRAST);
+  // #1428 — 플레어 없음으로 시작한다 (`flareCount = 0`). 목록은 장면이 시간 위상에서, 가시도는 프레임 위상에서 쓴다.
+  material.setArray4('flares', new Array<number>(4 * MAX_SUN_FLARES).fill(0));
+  material.setArray4('flareParams', new Array<number>(4 * MAX_SUN_FLARES).fill(0));
+  material.setFloat('flareCount', 0);
+  material.setFloat('flareVisibility', 1);
 
   return material;
 }
@@ -503,12 +570,60 @@ const writerSpots = createHeliographicSpots();
  * `out[4i..4i+2]` = 장면 단위벡터 중심, `out[4i+3]` = `2.5 × √(2·10⁻⁶·A(t))` (반영 각반경, 결정 1). 개수 뒤는 0 으로 채운다.
  */
 export function writeSunspotUniforms(jd: number, out: number[]): number {
-  const n = generateHeliographicSunspots(jd, writerSpots);
+  return writeSunspotUniformsFromSpots(
+    writerSpots,
+    generateHeliographicSunspots(jd, writerSpots),
+    out,
+  );
+}
+
+/**
+ * #1428 — 이미 생성된 흑점 목록 (`spots` 의 앞 `count` 개) 을 `vec4` 배열 `out` 에 쓰고 개수를 반환한다 (할당 0).
+ * 장면이 `updateAt` 에서 흑점 목록을 1 회 만들어 흑점 uniform 과 플레어 생성기가 공유한다 (ADR 1428 §교차검증 합의 4).
+ * {@link writeSunspotUniforms} 는 이 함수 위의 래퍼다 — 같은 목록이면 출력이 비트 동일하다.
+ */
+export function writeSunspotUniformsFromSpots(
+  spots: Readonly<HeliographicSpots>,
+  count: number,
+  out: number[],
+): number {
+  const n = Math.min(count, SUNSPOT_MAX, spots.latDeg.length);
   for (let i = 0; i < n; i++) {
-    heliographicToScene(writerSpots.latDeg[i]!, writerSpots.lonDeg[i]!, out, 4 * i);
-    out[4 * i + 3] = SUNSPOT_SIZE_EXAGGERATION * writerSpots.radiusRad[i]!;
+    heliographicToScene(spots.latDeg[i]!, spots.lonDeg[i]!, out, 4 * i);
+    out[4 * i + 3] = SUNSPOT_SIZE_EXAGGERATION * spots.radiusRad[i]!;
   }
   for (let k = 4 * n; k < 4 * SUNSPOT_MAX; k++) out[k] = 0;
+  return n;
+}
+
+/** 플레어 기록기 scratch — 생성기 출력 (모듈 재사용, 호출당 할당 0). */
+const writerFlares = createSunFlareList();
+
+/**
+ * #1428 플레어 기록기 — 장면 시계 jd 와 그 jd 의 흑점 목록에서 플레어를 `flaresOut` (`vec4` × {@link MAX_SUN_FLARES}: xyz 장면
+ * 단위벡터 중심 · w = {@link FLARE_RADIUS}) · `paramsOut` (`vec4` × 같은 수: x = 세기 0~1, yzw = 0) 에 쓰고 개수를 반환한다
+ * (할당 0). 흑점 생성기는 부르지 않는다 (§교차검증 합의 4). 개수 뒤는 0 으로 채운다.
+ */
+export function writeSunFlareUniforms(
+  jd: number,
+  spots: Readonly<HeliographicSpots>,
+  spotCount: number,
+  flaresOut: number[],
+  paramsOut: number[],
+): number {
+  const n = generateSunFlares(jd, spots, spotCount, writerFlares);
+  for (let i = 0; i < n; i++) {
+    heliographicToScene(writerFlares.latDeg[i]!, writerFlares.lonDeg[i]!, flaresOut, 4 * i);
+    flaresOut[4 * i + 3] = FLARE_RADIUS;
+    paramsOut[4 * i] = writerFlares.strength[i]!;
+    paramsOut[4 * i + 1] = 0;
+    paramsOut[4 * i + 2] = 0;
+    paramsOut[4 * i + 3] = 0;
+  }
+  for (let k = 4 * n; k < 4 * MAX_SUN_FLARES; k++) {
+    flaresOut[k] = 0;
+    paramsOut[k] = 0;
+  }
   return n;
 }
 
@@ -630,6 +745,23 @@ export function sunspotFilamentBasisMirror(
     c[0] * t[1] - c[1] * t[0],
   ];
   return { t, b };
+}
+
+/**
+ * #1428 — 플레어 한 개의 FRAGMENT_SHADER 모양 (`shape`, 세기 · 가시도 곱 전) 의 **순수 JS 미러**.
+ * @param qx 동서 성분 / 반경 (`dot(p − c, t) / rF`)
+ * @param qy 남북 성분 / 반경 (`dot(p − c, b) / rF`)
+ * ⚠️ FRAGMENT_SHADER 와 같은 식이어야 한다 (한쪽 수정 시 양쪽 동기화). 셰이더는 `|p − c| < rF` 밖을 건너뛴다 — 여기서는 0.
+ */
+export function sunFlareShapeMirror(qx: number, qy: number): number {
+  const r = Math.hypot(qx, qy);
+  if (!(r < 1)) return 0;
+  const across = (Math.abs(qx) - FLARE_RIBBON_OFFSET) / FLARE_RIBBON_SIGMA_ACROSS;
+  const along = qy / FLARE_RIBBON_SIGMA_ALONG;
+  const ribbon = Math.exp(-0.5 * (across * across + along * along));
+  const coreR = r / FLARE_CORE_SIGMA;
+  const core = Math.exp(-0.5 * coreR * coreR);
+  return Math.max(ribbon, core) * (1 - smoothstepMirror(FLARE_EDGE_INNER, 1, r));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
