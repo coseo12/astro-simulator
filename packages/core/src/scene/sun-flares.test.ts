@@ -154,10 +154,27 @@ describe('#1428 플레어 — 진입부 jd 가드 (합의 8)', () => {
       out.idSlot.fill(7);
       expect(generateSunFlares(jd, spots, spotCount, out)).toBe(0);
       expect(lastSunFlareCandidateCount()).toBe(0);
-      expect(Array.from(out.latDeg)).toEqual([7, 7, 7, 7]);
-      expect(Array.from(out.strength)).toEqual([7, 7, 7, 7]);
-      expect(Array.from(out.idSlot)).toEqual([7, 7, 7, 7]);
+      const untouched = new Array<number>(MAX_SUN_FLARES).fill(7);
+      expect(Array.from(out.latDeg)).toEqual(untouched);
+      expect(Array.from(out.strength)).toEqual(untouched);
+      expect(Array.from(out.idSlot)).toEqual(untouched);
     }
+  });
+
+  it('군 탄생 전 슬롯은 건너뛴다 — 군 슬롯 s0 의 전날 (s0 − 1) 슬롯 발생이 0', () => {
+    // 면적 600 MSH = 확률 1 → 슬롯마다 발생한다 (가드가 없으면 s0 − 1 슬롯 발생이 [s0 − 1, s0 + 0.14) 에 보인다).
+    const s0 = 5000;
+    const spots = syntheticGroup(600, s0);
+    const out = createSunFlareList();
+    let fromS0 = 0;
+    for (let jd = J2000 + s0 - 1; jd < J2000 + s0 + 1; jd += 5 * MIN) {
+      const n = generateSunFlares(jd, spots, 1, out);
+      for (let i = 0; i < n; i++) {
+        expect(out.flareSlot[i]).toBeGreaterThanOrEqual(s0);
+        fromS0++;
+      }
+    }
+    expect(fromS0, '전제: 탄생 슬롯 s0 자신의 발생은 보인다').toBeGreaterThan(0);
   });
 
   it('흑점 0 개 → 플레어 0 개', () => {

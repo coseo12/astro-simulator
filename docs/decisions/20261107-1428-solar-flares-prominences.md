@@ -327,6 +327,28 @@ agy (2026-11-07, `outcome: applied` · exit 0) — 로그 `.claude/logs/cross-va
 
 ---
 
+## Amendment 1 — 플레어 세기에 면적 게이트 · 감쇠 가시도는 별도 uniform (PR2 구현 · 리뷰 권고 1, 2026-11-08)
+
+> 원문 소급 편집 0. 사용자 결정 (Q2 = F1 · Q3 = T1) 은 그대로이고, 상태도 Accepted 를 유지한다. 결정 4 의 「발생률은 군 면적에 비례 — 출발값 D-T2」 안의 메커니즘과 셰이더 uniform 목록을 구현에 맞춰 적는다. 새 상수는 게이트 폭 1 개다 (`FLARE_GATE_WIDTH`, `sun-flares.ts`).
+
+### 1. 세기 = 광도 곡선 × 면적 게이트 × 감쇠 가시도
+
+결정 4 의 세기 식 「광도 곡선 × 감쇠 가시도」 에 면적 게이트를 곱한다. 군 · 일 슬롯의 판정 난수를 `r`, 발생 확률을 `p = min(1, 군 면적 × FLARE_PROBABILITY_PER_MSH)` 라 할 때 게이트는 `smoothstep(0, W, p − r)` 이고 `W = FLARE_GATE_WIDTH = 0.02` 다.
+
+- **왜 계단 `r < p` 가 아닌가 — 연속성.** 합의 4 의 호출 계약상 `p` 는 **지금 jd 의 군 면적**에서만 나온다 (플레어 생성기는 흑점 생성기를 다시 부를 수 없다). 그런데 군 면적은 플레어 한 회 (195 분) 동안에도 변한다 — 흑점 생성기의 성장 구간 면적 증가율은 100 MSH/일이다 [계산: 최대 면적 / (수명 10 % · 수명 = 최대 면적 / 10 MSH/일)]. 계단이면 면적이 문턱을 지나는 순간 진행 중인 플레어가 광도 곡선 중간 세기로 나타나거나 사라진다.
+  - PR2 단위 테스트 (`sun-flares.test.ts` 「면적이 자라는 군 48 개 × 6 일, 1 분 간격」) 가 계단 변이에서 FAIL 한다. 같은 변이에서 실제 흑점 10 일 sweep 은 통과했다 — 그 구간에 문턱 통과가 없었다 (PR #1431 본문 · 리뷰 재현).
+- **발생 확률은 바뀌지 않는다** [계산 — PR #1431 리뷰]. 게이트 > 0 ⇔ `r < p` 이므로 「발생했는가」 는 계단 판정과 같고, 발생 확률은 `p` 그대로다. 바뀌는 것은 `r ∈ (p − W, p)` 구간의 세기뿐이다. 그래서 「슬롯당 0 또는 1 회」 · 「발생률 ∝ 면적」 · §교차검증 이견 2 의 빈도 논거가 그대로 성립한다.
+- 게이트 전이 폭은 면적으로 `W / k = 12 MSH` 이고, 최대 성장률 100 MSH/일에서 약 173 분이다 [계산 — PR #1431 리뷰]. 광도 곡선 상승 (15 분) 보다 느려 결정 3 의 계수 `c = 48 /일` 을 바꾸지 않는다.
+
+### 2. 셰이더 uniform 목록에 `flareVisibility`
+
+결정 4 의 uniform 목록 (`flares` · `flareParams` · `flareCount`) 에 `uniform float flareVisibility` 를 더한다. 합성식은 `col = mix(col, vec3(1.0), fl * flareVisibility)` 다.
+
+- 목록 (`flares` · `flareParams` · `flareCount`) 은 시간 위상 (`updateAt` — 일시정지 중에는 돌지 않는다) 이 쓰고, 감쇠 가시도는 프레임 위상 (`syncSolarActivityFrame`) 이 쓴다 (결정 3). 일시정지 중에 가시도가 1 로 돌아오려면 프레임 위상이 쓸 별도 uniform 이 필요하다. 흑점 `spotVisibility` 와 같은 구조다.
+- `flareCount = 0` 이면 `fl = 0.0` 이라 `mix(col, vec3(1.0), 0.0)` 이 그대로 항등이다 (DoD D5 불변).
+
+---
+
 ## 참고
 
 - 측정 스크립트 · POC (일회성 — 커밋 안 함): 페이지 안에서 `Effect.ShadersStore` 의 `sunCorona` · `sunSurface` fragment 에 define 블록을 주입하고, 홍염 리본 메시를 `ShaderMaterial` 로 붙였다.

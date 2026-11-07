@@ -4,6 +4,8 @@
  * **설계 근거**: ADR `docs/decisions/20261107-1428-solar-flares-prominences.md`
  *   - 결정 4 — 플레어 자리는 흑점 생성기의 **군**이다. 군마다 일 슬롯 해시로 그날의 발생을 **슬롯당 0 또는 1 회** 정하고
  *     (발생률은 군 면적에 비례), 세기 = 광도 곡선 (상승 15 분 smoothstep · 감쇠 45 분 지수) × 감쇠 가시도.
+ *   - Amendment 1 — 세기에 면적 게이트 {@link sunFlareAreaGate} 를 곱한다 (연속성 — 발생 확률은 `p` 그대로). 감쇠 가시도는
+ *     셰이더 uniform `flareVisibility` 로 따로 곱한다.
  *   - §교차검증 합의 4 — **이 모듈은 흑점 생성기를 부르지 않는다.** 장면이 `updateAt` 에서 흑점 목록을 1 회 만들어 흑점 uniform
  *     기록과 이 생성기에 함께 넘긴다 (`?sunspots=off` 에서도 플레어 자리가 있다 — 토글 1 개 = 효과 1 개).
  *   - §교차검증 합의 7 — {@link MAX_SUN_FLARES} 가 셰이더 배열 크기 · 생성기 출력 상한 · 단위 테스트의 SSoT 다.

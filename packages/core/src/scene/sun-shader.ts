@@ -50,7 +50,7 @@
  * **#1428 플레어** (ADR `docs/decisions/20261107-1428-solar-flares-prominences.md` 결정 4): 목록은 CPU 가 만든다 (`sun-flares.ts`
  *   — 흑점 군 위치 · jd 순수 함수). 셰이더는 `uniform vec4 flares[4]` (`xyz` 장면 단위벡터 중심 · `w` 반경) · `flareParams[4]`
  *   (`x` 세기) · `flareCount` · `flareVisibility` (감쇠) 만 받아 흑점 루프와 같은 상수 상한 루프로 국소 백색을 만든다. 합성은
- *   흑점 · limb 뒤 `mix(col, vec3(1.0), fl)` — `flareCount = 0` 이면 루프 첫 반복에서 빠져 `fl = 0` 이고 `col` 이 그대로다
+ *   흑점 · limb 뒤 `mix(col, vec3(1.0), fl * flareVisibility)` — `flareCount = 0` 이면 루프 첫 반복에서 빠져 `fl = 0` 이고 `col` 이 그대로다
  *   (`?flares=off` · 소프트웨어 렌더 게이트의 경로, DoD D5).
  */
 

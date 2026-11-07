@@ -63,6 +63,7 @@ import {
   writeSunspotUniformsFromSpots,
 } from './sun-shader.js';
 import { MAX_SUN_FLARES, createSunFlareList, generateSunFlares } from './sun-flares.js';
+import { heliographicToScene } from './sunspots.js';
 
 /** 태양 실측 base 발광색 (colorHint.hex #FFE9A8 — 데이터 SSoT read-only). */
 const SUN_BASE: readonly [number, number, number] = [1.0, 233 / 255, 168 / 255];
@@ -547,15 +548,39 @@ describe('#1428 sun-shader 플레어 — 모양 미러', () => {
 });
 
 describe('#1428 sun-shader 흑점 · 플레어 기록기 — 흑점 목록 공유 (합의 4)', () => {
-  it('writeSunspotUniformsFromSpots = writeSunspotUniforms (같은 jd 의 생성 목록이면 비트 동일)', () => {
+  /**
+   * PR2 이전 (develop `cc1643fe`) 의 `writeSunspotUniforms` 본문을 그대로 옮긴 오라클. 새 `writeSunspotUniforms` 는
+   * `writeSunspotUniformsFromSpots` 를 감싼 래퍼라 둘끼리 비교하면 정의상 같다 (자기 참조) — 옛 본문과 대조한다.
+   */
+  function legacySunspotUniformsOracle(jd: number, out: number[]): number {
     const spots = createHeliographicSpots();
-    for (let jd = 2_415_020.5; jd < 2_488_070.5; jd += 731.3) {
-      const a = new Array<number>(4 * SUNSPOT_MAX).fill(9);
-      const b = new Array<number>(4 * SUNSPOT_MAX).fill(9);
-      const n = generateHeliographicSunspots(jd, spots);
-      expect(writeSunspotUniformsFromSpots(spots, n, a)).toBe(writeSunspotUniforms(jd, b));
-      for (let k = 0; k < a.length; k++) expect(Object.is(a[k], b[k])).toBe(true);
+    const n = generateHeliographicSunspots(jd, spots);
+    for (let i = 0; i < n; i++) {
+      heliographicToScene(spots.latDeg[i]!, spots.lonDeg[i]!, out, 4 * i);
+      out[4 * i + 3] = SUNSPOT_SIZE_EXAGGERATION * spots.radiusRad[i]!;
     }
+    for (let k = 4 * n; k < 4 * SUNSPOT_MAX; k++) out[k] = 0;
+    return n;
+  }
+
+  it('흑점 기록 — 래퍼 · 공유 목록 경로 둘 다 PR2 이전 본문 (오라클) 과 비트 동일', () => {
+    const spots = createHeliographicSpots();
+    let nonEmpty = 0;
+    for (let jd = 2_415_020.5; jd < 2_488_070.5; jd += 731.3) {
+      const want = new Array<number>(4 * SUNSPOT_MAX).fill(9);
+      const viaWrapper = new Array<number>(4 * SUNSPOT_MAX).fill(9);
+      const viaShared = new Array<number>(4 * SUNSPOT_MAX).fill(9);
+      const n = legacySunspotUniformsOracle(jd, want);
+      if (n > 0) nonEmpty++;
+      expect(writeSunspotUniforms(jd, viaWrapper)).toBe(n);
+      const spotCount = generateHeliographicSunspots(jd, spots);
+      expect(writeSunspotUniformsFromSpots(spots, spotCount, viaShared)).toBe(n);
+      for (let k = 0; k < want.length; k++) {
+        expect(Object.is(viaWrapper[k], want[k])).toBe(true);
+        expect(Object.is(viaShared[k], want[k])).toBe(true);
+      }
+    }
+    expect(nonEmpty, '전제: 흑점이 있는 표본').toBeGreaterThan(0);
   });
 
   it('writeSunFlareUniforms — xyz 장면 단위벡터 · w = 반경 0.06 · params.x = 세기 · 개수 뒤 0', () => {
