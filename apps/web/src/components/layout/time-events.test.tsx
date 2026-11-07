@@ -60,6 +60,7 @@ const CAPS = {
   cometTails: true,
   corona: true,
   sunspots: true,
+  flares: true,
   trails: true,
 };
 const J2000 = 2_451_545.0;

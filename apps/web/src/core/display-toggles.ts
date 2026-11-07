@@ -13,7 +13,8 @@
  * `?corona=` (`parse-corona-mode.ts` — 같은 `off` 옵트아웃 + 로드 전용 `force` — ADR `20261014-1335` 결정 6), #1341 PR1 의
  * `?trails=` (`parse-trails-mode.ts` — 기본 꺼짐 행, `on` 옵트인 — ADR `20261015-1341` 결정 T10), #1373 PR2 의 `?constellations=`
  * (`parse-constellations-mode.ts` — 같은 기본 꺼짐 · `on` 옵트인 — ADR `20261018-1373` 결정 T1), #1412 PR2 의 `?sunspots=`
- * (`parse-sunspots-mode.ts` — 같은 `off` 옵트아웃, `force` 없음 — ADR `20261025-1412` 결정 5). 쓰는 쪽은
+ * (`parse-sunspots-mode.ts` — 같은 `off` 옵트아웃, `force` 없음 — ADR `20261025-1412` 결정 5), #1428 PR3 의 `?flares=`
+ * (`parse-flares-mode.ts` — 같은 `off` 옵트아웃, `force` 없음 — ADR `20261107-1428` 결정 5 · Q7). 쓰는 쪽은
  * `serializeDisplayToggle(visible, defaultVisible)` 하나이고 그 역방향이 각 행의 `parse` 다.
  */
 
@@ -23,6 +24,7 @@ import { parseBeltVisible, parseKuiperVisible } from './parse-belt-mode';
 import { parseCloudsVisible } from './parse-cloud-mode';
 import { parseCometTailsVisible } from './parse-comet-tails-mode';
 import { parseEventsVisible } from './parse-events-mode';
+import { parseFlaresVisible } from './parse-flares-mode';
 import { parseCoronaVisible } from './parse-corona-mode';
 import { parseLabelsVisible } from './parse-labels-mode';
 import { parseNightLightsVisible } from './parse-night-lights-mode';
@@ -44,6 +46,7 @@ export type DisplayToggleId =
   | 'cometTails'
   | 'corona'
   | 'sunspots'
+  | 'flares'
   | 'trails'
   | 'events';
 
@@ -79,6 +82,13 @@ export interface DisplayCapabilities {
    */
   sunspots: boolean;
   /**
+   * #1428 PR3 — 태양 플레어 · 홍염을 그릴 수 있는가 — `!isSoftwareRenderer` (ADR `20261107-1428` 결정 5 · Q7 (a)). `force` 가 없어
+   * 소프트웨어 렌더에서는 늘 거짓이다. 표면 축은 없다 — 홍염은 별도 메시라 `?surface=off` 에서도 있고 (결정 5 표), 플레어 쪽만
+   * scene 이 셰이더 부재로 no-op 한다. scene 의 `setFlaresVisible` 은 렌더러를 묻지 않으므로 **이 필드가 소프트웨어 렌더에서
+   * 홍염 메시 지연 생성 · `flareCount` 기록을 막는 유일한 게이트**다 (PR #1431 리뷰 → PR3).
+   */
+  flares: boolean;
+  /**
    * #1341 PR1 — 궤적 trail 을 그릴 수 있는가 — 활성 물리 엔진이 Kepler 인가 (ADR `20261015-1341` 결정 T8 · Q-T4 (a)).
    * trail 점은 Kepler 해석해라 N-body 위치와 다르므로 그동안 core 가 메시를 끄고, 토글은 비활성 + 사유를 보인다.
    * 렌더러 축은 없다 (소프트웨어 렌더 게이트 없음 — 결정 T10). sim-canvas 가 엔진 전환마다 갱신한다.
@@ -111,6 +121,9 @@ export const DISPLAY_DISABLED_REASONS = {
   // #1412 PR2 — 태양 흑점 (결정 5 · Q9). 같은 사유 표현.
   softwareRendererSunspots:
     '소프트웨어 렌더링 환경에서는 성능 보호를 위해 태양 흑점을 표시하지 않습니다',
+  // #1428 PR3 — 태양 플레어 · 홍염 (결정 5 · Q7). 같은 사유 표현.
+  softwareRendererFlares:
+    '소프트웨어 렌더링 환경에서는 성능 보호를 위해 플레어 · 홍염을 표시하지 않습니다',
   // #1341 PR1 — 궤적 trail (결정 T8). 렌더러가 아니라 물리 엔진 사유다.
   nbodyTrails: 'N-body 엔진에서는 궤적을 표시하지 않습니다',
   surfaceOff: '표면 표시가 꺼져 있어 사용할 수 없습니다 (?surface=off)',
@@ -130,6 +143,7 @@ type IntentKey =
   | 'cometTailsVisible'
   | 'coronaVisible'
   | 'sunspotsVisible'
+  | 'flaresVisible'
   | 'trailsVisible'
   | 'eventsVisible';
 type IntentSetterKey =
@@ -144,6 +158,7 @@ type IntentSetterKey =
   | 'setCometTailsVisible'
   | 'setCoronaVisible'
   | 'setSunspotsVisible'
+  | 'setFlaresVisible'
   | 'setTrailsVisible'
   | 'setEventsVisible';
 
@@ -162,6 +177,7 @@ export interface DisplayToggleDef {
     | 'comettails'
     | 'corona'
     | 'sunspots'
+    | 'flares'
     | 'trails'
     | 'events';
   label: string;
@@ -366,6 +382,26 @@ export const DISPLAY_TOGGLES: readonly DisplayToggleDef[] = [
       return caps.surfaceDetail ? null : DISPLAY_DISABLED_REASONS.surfaceOff;
     },
     pressed: (intent, caps) => intent && caps !== null && caps.sunspots && caps.surfaceDetail,
+  },
+  {
+    // #1428 PR3 — 태양 플레어 · 홍염 (ADR `20261107-1428` 결정 5 · 사용자 결정 Q5 (a) 1 행 · Q6 (a) 기본 켜짐). 한 행이 둘을 함께
+    // 끈다 — 홍염 = 처음 켤 때 지연 생성 · 이후 `setEnabled`, 플레어 = `flareCount = 0` / 켜기 = 현재 장면 시각 목록 즉시 기록.
+    // 코로나 행과 합치지 않는다 (코로나는 시간 불변이고 `?corona=off` 는 fps 가드 셀 의미와 묶여 있다 — 결정 5).
+    // 가용성 = 렌더러 축 하나 (`caps.flares` — 로드 경로 `resolveFlaresAtLoad` 와 같은 결정식). 표면 축을 곱하지 않는다 —
+    // `?surface=off` 에서도 홍염은 그려진다 (결정 5 표).
+    id: 'flares',
+    urlKey: 'flares',
+    label: '플레어 · 홍염',
+    defaultVisible: true,
+    parse: parseFlaresVisible,
+    command: (visible) => ({ type: 'setFlaresVisible', visible }),
+    intentKey: 'flaresVisible',
+    setterKey: 'setFlaresVisible',
+    disabledReason: (caps) => {
+      if (caps === null) return DISPLAY_DISABLED_REASONS.sceneNotReady;
+      return caps.flares ? null : DISPLAY_DISABLED_REASONS.softwareRendererFlares;
+    },
+    pressed: (intent, caps) => intent && caps !== null && caps.flares,
   },
   {
     // #1341 PR1 — 궤적 trail (ADR `20261015-1341`). **기본 꺼짐** · `?trails=on` 옵트인 (결정 T10). 처음 켤 때 지연 생성,

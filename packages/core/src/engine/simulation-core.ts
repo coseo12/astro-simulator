@@ -56,6 +56,8 @@ export class SimulationCore {
   #setConstellationsVisibleHandler: ((visible: boolean) => void) | null = null;
   // #1412 PR2 — 태양 흑점 런타임 토글 핸들러 (위 코로나 동형 — ADR `20261025-1412` 결정 5).
   #setSunspotsVisibleHandler: ((visible: boolean) => void) | null = null;
+  // #1428 PR3 — 태양 플레어 · 홍염 런타임 토글 핸들러 (위 흑점 동형 — ADR `20261107-1428` 결정 5).
+  #setFlaresVisibleHandler: ((visible: boolean) => void) | null = null;
   #setRulerHandler: ((anchorId: string | null, targetId: string | null) => void) | null = null;
   // #1205 — 프레임 위상 핸들러. 매 프레임 1회, `timeChanged` 와 무관하게 호출된다.
   // ADR `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md`.
@@ -311,6 +313,15 @@ export class SimulationCore {
   }
 
   /**
+   * #1428 PR3 — 태양 플레어 · 홍염 런타임 토글 핸들러 연결. 핸들러는 scene 의 `setFlaresVisible(visible)` 를 부른다
+   * (홍염 = 처음 켤 때 지연 생성 · 이후 `setEnabled`, 플레어 = 끄기 `flareCount = 0` · 켜기 현재 장면 시각 목록 즉시 기록 —
+   * ADR `20261107-1428` 결정 5). 소프트웨어 렌더 차단은 web 몫 — scene 은 렌더러 종류를 묻지 않는다.
+   */
+  setFlaresVisibleHandler(handler: (visible: boolean) => void): void {
+    this.#setFlaresVisibleHandler = handler;
+  }
+
+  /**
    * #1341 PR2 — 거리 자 선 핸들러 연결. 핸들러는 scene 의 `setRuler(anchorId, targetId)` 를 부른다
    * (처음 켤 때 지연 생성 · 이후 `setEnabled` · 켠 직후 마지막 기준계로 1회 동기 — ADR `20261015-1341` 결정 R2).
    */
@@ -473,6 +484,9 @@ export class SimulationCore {
         break;
       case 'setSunspotsVisible':
         this.#setSunspotsVisibleHandler?.(cmd.visible);
+        break;
+      case 'setFlaresVisible':
+        this.#setFlaresVisibleHandler?.(cmd.visible);
         break;
       case 'setRuler':
         this.#setRulerHandler?.(cmd.anchorId, cmd.targetId);

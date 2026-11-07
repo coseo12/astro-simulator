@@ -17,7 +17,7 @@ import { useSimCommand } from './sim-context';
 
 /**
  * 쓰기 대상 URL 키 — 표 행마다 하나 (#1319 PR3 — `belt` · `kuiper`, #1329 PR2 — `comettails`, #1335 PR2 — `corona`, #1341 PR1 — `trails`,
- * #1347 — `events`, #1373 PR2 — `constellations`, #1412 PR2 — `sunspots`).
+ * #1347 — `events`, #1373 PR2 — `constellations`, #1412 PR2 — `sunspots`, #1428 PR3 — `flares`).
  * ⚠️ 표시 토글 표 (`display-toggles.ts`) 에 행을 더하면 여기에도 키를 더해야 한다 — 이 맵에 없는 키는 nuqs 가 조용히 무시해
  * 토글해도 URL 이 바뀌지 않는다 (#1347 qa B1). 누락은 `use-display-toggle.test.tsx` 의 「표 urlKey ⊆ 맵 키」 단언이 잡는다
  * (PR #1376 리뷰 권고 3 — export 는 그 단언용). 값은 읽지 않는다 — 초기값 파싱은 sim-canvas 가 기존 파서로 이미 했다 (#850 계약:
@@ -41,6 +41,8 @@ export const DISPLAY_URL_KEYS = {
   constellations: parseAsString,
   // #1412 PR2 — 태양 흑점 (기본 켜짐 행 — `off` 옵트아웃).
   sunspots: parseAsString,
+  // #1428 PR3 — 태양 플레어 · 홍염 (기본 켜짐 행 — `off` 옵트아웃).
+  flares: parseAsString,
 };
 
 export function useDisplayToggle(): (id: DisplayToggleId) => void {

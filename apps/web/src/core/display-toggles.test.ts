@@ -20,6 +20,7 @@ const HW: DisplayCapabilities = {
   cometTails: true,
   corona: true,
   sunspots: true,
+  flares: true,
   trails: true,
 };
 const SOFTWARE: DisplayCapabilities = {
@@ -29,6 +30,7 @@ const SOFTWARE: DisplayCapabilities = {
   cometTails: false,
   corona: false,
   sunspots: false,
+  flares: false,
   trails: true,
 };
 const SURFACE_OFF: DisplayCapabilities = {
@@ -38,6 +40,7 @@ const SURFACE_OFF: DisplayCapabilities = {
   cometTails: true,
   corona: true,
   sunspots: true,
+  flares: true,
   trails: true,
 };
 /** #1319 PR3 — 소프트웨어 렌더 + `?belt=N` 강제 (bench · verify 경로) — 띠는 만들어져 있으므로 토글도 열린다. */
@@ -48,6 +51,7 @@ const SOFTWARE_FORCED: DisplayCapabilities = {
   cometTails: false,
   corona: false,
   sunspots: false,
+  flares: false,
   trails: true,
 };
 /** #1329 PR2 — 소프트웨어 렌더 + `?comettails=force` (CI 강제 셀) — 꼬리는 만들어져 있으므로 토글도 열린다. */
@@ -58,6 +62,7 @@ const SOFTWARE_COMET_FORCED: DisplayCapabilities = {
   cometTails: true,
   corona: false,
   sunspots: false,
+  flares: false,
   trails: true,
 };
 /** #1335 PR2 — 소프트웨어 렌더 + `?corona=force` (CI 강제 셀) — 코로나는 만들어져 있으므로 토글도 열린다. */
@@ -68,11 +73,12 @@ const SOFTWARE_CORONA_FORCED: DisplayCapabilities = {
   cometTails: false,
   corona: true,
   sunspots: false,
+  flares: false,
   trails: true,
 };
 
 describe('display-toggles — 표 구성', () => {
-  it('13 토글 · URL 키 13종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 · #1347 시간 사건 · #1373 PR2 별자리 · #1412 PR2 태양 흑점 행 추가)', () => {
+  it('14 토글 · URL 키 14종 · id 중복 없음 (#1293 라벨 · #1319 PR3 소행성대 · 카이퍼 · #1329 PR2 혜성 꼬리 · #1335 PR2 태양 코로나 · #1341 PR1 궤적 · #1347 시간 사건 · #1373 PR2 별자리 · #1412 PR2 태양 흑점 · #1428 PR3 플레어 · 홍염 행 추가)', () => {
     expect(DISPLAY_TOGGLES.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -85,6 +91,7 @@ describe('display-toggles — 표 구성', () => {
       'cometTails',
       'corona',
       'sunspots',
+      'flares',
       'trails',
       'events',
     ]);
@@ -100,6 +107,7 @@ describe('display-toggles — 표 구성', () => {
       'comettails',
       'corona',
       'sunspots',
+      'flares',
       'trails',
       'events',
     ]);
@@ -118,6 +126,7 @@ describe('display-toggles — 표 구성', () => {
       { type: 'setCometTailsVisible', visible: false },
       { type: 'setSunCoronaVisible', visible: false },
       { type: 'setSunspotsVisible', visible: false },
+      { type: 'setFlaresVisible', visible: false },
       { type: 'setTrailsVisible', visible: false },
       null,
     ]);
@@ -154,7 +163,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
     expect(serializeDisplayToggle(false, true)).toBe('off');
   });
 
-  it('#1341 D10 — 기존 9행 + #1347 events · #1412 sunspots 는 defaultVisible=true 라 출력 불변 · trails · constellations (#1373) 만 기본 꺼짐', () => {
+  it('#1341 D10 — 기존 9행 + #1347 events · #1412 sunspots · #1428 flares 는 defaultVisible=true 라 출력 불변 · trails · constellations (#1373) 만 기본 꺼짐', () => {
     expect(DEFAULT_ON_ROWS.map((d) => d.id)).toEqual([
       'orbits',
       'stars',
@@ -166,6 +175,7 @@ describe('display-toggles — URL 직렬화 ↔ 기존 parse round-trip (D16)', 
       'cometTails',
       'corona',
       'sunspots',
+      'flares',
       'events',
     ]);
     for (const def of DEFAULT_ON_ROWS) {
@@ -240,7 +250,7 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     expect(orbits.pressed(false, SOFTWARE)).toBe(false);
   });
 
-  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 · 혜성 꼬리 · 태양 코로나 · 태양 흑점 불가 + 준비 중 사유 + 꺼짐', () => {
+  it('장면 미준비 (caps=null) — 신규 3종 · 띠 2종 · 혜성 꼬리 · 태양 코로나 · 태양 흑점 · 플레어 · 홍염 불가 + 준비 중 사유 + 꺼짐', () => {
     for (const id of [
       'stars',
       'clouds',
@@ -250,6 +260,7 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
       'cometTails',
       'corona',
       'sunspots',
+      'flares',
       'trails',
       'constellations',
     ] as const) {
@@ -391,6 +402,48 @@ describe('display-toggles — 가용성 · 표시 상태', () => {
     const def = getDisplayToggle('sunspots');
     for (const v of [true, false])
       expect(def.parse(serializeDisplayToggle(v, def.defaultVisible))).toBe(v);
+    expect(serializeDisplayToggle(false, def.defaultVisible)).toBe('off');
+  });
+
+  it('#1428 PR3 소프트웨어 렌더 — 플레어 · 홍염 불가 + 플레어 사유, 의도가 true 여도 꺼짐 (결정 5 · Q7 — scene 은 렌더러를 묻지 않는다)', () => {
+    const def = getDisplayToggle('flares');
+    expect(def.label).toBe('플레어 · 홍염');
+    expect(def.disabledReason(SOFTWARE)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererFlares);
+    expect(def.pressed(true, SOFTWARE)).toBe(false);
+    // `force` 가 없다 — 다른 행의 강제 (`?belt=N` · `?comettails=force` · `?corona=force`) 는 플레어 · 홍염을 열지 않는다.
+    for (const caps of [SOFTWARE_FORCED, SOFTWARE_COMET_FORCED, SOFTWARE_CORONA_FORCED]) {
+      expect(def.disabledReason(caps)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererFlares);
+      expect(def.pressed(true, caps)).toBe(false);
+    }
+    // 하드웨어에서는 열린다 — 게이트가 무조건 막는 변이 (`return reason`) 를 잡는다.
+    expect(def.disabledReason(HW)).toBeNull();
+    expect(def.pressed(true, HW)).toBe(true);
+    expect(def.pressed(false, HW)).toBe(false);
+    expect(new Set(Object.values(DISPLAY_DISABLED_REASONS)).size).toBe(
+      Object.values(DISPLAY_DISABLED_REASONS).length,
+    );
+  });
+
+  it('#1428 PR3 ?surface=off — 플레어 · 홍염은 열린 채 (홍염은 별도 메시 — 결정 5 표) · 흑점만 표면 사유로 막힌다', () => {
+    const def = getDisplayToggle('flares');
+    expect(def.disabledReason(SURFACE_OFF)).toBeNull();
+    expect(def.pressed(true, SURFACE_OFF)).toBe(true);
+    expect(getDisplayToggle('sunspots').disabledReason(SURFACE_OFF)).toBe(
+      DISPLAY_DISABLED_REASONS.surfaceOff,
+    );
+    // 플레어 가용성은 다른 렌더러 게이트 행과 독립 — 플레어 축만 막혀도 흑점 · 코로나는 그대로 열린다.
+    const onlyFlaresOff: DisplayCapabilities = { ...HW, flares: false };
+    expect(def.disabledReason(onlyFlaresOff)).toBe(DISPLAY_DISABLED_REASONS.softwareRendererFlares);
+    for (const other of DISPLAY_TOGGLES.filter((d) => d.id !== 'flares'))
+      expect(other.disabledReason(onlyFlaresOff), other.id).toBeNull();
+  });
+
+  it('#1428 PR3 플레어 parse ↔ serialize 왕복 — OFF = `off`, ON = 키 삭제 (`force` 는 모르는 값 → ON 폴백)', () => {
+    const def = getDisplayToggle('flares');
+    expect(def.urlKey).toBe('flares');
+    for (const v of [true, false])
+      expect(def.parse(serializeDisplayToggle(v, def.defaultVisible))).toBe(v);
+    expect(serializeDisplayToggle(true, def.defaultVisible)).toBeNull();
     expect(serializeDisplayToggle(false, def.defaultVisible)).toBe('off');
   });
 
