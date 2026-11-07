@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.108.1] - 2026-11-07
+
 ### Fixed
 
 - **[#1422] WebGL2 폴백에서 위성을 가까이 볼 때 절차 표면 · 고리 · 태양 · 구름에 폴리곤 구멍이 나던 문제** ([#1422](https://github.com/coseo12/astro-simulator/issues/1422)). 위성 focus 처럼 장면 좌표가 큰 시점 (카메라 절대좌표 2.0e6 ~ 4.84e6 실측) 에서는 투영 z 오프셋이 float32 행렬 곱에서 소실된다. 그 결과 커스텀 셰이더 정점이 전부 `clip.z == clip.w` (far clip 평면 위) 에 놓였고, WebGL2 (ANGLE Metal Renderer: Apple M1 Pro) 가 삼각형 일부를 잘라냈다. Babylon StandardMaterial 은 자체 log-depth vertex include 가 z 를 덮어써서 이 문제가 없었다.
@@ -12,6 +14,10 @@ Semantic Versioning을 따른다.
   - 실측 (1280×720). 구멍 술어는 대상 body 만 남긴 고립 장면에서 disk ≤ 0.97R 안의 배경색 (magenta) 픽셀 수다 (PR #1425 본문). europa 220 px 20165 → 0, focus=europa 에서 본 목성 8221 → 0, PR 본문 표의 위성 focus 근접 시나리오 전부 0. WebGPU 는 같은 장면에서 보정 전후 픽셀 diff 0 이다 (노출 장면 3종 · 고리만 남긴 장면 포함).
   - Babylon 동형 식 (`gl_Position.z = log2(1 + w) * C`) 은 기각했다. WebGPU 목성 고리 가장자리가 바뀌었기 때문이다 (자연 장면 23 px · 고리만 남긴 장면 12242 px).
   - sun-corona · comet-tail · belt-particles 는 vertex 패턴이 같지만, 측정 장면에서 보정 전후 픽셀 차이가 0 이라 고치지 않았다.
+
+### Behavior Changes
+
+- **WebGL2 폴백 환경에서 위성 focus 후 시간을 옮기고 가까이 볼 때 표면에 구멍이 나지 않는다** (#1422). 실사용 경로 (검색으로 europa focus → 「지금」 → 휠 줌) 에서 PR #1425 qa 실측 구멍 픽셀 86055 → 0 이다. WebGPU 는 qa 실 Chrome 비교 48 회 전부 0 px 로 화면이 바뀌지 않는다.
 
 ## [0.108.0] - 2026-10-31
 
