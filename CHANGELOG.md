@@ -22,7 +22,7 @@ Semantic Versioning을 따른다.
   - 표시 근사: 플레어 위치 · 빈도 · 세기는 통계 모델이고 특정 날짜의 실제 플레어와 같지 않다. 크기는 흑점 반영 (×2.5 과장) 에 맞춘 값이다. 기본 화면 (disk 반경 79 px) 의 on/off diff 는 55 픽셀 (픽셀 수 — disk 안 · 채널 차 > 2) 이다. 발생률 · 모양 상수는 육안 승인 단계에서 바뀔 수 있다.
 - **[#1428] 표시 패널에 「플레어 · 홍염」 토글 — PR3** ([#1428](https://github.com/coseo12/astro-simulator/issues/1428)). ADR [`20261107-1428`](docs/decisions/20261107-1428-solar-flares-prominences.md) 결정 5 · 6, 사용자 결정 Q5 (a) 1 행 · Q6 (a) 기본 켜짐. 표시 토글 표에서 태양 흑점 바로 다음 행이다 (표는 14행). 한 행이 플레어와 홍염을 함께 끈다. 끄면 URL 에 `flares=off` 를 쓰고 켜면 키를 지운다 (ADR 1265 결정 5 어휘 — 역방향 파서는 PR1 `parseFlaresVisible`).
   - 가용성은 `!isSoftwareRenderer` 하나다. 표면 축은 곱하지 않는다 — 홍염은 별도 메시라 `?surface=off` 에서도 그려진다 (결정 5 표). 소프트웨어 렌더면 「소프트웨어 렌더링 환경에서는 성능 보호를 위해 플레어 · 홍염을 표시하지 않습니다」 사유로 `aria-disabled` 가 되고, 눌러도 store · 명령 · URL 이 바뀌지 않는다.
-  - 장면 핸들 `setFlaresVisible` 은 렌더러 종류를 묻지 않는다 (PR #1431 리뷰). 그래서 이 가용성이 소프트웨어 렌더에서 홍염 메시 지연 생성과 `flareCount` 기록을 막는 유일한 지점이다. 흑점 · 코로나 행과 같은 방식이다. 단위 테스트는 표 · 훅 · 패널 세 층에 있고, 게이트를 지우는 변이에서 4 건이 실패한다.
+  - 장면 핸들 `setFlaresVisible` 은 렌더러 종류를 묻지 않는다 (PR #1431 리뷰). 그래서 런타임 토글 경로 (표시 패널 · 투어) 에서는 이 가용성이 소프트웨어 렌더의 홍염 메시 지연 생성과 `flareCount` 기록을 막는 유일한 지점이다. 로드 경로는 별개 지점인 `resolveFlaresAtLoad` 가 막는다 (PR1). 흑점 · 코로나 행과 같은 방식이다. 단위 테스트는 표 · 훅 · 패널 세 층에 있다. 행 게이트를 지우는 변이 (`caps.flares ? null : …` → `null`) 에서 web `src/core` · `src/components/layout` · `src/lib/tours` 871 건 중 4 건이 실패한다.
   - core 명령 `setFlaresVisible` · `SimulationCore.setFlaresVisibleHandler` · store `flaresVisible` · 가용성 필드 `displayCapabilities.flares`. sim-canvas 가 PR1 장면 핸들 `setFlaresVisible` 에 잇는다.
   - 교육 투어는 플레어 · 홍염을 지정하지 않는다. 투어 엔진은 표를 순회하므로 이 행도 시작 스냅샷 · 단계 전환 · 종료 복원 (의도 + URL 키) 에 들어간다.
 
@@ -34,7 +34,7 @@ Semantic Versioning을 따른다.
   - 패널 끔 ↔ `?flares=off` 로드는 WebGPU · 하드웨어 WebGL2 모두 0 이다.
   - 다시 켬 ↔ 처음 로드는 캔버스 네 모서리 3 px 안의 20 픽셀만 다르다. 같은 20 픽셀이 `?flares=off` 새로고침 ↔ `?flares=off` 로드에서도 나온다. 그 밖은 0 이다.
   - 양성 대조로, 켬 ↔ 끔 (채널 차 > 2) 은 11,014 (WebGPU) · 11,022 (WebGL2) 픽셀이다.
-  - swiftshader (`?gpu=a`) 에서는 패널 행을 세 번 눌러도 홍염 메시가 생기지 않고 `flareCount` 가 0 이다. 기본 · focus · `?flares=off` focus 세 화면 모두 develop 과 캔버스 차이 0 이다. 게이트를 지운 변이 (같은 클릭 경로) 에서는 메시가 생기고 develop 과 1,693 픽셀이 달라진다.
+  - 소프트웨어 렌더 (swiftshader) 에서는 — 측정 쿼리에 `?gpu=a` (GPU tier A 강제) 를 붙였다 — 패널 행을 세 번 눌러도 홍염 메시가 생기지 않고 `flareCount` 가 0 이다. 기본 · focus · `?flares=off` focus 세 화면 모두 develop 과 캔버스 차이 0 이다. 게이트를 지운 변이 (같은 클릭 경로) 에서는 메시가 생기고 develop 과 1,693 픽셀이 달라진다.
 - `verify:1265-display-panel` 의 토글 집합에 `flares` 를 더했다 (D1 개수 · D11 URL · D14 Tab 순회 · D15 스트레스 — 소프트웨어 렌더 게이트 집합 포함). 전체 끔 쿼리에 `flares=off` 가 붙는다 (ADR 1428 결정 6). 새 게이트는 없다.
 
 ## [0.108.1] - 2026-11-07

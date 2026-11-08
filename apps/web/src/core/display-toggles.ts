@@ -84,8 +84,9 @@ export interface DisplayCapabilities {
   /**
    * #1428 PR3 — 태양 플레어 · 홍염을 그릴 수 있는가 — `!isSoftwareRenderer` (ADR `20261107-1428` 결정 5 · Q7 (a)). `force` 가 없어
    * 소프트웨어 렌더에서는 늘 거짓이다. 표면 축은 없다 — 홍염은 별도 메시라 `?surface=off` 에서도 있고 (결정 5 표), 플레어 쪽만
-   * scene 이 셰이더 부재로 no-op 한다. scene 의 `setFlaresVisible` 은 렌더러를 묻지 않으므로 **이 필드가 소프트웨어 렌더에서
-   * 홍염 메시 지연 생성 · `flareCount` 기록을 막는 유일한 게이트**다 (PR #1431 리뷰 → PR3).
+   * scene 이 셰이더 부재로 no-op 한다. scene 의 `setFlaresVisible` 은 렌더러를 묻지 않으므로 **런타임 토글 경로 (표시 패널 · 투어)
+   * 에서는 이 필드가 소프트웨어 렌더의 홍염 메시 지연 생성 · `flareCount` 기록을 막는 유일한 게이트**다 (PR #1431 리뷰 → PR3).
+   * 로드 경로는 별개 지점인 sim-canvas 의 `resolveFlaresAtLoad(의도, !isSoftwareRenderer)` 가 막는다.
    */
   flares: boolean;
   /**
