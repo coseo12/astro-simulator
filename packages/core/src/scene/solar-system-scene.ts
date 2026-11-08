@@ -51,8 +51,25 @@ import {
 } from './belt-population.js';
 import { cometOrbitNormal, createCometTail, type CometTailHandles } from './comet-tail.js';
 import { createSunCorona, type SunCoronaHandles } from './sun-corona.js';
-import { isSunSurfaceMaterial, writeSunspotUniforms } from './sun-shader.js';
-import { SUNSPOT_MAX, createSunspotVisibilityState, stepSunspotVisibility } from './sunspots.js';
+import {
+  isSunSurfaceMaterial,
+  writeSunFlareUniforms,
+  writeSunspotUniformsFromSpots,
+} from './sun-shader.js';
+import {
+  SUNSPOT_MAX,
+  createHeliographicSpots,
+  createSunspotVisibilityState,
+  generateHeliographicSunspots,
+  stepSunspotVisibility,
+} from './sunspots.js';
+import { FLARE_CYCLES_PER_DAY, MAX_SUN_FLARES } from './sun-flares.js';
+import {
+  PROMINENCE_CYCLES_PER_DAY,
+  createSunProminences,
+  type SunProminencesHandles,
+} from './sun-prominences.js';
+import { createActivityVisibilityState, stepActivityVisibility } from './activity-visibility.js';
 import { createRingPlaceholder, type RingPlaceholderHandles } from './ring-placeholder.js';
 import { createRingShaderMesh, type RingShaderHandles } from './ring-shader.js';
 import { createStarfield, type StarfieldHandles } from './starfield.js';
@@ -328,6 +345,14 @@ export interface SolarSystemSceneHandles {
    */
   setSunspotsVisible: (visible: boolean) => void;
   /**
+   * #1428 — 태양 플레어 · 홍염 표시 토글 (ADR 20261107-1428 결정 5). 홍염 메시가 없으면 그때 한 번 만들고, **같은 호출 안에서**
+   * 현재 장면 시각의 루프를 기록하고 LOD 가시성을 맞춘다 (§교차검증 합의 6 — 일시정지 중이면 `updateAt` 이 돌지 않는다).
+   * 이후는 `setEnabled` 만 바꾼다 (dispose 는 장면 dispose 때만). 렌더러 종류는 묻지 않는다 (소프트웨어 게이트는 web 책임).
+   * 플레어 (sun 셰이더) 는 같은 호출에서 `flareCount` 를 다시 쓴다 — 켜기 = 현재 장면 시각의 목록 즉시 기록, 끄기 = 0
+   * (`surfaceDetail = false` 면 셰이더가 없어 플레어 쪽은 no-op). 표시 패널 연결은 PR3.
+   */
+  setFlaresVisible: (visible: boolean) => void;
+  /**
    * #1341 — 궤적 trail 표시 토글 (ADR 20261015-1341 결정 T7 · T8). 처음 켤 때 지연 생성, 이후 `setEnabled` 만 바꾼다
    * (dispose 는 장면 dispose 때만). N-body 엔진 (`activeEngine !== 'kepler'`) 이면 의도만 기억하고 켜지 않는다 —
    * Kepler 로 돌아오면 그 의도대로 켠다. 켠 직후 마지막으로 메시에 쓴 `(origin, scale, jd)` 로 정점을 1회 동기한다
@@ -569,6 +594,8 @@ export interface SolarSystemSceneHandles {
   getCometTails: () => readonly CometTailHandles[];
   /** #1335 — 태양 코로나 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용 (ADR 20261014-1335). */
   getSunCorona: () => SunCoronaHandles | null;
+  /** #1428 — 태양 홍염 핸들. 아직 만들어지지 않았으면 null. 진단 · 단위 테스트용 (ADR 20261107-1428). */
+  getSunProminences: () => SunProminencesHandles | null;
   /**
    * #1319 결정 2 — body `mesh.position` 이 마지막으로 쓰인 기준계 `(origin, scale)` 의 사본.
    * 띠 입자가 draw 직전에 읽는 값과 같은 원본이다. 진단 · 단위 테스트용.
@@ -713,6 +740,13 @@ export interface SolarSystemSceneOptions {
    * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 5 · Q9) 는 호출자(web) 가 판정해 이 값으로만 전달한다.
    */
   sunspots?: boolean;
+  /**
+   * #1428 — 태양 플레어 · 홍염을 **로드 시** 켠다 (ADR 20261107-1428 결정 5). 기본 false (core 보수 기본). 홍염은 별도 메시라
+   * `surfaceDetail` 과 무관하다 (`?surface=off` 에서도 있다). false 여도 `setFlaresVisible(true)` 가 처음 켤 때 지연 생성한다.
+   *
+   * ⚠️ 렌더러 판정을 하지 않는다 — 소프트웨어 렌더 게이트 (결정 5 · Q7) 는 호출자(web) 가 판정해 이 값으로만 전달한다.
+   */
+  flares?: boolean;
   /**
    * P4-A #165 — true면 소행성대를 N-body 엔진에 편입한다.
    * Kepler 경로에서는 무시. Newton/Barnes-Hut/WebGPU 선택 시 전체 N이 (행성+소행성)으로 커져
@@ -934,6 +968,7 @@ export function createSolarSystemScene(
     cometTails: cometTailsAtLoad = false,
     sunCorona: sunCoronaAtLoad = false,
     sunspots: sunspotsAtLoad = false,
+    flares: flaresAtLoad = false,
     enableGR = false,
     grMode,
     integrator = 'velocity-verlet',
@@ -2110,37 +2145,124 @@ export function createSolarSystemScene(
   //  - mid variant 는 LOD 첫 전환 때 지연 생성되므로 머티리얼을 저장하지 않고 쓸 때마다 찾는다. 처음 본 머티리얼은 프레임
   //    위상에서 장면 버퍼를 묶는다 (`setArray4` 는 참조 저장 — 이후 버퍼 제자리 갱신이 그대로 업로드된다).
   //  - 해제: 머티리얼 dispose 와 함께 사라진다. 버퍼 · 상태는 장면 클로저 소유.
+  //
+  // #1428 — 태양 플레어 (ADR 20261107-1428 결정 4). 같은 sun 셰이더 · 같은 위상 배치다 (목록 = 시간 위상, 가시도 = 프레임 위상).
+  //  - 흑점 목록은 `surfaceDetail && (흑점 켬 || 플레어 켬)` 일 때 **1 회** 만들어 흑점 uniform 과 플레어 생성기가 공유한다
+  //    (§교차검증 합의 4 — 플레어 생성기는 흑점 생성기를 부르지 않는다). 흑점 uniform 은 흑점이 켜졌을 때만 쓴다 — 그래서
+  //    `?sunspots=off` 에서도 플레어 자리가 있다.
+  //  - 플레어 꺼짐 (`?flares=off` · 소프트웨어 렌더 게이트 · 표시 토글) 이면 `flareCount = 0` — 셰이더 루프 첫 반복에서 빠진다 (D5).
   let sunspotsEnabled = sunspotsAtLoad;
+  let flaresEnabled = flaresAtLoad;
   let sunspotCount = 0;
+  let flareCount = 0;
   const sunspotUniforms = new Array<number>(4 * SUNSPOT_MAX).fill(0);
+  const flareUniforms = new Array<number>(4 * MAX_SUN_FLARES).fill(0);
+  const flareParamUniforms = new Array<number>(4 * MAX_SUN_FLARES).fill(0);
+  const sceneSpots = createHeliographicSpots();
   const sunspotBoundMaterials = new WeakSet<object>();
   const sunspotVisibility = createSunspotVisibilityState();
+  const flareVisibility = createActivityVisibilityState();
   const bindSunspotMaterial = (material: unknown): void => {
     if (!isSunSurfaceMaterial(material)) return;
     if (!sunspotBoundMaterials.has(material)) {
       material.setArray4('spots', sunspotUniforms);
+      material.setArray4('flares', flareUniforms);
+      material.setArray4('flareParams', flareParamUniforms);
       sunspotBoundMaterials.add(material);
     }
     material.setFloat('spotCount', sunspotCount);
+    material.setFloat('flareCount', flareCount);
   };
-  /** 시간 위상 — 장면 시계 jd 의 흑점 목록을 기록한다 (`surfaceDetail = false` 면 셰이더가 없어 no-op). */
+  /**
+   * 시간 위상 — 장면 시계 jd 의 흑점 · 플레어 목록을 기록한다 (`surfaceDetail = false` 면 셰이더가 없어 no-op).
+   * 흑점 생성기 호출은 둘 중 하나라도 켜져 있을 때 1 회다 (§교차검증 합의 4).
+   */
   const writeSunspots = (clockJd: number): void => {
     if (!surfaceDetail) return;
-    sunspotCount = sunspotsEnabled ? writeSunspotUniforms(clockJd, sunspotUniforms) : 0;
+    const spotTotal =
+      sunspotsEnabled || flaresEnabled ? generateHeliographicSunspots(clockJd, sceneSpots) : 0;
+    sunspotCount = sunspotsEnabled
+      ? writeSunspotUniformsFromSpots(sceneSpots, spotTotal, sunspotUniforms)
+      : 0;
+    flareCount = flaresEnabled
+      ? writeSunFlareUniforms(clockJd, sceneSpots, spotTotal, flareUniforms, flareParamUniforms)
+      : 0;
     bindSunspotMaterial(meshes.get('sun')?.material);
     bindSunspotMaterial(midVariants.get('sun')?.material);
   };
-  const syncSunspotMaterialFrame = (material: unknown, visibility: number): void => {
+  const syncSunspotMaterialFrame = (
+    material: unknown,
+    visibility: number,
+    flareFade: number,
+  ): void => {
     if (!isSunSurfaceMaterial(material)) return;
     if (!sunspotBoundMaterials.has(material)) bindSunspotMaterial(material);
     material.setFloat('spotVisibility', visibility);
+    material.setFloat('flareVisibility', flareFade);
   };
-  /** 프레임 위상 — 감쇠 가시도 갱신 + 지연 생성된 variant 머티리얼 묶기 (결정 3). 매 프레임이라 할당 0 (배열 · 이터레이터 없음). */
-  const syncSunspotFrame = (): void => {
+
+  // #1428 — 태양 홍염 (ADR 20261107-1428 결정 1 · 3 · 5). 태양 1개 = 메시 1 · ShaderMaterial 1 (draw call +1).
+  //  - 루프 (정점 버퍼) 는 jd 의 함수라 시간 위상 (`updateAt`) 이 쓴다 — 일시정지 중 갱신 0.
+  //  - 감쇠 가시도 (`uVisibility`) 는 프레임 위상 (`syncSolarActivityFrame`) 이 쓴다 — `surfaceDetail` 과 무관 (별도 메시).
+  //  - LOD 추종 (`isVisible`) 은 코로나와 같은 자리 · 같은 식 (프레임 위상 LOD 적용부), 토글은 `setEnabled` (결정 5).
+  //  - 기준계는 코로나와 같다 — draw 직전 태양 mesh.position + `bodyFrame.scale` (ADR 1335 결정 2).
+  let sunProminences: SunProminencesHandles | null = null;
+  const prominenceVisibility = createActivityVisibilityState();
+  const createSunProminencesForScene = (): SunProminencesHandles => {
+    const sunMesh = meshes.get('sun');
+    const sunBody = bodiesById.get('sun');
+    if (!sunMesh || !sunBody) throw new Error('[sun-prominences] 태양 mesh · 데이터 없음');
+    return createSunProminences(scene, {
+      sunMesh,
+      radiusMeters: sunBody.radius * bodyScale('sun'),
+      frameProvider: () => bodyFrame,
+    });
+  };
+  // 코로나 `syncSunCoronaLodVisibility` 와 같은 식 — 태양 rim 을 싣는 variant (high / mid) 가 보이는 동안만.
+  const syncSunProminencesLodVisibility = (prominences: SunProminencesHandles): void => {
+    prominences.mesh.isVisible =
+      prominences.sunMesh.isVisible || midVariants.get('sun')?.isVisible === true;
+  };
+  /** 시간 위상 — 장면 시계 jd 의 홍염 루프를 기록한다. 꺼져 있으면 (토글 off · 미생성) 건너뛴다 — 켤 때 즉시 기록한다. */
+  const writeProminences = (clockJd: number): void => {
+    if (!sunProminences || !sunProminences.mesh.isEnabled(false)) return;
+    sunProminences.writeAt(clockJd);
+  };
+  if (flaresAtLoad) sunProminences = createSunProminencesForScene();
+  disposables.push({
+    dispose: () => {
+      sunProminences?.dispose();
+      sunProminences = null;
+    },
+  });
+  phase('scene:sun-prominences');
+
+  /**
+   * 프레임 위상 — 태양 활동 효과의 감쇠 가시도 (ADR 1428 결정 3 · ADR 1412 결정 3). 매 프레임이라 할당 0 (배열 · 이터레이터 없음).
+   * 세 단계 (#1428 §교차검증 합의 5 — 실행 조건 분리): 홍염은 별도 메시라 **조건 없이**, 흑점 · 플레어는 sun 셰이더가 있을
+   * 때만 (`surfaceDetail`). 상태의 `step` 은 토글과 무관하게 매 프레임 진행한다 — 켜는 순간의 가시도가 직전 재생 속도를 반영한다.
+   */
+  const syncSolarActivityFrame = (): void => {
+    const nowMs = performance.now();
+    const prominenceFade = stepActivityVisibility(
+      prominenceVisibility,
+      PROMINENCE_CYCLES_PER_DAY,
+      currentClockJd,
+      nowMs,
+    );
+    sunProminences?.setFadeVisibility(prominenceFade);
+
     if (!surfaceDetail) return;
-    const visibility = stepSunspotVisibility(sunspotVisibility, currentClockJd, performance.now());
-    syncSunspotMaterialFrame(meshes.get('sun')?.material, visibility);
-    syncSunspotMaterialFrame(midVariants.get('sun')?.material, visibility);
+    const visibility = stepSunspotVisibility(sunspotVisibility, currentClockJd, nowMs);
+    // 플레어 계수 `c = 1/(2 · 15 분)` = 48 /일 (ADR 1428 결정 3 · 축 4) — `1h` 보임 · `1d` 감쇠.
+    const flareFade = stepActivityVisibility(
+      flareVisibility,
+      FLARE_CYCLES_PER_DAY,
+      currentClockJd,
+      nowMs,
+    );
+    syncSunspotMaterialFrame(meshes.get('sun')?.material, visibility, flareFade);
+    syncSunspotMaterialFrame(midVariants.get('sun')?.material, visibility, flareFade);
   };
 
   // #1341 — 궤적 trail (ADR 20261015-1341 결정 T1 ~ T10). 기본 꺼짐 — 로드 시 아무것도 만들지 않는다 (결정 T10).
@@ -2794,8 +2916,11 @@ export function createSolarSystemScene(
     // #1341 결정 R2 — 자 선 끝점도 같은 스냅샷 기준계로.
     syncRuler(ox, oy, oz, sceneUnitPerMeter);
 
-    // #1412 결정 2 — 흑점 목록 (장면 시계 — 자전과 같은 축, ADR 1370 §결정 P). 감쇠는 프레임 위상 몫.
+    // #1412 결정 2 — 흑점 목록 (장면 시계 — 자전과 같은 축, ADR 1370 §결정 P) · #1428 결정 4 — 같은 목록에서 플레어.
+    // 감쇠는 프레임 위상 몫.
     writeSunspots(clockJd);
+    // #1428 결정 1 — 홍염 루프 (장면 시계 — 흑점과 같은 축). 감쇠는 프레임 위상 몫.
+    writeProminences(clockJd);
 
     // #782 §A2.3 결정 5 — self-rotation (자전). rotationStates 는 selfRotation=true 일 때만 채워지므로
     // selfRotation=false 면 이 루프 전체 skip (연산 0, 자전 정지 = 현행 픽셀 100% 복귀).
@@ -3105,6 +3230,10 @@ export function createSolarSystemScene(
       // #1335 결정 4 의 1 — 코로나도 같은 자리 · 같은 식 (low = bodyScale 미적용 billboard 에서 꺼진다). 쓰는 주체가 코로나
       // 메시 밖 (프레임 위상) 이라 재활성 경로가 산다. 메시가 없으면 (로드 OFF · 소프트웨어 미생성) 건너뛴다 (§교차검증 합의 2).
       if (sunCorona && sunCorona.sunMesh === highMesh) syncSunCoronaLodVisibility(sunCorona);
+      // #1428 결정 1 — 홍염도 같은 자리 · 같은 식 (ADR 1335 결정 4 그대로).
+      if (sunProminences && sunProminences.sunMesh === highMesh) {
+        syncSunProminencesLodVisibility(sunProminences);
+      }
 
       // 집계.
       if (nextLevel === 'high') lodStats.high += 1;
@@ -3366,8 +3495,10 @@ export function createSolarSystemScene(
    * 카메라만 움직이는 프레임의 갱신 소유자이며, ADR
    * `docs/decisions/20260907-1205-frame-phase-vs-time-phase.md` §결정 2 의 멤버십 3조건
    * (카메라/뷰포트 종속 · 시간이 멈춰도 의미 있음 · 멱등) 을 전건 충족하는 것만 들어온다.
-   * **멤버는 `runLodPass` 와 `syncSunspotFrame` (#1412) 둘이다.** 늘리기 전에 그 3조건 판정을 ADR 에 박제할 것.
-   * `syncSunspotFrame` 의 판정은 ADR 1205 Amendment 1 (조건 2 만 충족 — 조건 1 · 3 은 명시 예외, 근거는 ADR 1412 결정 2 · 3).
+   * **멤버는 `runLodPass` 와 `syncSolarActivityFrame` (#1412 · #1428) 둘이다.** 늘리기 전에 그 3조건 판정을 ADR 에 박제할 것.
+   * `syncSolarActivityFrame` 의 판정은 ADR 1205 Amendment 1 (조건 2 만 충족 — 조건 1 · 3 은 명시 예외, 근거는 ADR 1412 결정 2 · 3).
+   * #1428 (ADR 20261107-1428 결정 3) 에서 `syncSunspotFrame` 을 개명하고 효과별 감쇠 (흑점 · 홍염, PR2 플레어) 를 함께 진행한다 —
+   * 멤버 수는 그대로 2 다. 홍염 단계는 `surfaceDetail` 과 무관하게, 흑점 단계는 `surfaceDetail` 일 때만 돈다 (§교차검증 합의 5).
    *
    * 아래 hook 책임 서술은 #1205 이전 `updateAt` 안 P11-B #289 hook 자리에 있던 것을 옮겨온 것이다.
    *
@@ -3386,8 +3517,8 @@ export function createSolarSystemScene(
     if (cam) {
       runLodPass(cam);
     }
-    // #1412 결정 3 — 흑점 감쇠 (LOD 뒤 — 이번 프레임에 지연 생성된 mid variant 머티리얼도 같은 프레임에 묶인다).
-    syncSunspotFrame();
+    // #1412 결정 3 · #1428 결정 3 — 태양 활동 감쇠 (LOD 뒤 — 이번 프레임에 지연 생성된 mid variant 머티리얼도 같은 프레임에 묶인다).
+    syncSolarActivityFrame();
   };
 
   // P11-B #289 — LOD API 외부 노출.
@@ -3674,6 +3805,27 @@ export function createSolarSystemScene(
     writeSunspots(currentClockJd);
   };
 
+  // #1428 결정 5 — 플레어 · 홍염 런타임 토글. 코로나와 같은 수명 계약 (없을 때만 생성, 이후 `setEnabled`) + 지연 생성 직후
+  // (a) 현재 장면 시각으로 루프 기록 · (b) LOD 가시성 1 회 (§교차검증 합의 6). 다시 켤 때도 그 사이 시각이 바뀌었을 수 있어
+  // 즉시 기록한다 (흑점 `setSunspotsVisible` 「켜기 = 현재 시각 즉시 기록」 선례).
+  const setFlaresVisible = (visible: boolean) => {
+    // 플레어 (sun 셰이더) — 켜기 = 현재 장면 시각 목록 즉시 기록, 끄기 = `flareCount = 0` (흑점 토글과 같은 수명주기).
+    if (flaresEnabled !== visible) {
+      flaresEnabled = visible;
+      writeSunspots(currentClockJd);
+    }
+    if (visible) {
+      if (!sunProminences) {
+        sunProminences = createSunProminencesForScene();
+        syncSunProminencesLodVisibility(sunProminences);
+      }
+      sunProminences.mesh.setEnabled(true);
+      sunProminences.writeAt(currentClockJd);
+      return;
+    }
+    sunProminences?.mesh.setEnabled(false);
+  };
+
   // #1341 결정 T7 · T10 — 궤적 trail 런타임 토글. 기본 꺼짐 · 처음 켤 때 지연 생성 · 이후 `setEnabled`.
   const setTrailsVisible = (visible: boolean) => {
     trailsVisible = visible;
@@ -3830,6 +3982,7 @@ export function createSolarSystemScene(
     setCometTailsVisible,
     setSunCoronaVisible,
     setSunspotsVisible,
+    setFlaresVisible,
     setTrailsVisible,
     setTrailDirection,
     getTier,
@@ -3860,6 +4013,7 @@ export function createSolarSystemScene(
     getKuiperParticles: () => kuiperParticles,
     getCometTails: () => cometTails ?? [],
     getSunCorona: () => sunCorona,
+    getSunProminences: () => sunProminences,
     getTrailLines: () => trailLines,
     getTrailBodySpecs: () => ensureTrailSpecs(),
     setRuler,

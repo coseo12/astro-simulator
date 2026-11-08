@@ -31,6 +31,7 @@ const IDS = [
   'cometTails',
   'corona',
   'sunspots',
+  'flares',
   'trails',
   'events',
 ] as const;
@@ -57,6 +58,7 @@ beforeEach(() => {
     cometTailsVisible: true,
     coronaVisible: true,
     sunspotsVisible: true,
+    flaresVisible: true,
     // #1341 — 기본은 꺼짐이지만 이 파일의 전제 (전 토글 ON) 에 맞춘다.
     trailsVisible: true,
     eventsVisible: true,
@@ -67,6 +69,7 @@ beforeEach(() => {
       cometTails: true,
       corona: true,
       sunspots: true,
+      flares: true,
       trails: true,
     },
     displayPanelOpen: false,
@@ -368,6 +371,7 @@ describe('DisplayPanel — 접근 가능한 이름 · 설명 (cross-validate 5-B
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -418,6 +422,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -447,6 +452,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -485,6 +491,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -523,6 +530,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -561,6 +569,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -575,6 +584,50 @@ describe('DisplayPanel — 토글 분기', () => {
     fireEvent.click(el);
     expect(el).toHaveAttribute('aria-pressed', 'false');
     expect(sentCommands).toEqual([]);
+  });
+
+  it('#1428 PR3 소프트웨어 렌더 — 플레어 · 홍염: aria-disabled + 플레어 사유 · 네이티브 disabled 아님 · 클릭 no-op (결정 5 · Q7)', () => {
+    // `?flares=off` 로드 상태 (의도 false) 에서 누르는 경우가 위험한 방향이다 — 게이트가 없으면 `setFlaresVisible(true)` 가 나간다.
+    useSimStore.setState({
+      flaresVisible: false,
+      displayCapabilities: {
+        starfield: false,
+        surfaceDetail: true,
+        belt: false,
+        cometTails: false,
+        corona: false,
+        sunspots: false,
+        flares: false,
+        trails: true,
+      },
+    });
+    renderPanel();
+    openPanel();
+    const el = toggleEl('flares');
+    expect(el).toHaveAttribute('aria-disabled', 'true');
+    expect(el).not.toBeDisabled();
+    expect(el).toHaveAttribute('title', DISPLAY_DISABLED_REASONS.softwareRendererFlares);
+    expect(el).toHaveAccessibleDescription(DISPLAY_DISABLED_REASONS.softwareRendererFlares);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(el);
+    fireEvent.click(el);
+    expect(el).toHaveAttribute('aria-pressed', 'false');
+    expect(useSimStore.getState().flaresVisible).toBe(false);
+    expect(sentCommands).toEqual([]);
+  });
+
+  it('#1428 PR3 하드웨어 — 플레어 · 홍염 클릭 → aria-pressed 반전 + 명령 (흑점 · 코로나 행은 그대로)', () => {
+    renderPanel();
+    openPanel();
+    expect(screen.getByRole('button', { name: '플레어 · 홍염' })).toBe(toggleEl('flares'));
+    fireEvent.click(toggleEl('flares'));
+    expect(toggleEl('flares')).toHaveAttribute('aria-pressed', 'false');
+    expect(toggleEl('sunspots')).toHaveAttribute('aria-pressed', 'true');
+    expect(toggleEl('corona')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands).toEqual([{ type: 'setFlaresVisible', visible: false }]);
+    fireEvent.click(toggleEl('flares'));
+    expect(toggleEl('flares')).toHaveAttribute('aria-pressed', 'true');
+    expect(sentCommands.at(-1)).toEqual({ type: 'setFlaresVisible', visible: true });
   });
 
   it('#1412 PR2 하드웨어 — 태양 흑점 클릭 → aria-pressed 반전 + 명령 (코로나 행은 그대로)', () => {
@@ -609,6 +662,7 @@ describe('DisplayPanel — 토글 분기', () => {
           cometTails: true,
           corona: true,
           sunspots: true,
+          flares: true,
           trails: false,
         },
       }),
@@ -630,6 +684,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: true,
         corona: true,
         sunspots: true,
+        flares: true,
         trails: true,
       },
     });
@@ -643,6 +698,8 @@ describe('DisplayPanel — 토글 분기', () => {
     }
     expect(sentCommands).toEqual([]);
     expect(toggleEl('stars')).toHaveAttribute('aria-disabled', 'false');
+    // #1428 PR3 — 플레어 · 홍염은 표면 축이 없다 (홍염은 별도 메시 — 결정 5 표) — 열린 채로 남는다.
+    expect(toggleEl('flares')).toHaveAttribute('aria-disabled', 'false');
   });
 
   it('비활성 토글도 포커스를 받는다 — Tab 순회에서 빠지지 않는다 (D14 · aria-disabled 해석)', () => {
@@ -654,6 +711,7 @@ describe('DisplayPanel — 토글 분기', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });

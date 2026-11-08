@@ -36,6 +36,7 @@ import { parseBeltParam, parseKuiperVisible, resolveBeltAtLoad } from '@/core/pa
 import { parseCometTailsParam, resolveCometTailsAtLoad } from '@/core/parse-comet-tails-mode';
 import { parseCoronaParam, resolveCoronaAtLoad } from '@/core/parse-corona-mode';
 import { parseSunspotsVisible, resolveSunspotsAtLoad } from '@/core/parse-sunspots-mode';
+import { parseFlaresVisible, resolveFlaresAtLoad } from '@/core/parse-flares-mode';
 import { parseTrailsVisible } from '@/core/parse-trails-mode';
 import { parseConstellationsVisible } from '@/core/parse-constellations-mode';
 import { parseNightLightsVisible } from '@/core/parse-night-lights-mode';
@@ -673,6 +674,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // #1412 — 태양 흑점 (ADR 20261025-1412 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 미지정 켜짐 · `off` 꺼짐 (`force` 없음 — CI 강제 셀을 만들지 않는다). 표시 패널 토글 (PR2) 은 아래 핸들러 등록 블록.
         const sunspotsParamVisible = parseSunspotsVisible(beltUrl.get('sunspots'));
+        // #1428 — 태양 플레어 · 홍염 (ADR 20261107-1428 결정 5). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
+        // 미지정 켜짐 · `off` 꺼짐 (`force` 없음 — Q7). 표시 패널 토글 (PR3) 은 아래 핸들러 등록 블록.
+        const flaresParamVisible = parseFlaresVisible(beltUrl.get('flares'));
         // #1341 — 궤적 trail (ADR 20261015-1341 결정 T10). 같은 파싱 객체에서 읽는다 (#850 계약: 증가 0).
         // 기본 꺼짐 · `on` 옵트인. 로드 시 생성하지 않고 아래 핸들러 등록 블록에서 의도만 scene 에 넘긴다 (지연 생성).
         const trailsParamVisible = parseTrailsVisible(beltUrl.get('trails'));
@@ -857,6 +861,8 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           ),
           // #1412 — 태양 흑점. 소프트웨어 렌더 게이트는 여기서 (결정 5 · Q9 — core 는 렌더러를 모른다).
           sunspots: resolveSunspotsAtLoad(sunspotsParamVisible, !isSoftwareRenderer),
+          // #1428 — 태양 플레어 · 홍염. 소프트웨어 렌더 게이트는 여기서 (결정 5 · Q7 — core 는 렌더러를 모른다).
+          flares: resolveFlaresAtLoad(flaresParamVisible, !isSoftwareRenderer),
           grMode,
           integrator,
           ringRenderMode,
@@ -1169,6 +1175,9 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         instance.setSunCoronaVisibleHandler((visible) => solar.setSunCoronaVisible(visible));
         // #1412 PR2 — 태양 흑점 (같은 wiring). 가용성 = `sunspots` (소프트웨어 렌더가 아님) ∧ `surfaceDetail` (결정 5).
         instance.setSunspotsVisibleHandler((visible) => solar.setSunspotsVisible(visible));
+        // #1428 PR3 — 태양 플레어 · 홍염 (같은 wiring). 가용성 `flares` = 소프트웨어 렌더가 아님 (결정 5 · Q7 — `force` 없음).
+        // scene 의 `setFlaresVisible` 은 렌더러를 묻지 않으므로 소프트웨어 렌더 차단은 아래 가용성 `flares` 가 한다.
+        instance.setFlaresVisibleHandler((visible) => solar.setFlaresVisible(visible));
         // #1341 PR1 — 궤적 trail (같은 wiring). 가용성 `trails` = 활성 물리 엔진이 Kepler (결정 T8 — 렌더러 게이트 없음).
         instance.setTrailsVisibleHandler((visible) => solar.setTrailsVisible(visible));
         // #1373 PR2 — 별자리 (같은 wiring). 가용성 = 별 배경과 같은 `starfield` (결정 R5 — 소프트웨어 렌더면 명령이 막힌다).
@@ -1196,6 +1205,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           store.setCometTailsVisible(cometTailsMode.visible);
           store.setCoronaVisible(coronaMode.visible);
           store.setSunspotsVisible(sunspotsParamVisible);
+          store.setFlaresVisible(flaresParamVisible);
           store.setTrailsVisible(trailsParamVisible);
           store.setConstellationsVisible(constellationsParamVisible);
           // 핸들러 등록 **뒤에** 가용성을 연다 — 그 전 토글은 command 가 no-op 으로 사라진다.
@@ -1206,6 +1216,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
             cometTails: !isSoftwareRenderer || cometTailsMode.forced,
             corona: !isSoftwareRenderer || coronaMode.forced,
             sunspots: !isSoftwareRenderer,
+            flares: !isSoftwareRenderer,
             trails: solar.getPhysicsEngine() === 'kepler',
           });
         }

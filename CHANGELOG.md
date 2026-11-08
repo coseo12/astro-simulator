@@ -5,6 +5,40 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.109.0] - 2026-11-08
+
+### Added
+
+- **[#1428] 태양 림 밖에 홍염 (태양면 고정 3D 루프) 을 그린다 — PR1** ([#1428](https://github.com/coseo12/astro-simulator/issues/1428)). ADR [`20261107-1428`](docs/decisions/20261107-1428-solar-flares-prominences.md) 결정 1 · 3 · 5 · 6 · 7. 플레어 (결정 4) 는 PR2, 표시 패널 행은 PR3 이다.
+  - 신규 `sun-prominences.ts` — 장면 시계 jd 의 순수 함수 생성기 (일 슬롯 mulberry32 · 흑점과 같은 사이클 모양 · 활동대 위도 · 차등 자전 `ω(φ)`) 와 메시 1 개 · GLSL `ShaderMaterial` 1 개 (draw call +1). 루프는 흑점과 같은 태양면 좌표에 있어 자전으로 림을 넘나들고, 수명 끝에 일부는 분출해 사라진다. fragment 가 disk 안쪽 (`ρ < 1`) 을 버려 림 밖 부분만 보인다. 정점 버퍼는 1 회 할당하고 비활성 슬롯은 밝기 0 · 면적 0 으로 퇴화시킨다.
+  - 신규 `activity-visibility.ts` — 흑점 광과민성 감쇠 상태기계를 효과별 계수 `c` (cycles/일) 를 받는 공용 함수로 옮겼다. 흑점은 `c = ω(0)/360` 을 넘기는 래퍼이고 `sunspots.test.ts` 는 수정 없이 통과한다. 홍염은 `c = 1` 이라 `1d` 재생에서 보이고 `1M` 이상에서 숨는다 (실 Chrome 프리셋 전환 실측 — `1d` 1 · `1M` 0 · 일시정지 1 · `1y` 0 · `1h` 1).
+  - URL `?flares=off` 로 끈다 (`force` 없음). 소프트웨어 렌더에서는 만들지 않는다. `verify:774-sun` 의 두 쿼리에 `&flares=off` 를 붙였다.
+  - #1422 vertex clip z 보정 (`LOG_DEPTH_VERTEX_Z_GLSL`) 은 홍염 셰이더에 넣지 않았다 (결정 2). 위성 focus 후 시간 점프 시나리오에서 하드웨어 WebGL2 노출이 0 이었다 (같은 장면의 sun-shader 대조군은 보정을 빼면 37,612 px). WebGL2 구멍이 보고되면 적용한다 (재검토 트리거 6).
+  - 표시 근사: 홍염 위치 · 높이 · 개수 · 수명은 통계 모델이고 특정 날짜의 실제 홍염과 같지 않다. 높이 (0.20 R 이상 0.32 R 이하) 는 실제 범위 (0.015 R 이상 0.15 R 이하) 를 과장한 값이다. 형태 상수는 육안 승인 단계에서 바뀔 수 있다.
+- **[#1428] 흑점 군 위에 플레어 (국소 백색 섬광) 를 그린다 — PR2** ([#1428](https://github.com/coseo12/astro-simulator/issues/1428)). ADR [`20261107-1428`](docs/decisions/20261107-1428-solar-flares-prominences.md) 결정 3 · 4 · 7, §교차검증 합의 4 · 7 · 8. 표시 패널 행은 PR3 이다.
+  - 신규 `sun-flares.ts` — `generateSunFlares(jd, spots, spotCount, out)`. 흑점 군마다 일 슬롯 해시로 그날의 발생을 0 또는 1 회 정한다 (확률 = 군 면적 × 1/600). 세기는 광도 곡선 (상승 15 분 smoothstep · 감쇠 45 분 지수, 3 시간 15 분 뒤 0) 이다. 흑점 생성기를 부르지 않는다 — 장면이 흑점 목록을 1 회 만들어 흑점 uniform 과 함께 쓰므로 `?sunspots=off` 에서도 플레어는 있다. `MAX_SUN_FLARES = 4` 가 셰이더 배열 크기 · 생성기 상한의 SSoT 다.
+  - 발생 판정은 계단 대신 폭 0.02 의 게이트로 둔다. 판정에 쓰는 군 면적이 플레어 진행 중에도 변해, 계단이면 진행 중 플레어가 곡선 중간 세기로 나타나거나 사라진다 (단위 테스트 — 계단 판정 변이에서 1 분 간격 연속성 단언이 실패한다).
+  - sun 셰이더 — `flares[4]` · `flareParams[4]` · `flareCount` · `flareVisibility` uniform, 흑점 루프와 같은 상수 상한 루프 (2-리본 + 중심 핵, 반경 = 그 군의 흑점 반영 반경 — 사용자 D1 「반영까지 덮게」), 합성은 흑점 · limb 뒤 `mix(col, vec3(1.0), fl * flareVisibility)`. 셰이더에 시간 uniform 은 없다. 면적 게이트 · `flareVisibility` · 크기는 ADR Amendment 1 에 적었다.
+  - 감쇠 계수 `c = 48 /일` — `1h` 재생에서 보이고 `1d` 재생 (기본) 에서 숨는다. 일시정지 · 날짜 점프 뒤에는 보인다 (실 Chrome 근접 화면 `flareVisibility` — `1h` 1 · `1d` 0 · 일시정지 1, WebGPU · 하드웨어 WebGL2).
+  - 생성기 표본 (2014-01-01 ~ 06-30, 5 분 간격) 의 발생은 하루 3.5 회다. 같은 표본에서 동시 후보는 최대 5 개라 상한 4 를 넘는 순간이 있고, 그때는 가장 어두운 것을 버린다.
+  - 표시 근사: 플레어 위치 · 빈도 · 세기는 통계 모델이고 특정 날짜의 실제 플레어와 같지 않다. 크기는 흑점 반영 (×2.5 과장) 에 맞춘 값이다. 기본 화면 (disk 반경 79 px) 의 on/off diff 는 55 픽셀 (픽셀 수 — disk 안 · 채널 차 > 2) 이다. 발생률 · 모양 상수는 육안 승인 단계에서 바뀔 수 있다.
+- **[#1428] 표시 패널에 「플레어 · 홍염」 토글 — PR3** ([#1428](https://github.com/coseo12/astro-simulator/issues/1428)). ADR [`20261107-1428`](docs/decisions/20261107-1428-solar-flares-prominences.md) 결정 5 · 6, 사용자 결정 Q5 (a) 1 행 · Q6 (a) 기본 켜짐. 표시 토글 표에서 태양 흑점 바로 다음 행이다 (표는 14행). 한 행이 플레어와 홍염을 함께 끈다. 끄면 URL 에 `flares=off` 를 쓰고 켜면 키를 지운다 (ADR 1265 결정 5 어휘 — 역방향 파서는 PR1 `parseFlaresVisible`).
+  - 가용성은 `!isSoftwareRenderer` 하나다. 표면 축은 곱하지 않는다 — 홍염은 별도 메시라 `?surface=off` 에서도 그려진다 (결정 5 표). 소프트웨어 렌더면 「소프트웨어 렌더링 환경에서는 성능 보호를 위해 플레어 · 홍염을 표시하지 않습니다」 사유로 `aria-disabled` 가 되고, 눌러도 store · 명령 · URL 이 바뀌지 않는다.
+  - 장면 핸들 `setFlaresVisible` 은 렌더러 종류를 묻지 않는다 (PR #1431 리뷰). 그래서 런타임 토글 경로 (표시 패널 · 투어) 에서는 이 가용성이 소프트웨어 렌더의 홍염 메시 지연 생성과 `flareCount` 기록을 막는 유일한 지점이다. 로드 경로는 별개 지점인 `resolveFlaresAtLoad` 가 막는다 (PR1). 흑점 · 코로나 행과 같은 방식이다. 단위 테스트는 표 · 훅 · 패널 세 층에 있다. 행 게이트를 지우는 변이 (`caps.flares ? null : …` → `null`) 에서 web `src/core` · `src/components/layout` · `src/lib/tours` 871 건 중 4 건이 실패한다.
+  - core 명령 `setFlaresVisible` · `SimulationCore.setFlaresVisibleHandler` · store `flaresVisible` · 가용성 필드 `displayCapabilities.flares`. sim-canvas 가 PR1 장면 핸들 `setFlaresVisible` 에 잇는다.
+  - 교육 투어는 플레어 · 홍염을 지정하지 않는다. 투어 엔진은 표를 순회하므로 이 행도 시작 스냅샷 · 단계 전환 · 종료 복원 (의도 + URL 키) 에 들어간다.
+
+### Behavior Changes
+
+- **하드웨어 렌더의 태양 림 밖에 적색 루프가 보인다** (#1428). 기본 화면 (2014-04-01, 사이클 극대) 에서 on/off diff 의 20 px 이상 연결 성분 5 개 · 최대 높이 27.8 px (WebGPU 실측). `?flares=off` 는 develop 과 캔버스 픽셀이 같다 (기본 화면 — WebGPU · 하드웨어 WebGL2 · swiftshader). 소프트웨어 렌더 (CI) 화면은 바뀌지 않는다.
+- **하드웨어 렌더의 태양 흑점 군 위에 플레어가 켜졌다 꺼진다** (#1428 PR2). 일시정지 · `1h` 이하 재생 · 날짜 점프 뒤에 보이고, 기본 재생 `1d` 에서는 감쇠로 숨는다. 근접 화면 (disk 반경 364 px) 정점 플레어의 disk 안 on/off diff 는 6,546 픽셀 (픽셀 수, WebGPU 실측). `?flares=off` 는 develop 과 캔버스 픽셀이 같다 (기본 · focus · 근접 — WebGPU · 하드웨어 WebGL2, 기본 · focus — swiftshader). 소프트웨어 렌더 (CI) 화면은 바뀌지 않는다.
+- **표시 패널 토글이 14개가 된다** (#1428 PR3). 플레어 · 홍염을 런타임에 끄고 켤 수 있고, 끈 상태는 URL · 북마크 · 새로고침으로 이어진다. 로컬 실측 1회 (macOS · Apple M1 Pro · Chrome 157 headed, `?t=2456748.626305&speed=0&focus=sun` + 근접 카메라 — 태양 반경의 2.6 배). 차이 픽셀 = 캔버스 요소 캡처 1280×800 전체 (DOM 오버레이 숨김) 에서 RGB 중 한 채널이라도 값이 다른 픽셀 수.
+  - 패널 끔 ↔ `?flares=off` 로드는 WebGPU · 하드웨어 WebGL2 모두 0 이다.
+  - 다시 켬 ↔ 처음 로드는 캔버스 네 모서리 3 px 안의 20 픽셀만 다르다. 같은 20 픽셀이 `?flares=off` 새로고침 ↔ `?flares=off` 로드에서도 나온다. 그 밖은 0 이다.
+  - 양성 대조로, 켬 ↔ 끔 (채널 차 > 2) 은 11,014 (WebGPU) · 11,022 (WebGL2) 픽셀이다.
+  - 소프트웨어 렌더 (swiftshader) 에서는 — 측정 쿼리에 `?gpu=a` (GPU tier A 강제) 를 붙였다 — 패널 행을 세 번 눌러도 홍염 메시가 생기지 않고 `flareCount` 가 0 이다. 기본 · focus · `?flares=off` focus 세 화면 모두 develop 과 캔버스 차이 0 이다. 게이트를 지운 변이 (같은 클릭 경로) 에서는 메시가 생기고 develop 과 1,693 픽셀이 달라진다.
+- `verify:1265-display-panel` 의 토글 집합에 `flares` 를 더했다 (D1 개수 · D11 URL · D14 Tab 순회 · D15 스트레스 — 소프트웨어 렌더 게이트 집합 포함). 전체 끔 쿼리에 `flares=off` 가 붙는다 (ADR 1428 결정 6). 새 게이트는 없다.
+
 ## [0.108.1] - 2026-11-07
 
 ### Fixed

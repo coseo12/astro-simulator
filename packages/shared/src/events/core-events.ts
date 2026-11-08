@@ -80,6 +80,10 @@ export type CoreEvents = {
  *
  * #1412 PR2 — `setSunspotsVisible` 추가. 태양 흑점의 런타임 토글 (ADR
  * `docs/decisions/20261025-1412-sunspots.md` 결정 5 · 사용자 결정 Q6). 소프트웨어 렌더 · `?surface=off` 게이트는 web 이 한다.
+ *
+ * #1428 PR3 — `setFlaresVisible` 추가. 태양 플레어 · 홍염을 **함께** 켜고 끄는 런타임 토글 (ADR
+ * `docs/decisions/20261107-1428-solar-flares-prominences.md` 결정 5 · 사용자 결정 Q5 (a) · Q6 (a)). 소프트웨어 렌더 게이트는
+ * web 이 한다 (scene 의 `setFlaresVisible` 은 렌더러 종류를 묻지 않는다).
  */
 export type CoreCommand =
   | { type: 'setTimeScale'; scale: number }
@@ -104,4 +108,5 @@ export type CoreCommand =
   | { type: 'setTrailsVisible'; visible: boolean }
   | { type: 'setConstellationsVisible'; visible: boolean }
   | { type: 'setSunspotsVisible'; visible: boolean }
+  | { type: 'setFlaresVisible'; visible: boolean }
   | { type: 'setRuler'; anchorId: string | null; targetId: string | null };

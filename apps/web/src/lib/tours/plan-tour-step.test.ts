@@ -24,6 +24,7 @@ const CAPS_ALL: DisplayCapabilities = {
   cometTails: true,
   corona: true,
   sunspots: true,
+  flares: true,
   trails: true,
 };
 
@@ -256,11 +257,12 @@ describe('planDisplayRestore · readDisplayIntents (E5)', () => {
     expect(planDisplayRestore(snapshot, snapshot)).toEqual([]);
   });
 
-  it('store 의도 13종 (표 행 전부 — #1412 PR2 흑점 포함) 를 읽는다', () => {
+  it('store 의도 14종 (표 행 전부 — #1412 PR2 흑점 · #1428 PR3 플레어 · 홍염 포함) 를 읽는다', () => {
     const intents = readDisplayIntents(useSimStore.getState());
     expect(Object.keys(intents).sort()).toEqual(DISPLAY_TOGGLES.map((d) => d.id).sort());
-    expect(Object.keys(intents)).toHaveLength(13);
+    expect(Object.keys(intents)).toHaveLength(14);
     expect(intents.sunspots).toBe(true);
+    expect(intents.flares).toBe(true);
   });
 
   it('#1412 PR2 흑점 — 지정하지 않은 단계는 이탈 축에 넣지 않고, 단계 전환 · 종료 복원은 스냅샷으로 되돌린다', () => {
