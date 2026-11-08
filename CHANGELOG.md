@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.109.0] - 2026-11-08
+
 ### Added
 
 - **[#1428] 태양 림 밖에 홍염 (태양면 고정 3D 루프) 을 그린다 — PR1** ([#1428](https://github.com/coseo12/astro-simulator/issues/1428)). ADR [`20261107-1428`](docs/decisions/20261107-1428-solar-flares-prominences.md) 결정 1 · 3 · 5 · 6 · 7. 플레어 (결정 4) 는 PR2, 표시 패널 행은 PR3 이다.
