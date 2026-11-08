@@ -146,6 +146,11 @@ export interface SimStoreState {
    */
   sunspotsVisible: boolean;
   /**
+   * #1428 PR3 — 태양 플레어 · 홍염 표시 의도 (기본 true — ADR `20261107-1428` 결정 5 · 사용자 결정 Q6 (a)). 실제 표시는 의도 ∧ 환경
+   * (`displayCapabilities.flares` — 소프트웨어 렌더 게이트) 이다 (`sunspotsVisible` 동형 — 표면 게이트는 없다).
+   */
+  flaresVisible: boolean;
+  /**
    * #1341 PR1 — 궤적 trail 표시 의도 (기본 **false** — ADR `20261015-1341` 결정 T10, 옵트인 `?trails=on`). 실제 표시는
    * 의도 ∧ 환경 (`displayCapabilities.trails` — Kepler 엔진, 결정 T8) 이다.
    */
@@ -247,6 +252,8 @@ export interface SimStoreState {
   setCoronaVisible: (visible: boolean) => void;
   /** #1412 PR2 — 태양 흑점 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setSunspotsVisible: (visible: boolean) => void;
+  /** #1428 PR3 — 태양 플레어 · 홍염 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
+  setFlaresVisible: (visible: boolean) => void;
   /** #1341 PR1 — 궤적 trail 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
   setTrailsVisible: (visible: boolean) => void;
   /** #1373 PR2 — 별자리 표시 의도 설정. 표시 패널 (`useDisplayToggle`) + URL 초기값에서 호출. */
@@ -317,6 +324,8 @@ export const useSimStore = create<SimStoreState>((set) => ({
   coronaVisible: true,
   // #1412 PR2 — 기본 ON (Q6). `?sunspots=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
   sunspotsVisible: true,
+  // #1428 PR3 — 기본 ON (Q6 (a)). `?flares=off` 는 sim-canvas 가 mount 직후 false 로 덮어쓴다.
+  flaresVisible: true,
   // #1341 PR1 — 기본 OFF (결정 T10). `?trails=on` 은 sim-canvas 가 mount 직후 true 로 덮어쓴다.
   trailsVisible: false,
   constellationsVisible: false,
@@ -372,6 +381,7 @@ export const useSimStore = create<SimStoreState>((set) => ({
   setCometTailsVisible: (visible) => set({ cometTailsVisible: visible }),
   setCoronaVisible: (visible) => set({ coronaVisible: visible }),
   setSunspotsVisible: (visible) => set({ sunspotsVisible: visible }),
+  setFlaresVisible: (visible) => set({ flaresVisible: visible }),
   setTrailsVisible: (visible) => set({ trailsVisible: visible }),
   setConstellationsVisible: (visible) => set({ constellationsVisible: visible }),
   setEventsVisible: (visible) => set({ eventsVisible: visible }),

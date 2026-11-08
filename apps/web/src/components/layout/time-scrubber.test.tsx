@@ -77,6 +77,7 @@ beforeEach(() => {
       cometTails: true,
       corona: true,
       sunspots: true,
+      flares: true,
       trails: true,
     },
   });

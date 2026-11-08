@@ -24,6 +24,7 @@ const HW = {
   cometTails: true,
   corona: true,
   sunspots: true,
+  flares: true,
   trails: true,
 };
 
@@ -47,6 +48,7 @@ beforeEach(() => {
     cometTailsVisible: true,
     coronaVisible: true,
     sunspotsVisible: true,
+    flaresVisible: true,
     displayCapabilities: HW,
   });
 });
@@ -130,6 +132,7 @@ describe('useDisplayToggle', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -153,6 +156,7 @@ describe('useDisplayToggle', () => {
         cometTails: true,
         corona: true,
         sunspots: true,
+        flares: true,
         trails: true,
       },
     });
@@ -211,6 +215,7 @@ describe('useDisplayToggle', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -256,6 +261,7 @@ describe('useDisplayToggle', () => {
         cometTails: true,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -283,6 +289,7 @@ describe('useDisplayToggle', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -325,6 +332,7 @@ describe('useDisplayToggle', () => {
         cometTails: false,
         corona: true,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -352,6 +360,7 @@ describe('useDisplayToggle', () => {
         cometTails: false,
         corona: false,
         sunspots: false,
+        flares: false,
         trails: true,
       },
     });
@@ -401,6 +410,64 @@ describe('useDisplayToggle', () => {
       });
       expect(onUrlUpdate).not.toHaveBeenCalled();
     }
+  });
+
+  it('#1428 PR3 플레어 · 홍염 — OFF 명령 + URL `flares=off`, ON 은 키 삭제 (다른 키 유지)', async () => {
+    const { toggle, onUrlUpdate } = setup('?t=2456748.5&focus=sun');
+    act(() => toggle('flares'));
+    expect(useSimStore.getState().flaresVisible).toBe(false);
+    await waitFor(() => expect(onUrlUpdate).toHaveBeenCalled());
+    expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.get('flares')).toBe('off');
+    act(() => toggle('flares'));
+    expect(useSimStore.getState().flaresVisible).toBe(true);
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.calls.at(-1)![0].searchParams.has('flares')).toBe(false),
+    );
+    const last = onUrlUpdate.mock.calls.at(-1)![0];
+    expect(last.searchParams.get('t')).toBe('2456748.5');
+    expect(last.searchParams.get('focus')).toBe('sun');
+    expect(sentCommands).toEqual([
+      { type: 'setFlaresVisible', visible: false },
+      { type: 'setFlaresVisible', visible: true },
+    ]);
+  });
+
+  it('#1428 PR3 소프트웨어 렌더 — 의도가 꺼짐이어도 켜짐이어도 `setFlaresVisible` 0 회 · store · URL 무변화 (scene 은 렌더러를 묻지 않는다 — PR #1431 리뷰)', async () => {
+    // sim-canvas 가 소프트웨어 렌더에서 여는 가용성 (`flares: !isSoftwareRenderer`) 과 같은 모양.
+    const softwareCaps = {
+      ...HW,
+      starfield: false,
+      belt: false,
+      cometTails: false,
+      corona: false,
+      sunspots: false,
+      flares: false,
+    };
+    // 의도 false (`?flares=off` 로드) 에서 누르는 것이 위험한 방향이다 — 게이트가 없으면 `setFlaresVisible(true)` 가 나가
+    // scene 이 홍염 메시를 지연 생성하고 `flareCount` 를 기록한다 (결정 5 「소프트웨어 렌더 미생성」 위반).
+    for (const intent of [false, true]) {
+      sentCommands = [];
+      useSimStore.setState({ flaresVisible: intent, displayCapabilities: softwareCaps });
+      const { toggle, onUrlUpdate } = setup();
+      act(() => {
+        toggle('flares');
+        toggle('flares');
+      });
+      expect(useSimStore.getState().flaresVisible).toBe(intent);
+      expect(sentCommands).toEqual([]);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(onUrlUpdate).not.toHaveBeenCalled();
+    }
+  });
+
+  it('#1428 PR3 ?surface=off — 플레어 · 홍염 토글은 그대로 동작한다 (홍염은 별도 메시 — 결정 5 표)', () => {
+    useSimStore.setState({ displayCapabilities: { ...HW, surfaceDetail: false } });
+    const { toggle } = setup();
+    act(() => toggle('flares'));
+    expect(useSimStore.getState().flaresVisible).toBe(false);
+    expect(sentCommands).toEqual([{ type: 'setFlaresVisible', visible: false }]);
   });
 
   it('같은 틱 연속 호출 — 호출 시점 store 를 기준으로 반전 (왕복)', () => {
