@@ -1,6 +1,6 @@
 # ADR 20261118-1435 — 하드웨어 WebGL2 데스크톱의 GPU tier: tier c 일괄 판정을 소프트웨어 렌더로 좁힌다
 
-- **상태**: Provisional — cross-validate 2026-11-18 반영 완료 · 사용자 결정 Q1~Q5 대기 (응답 반영 후 Accepted 전이)
+- **상태**: Accepted (cross-validate 2026-11-18) — 사용자 결정 Q1~Q5 전부 권고안 (2026-11-18, §5 · §7 Amendment 1)
 - **날짜**: 2026-11-18
 - **결정자**: architect (이슈 [#1435](https://github.com/coseo12/astro-simulator/issues/1435))
 - **관련**:
@@ -238,7 +238,7 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 
 ## §5 결정 (사용자 선택 박제 후)
 
-> **미결 — 아래 Q1~Q5 의 사용자 응답 후 확정한다.** 그 전까지 아래는 권고안이다.
+> **확정 (2026-11-18)** — 사용자가 Q1~Q5 를 전부 권고안으로 결정했다. **A 채택**: WebGPU 미지원 데스크톱 중 렌더러가 하드웨어로 판독된 경우를 tier b 로 올린다. 소프트웨어 렌더 · 렌더러 판독 불가 · 모바일 비-WebGPU 는 tier c 를 유지한다.
 
 ### 사용자 결정 질문
 
@@ -249,6 +249,16 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 | Q3 | WebGPU 없는 약한 하드웨어 GPU 의 fps 위험 (미실측) | (a) 수용 — `?gpu=c` 로 수동 하향 가능 / (b) 수용 + 런타임 fps 하향 (원 ADR §미해결 1) 을 후속 이슈로 분리 / (c) 이번 범위에 런타임 하향 포함 | **(b)** — 실피해 관측 전이므로 `deferred:no-incident` 로 |
 | Q4 | 하드웨어 WebGL2 에서 「저성능 환경 감지」 알림이 사라진다 | (a) 수용 / (b) 「WebGL2 로 렌더 중」 같은 별도 안내 신설 | **(a)** — 화면이 WebGPU 와 같으므로 「축소」 안내가 사실이 아니게 된다 |
 | Q5 | 육안 확인 (D-T2) | POC 이미지 (§1 측정 시각 자료) 의 A 열이 기대와 맞는가 | 확인 요청 |
+
+### 사용자 결정 (2026-11-18)
+
+| Q | 결정 | 구현에 미치는 것 |
+| --- | --- | --- |
+| Q1 | **A** — 하드웨어 WebGL2 데스크톱 → tier b | 아래 구현 절차 1~6 |
+| Q2 | **(c)** — 확장 (`WEBGL_debug_renderer_info`) 이 없으면 `gl.getParameter(gl.RENDERER)` 로 다시 읽고, 그래도 판독 불가면 tier c | 절차 2 의 폴백 · 구현 DoD 5 |
+| Q3 | **(b)** — 약한 GPU fps 위험 수용. 런타임 fps 기반 tier 하향은 후속 이슈 [#1437](https://github.com/coseo12/astro-simulator/issues/1437) 로 분리 (`deferred:no-incident`) | 이번 범위 밖 (§8) |
+| Q4 | **(a)** — 하드웨어 WebGL2 에서 「저성능 환경 감지」 알림이 사라지는 것을 수용. 별도 안내 신설 없음 | 구현 DoD 1 의 알림 항목 |
+| Q5 | **승인** — develop (점) / A / C 비교 중 A 화면 승인 | — |
 
 ### 구현 절차 (A 채택 시 — Developer 인수인계)
 
@@ -266,6 +276,29 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 5. `browser-verify-glow-marker.mjs` 축 6 — 하드웨어 렌더러에서 돌면 tier b 가 되어 재현 전제가 사라진다. 전제 검사 (`__isSoftwareRenderer === true` 아니면 `exit 2` 전제 위반) 를 추가한다. CI 는 소프트웨어라 판정 불변.
 6. qa: 실 Chrome headed 로 본 ADR 측정 1·4·5 재현 (하드웨어 WebGL2 원판 · WebGPU 0 px · swiftshader 0 px) + 하드웨어 WebGL2 3단계 브라우저 검증.
 
+### 구현 DoD (검증 가능한 완료 기준 — 구현 PR 의 스프린트 계약)
+
+측정 방법은 §1 「측정 방법」 과 같다 (실 Chrome headed · 1280×720 · DPR 1 · 하드웨어 WebGL2 = `--use-angle=metal` + `navigator.gpu` 제거 · 소프트웨어 = `--use-angle=swiftshader` + `navigator.gpu` 제거 · 픽셀 차이 = 채널 차 > 2 인 픽셀 수, 같은 쿼리 재로드 잡음 0 확인 후 판정). 수치는 본 측정 환경 기준이며 다른 기기에서는 같은 절차로 develop 과 비교한다.
+
+| # | 완료 기준 (이슈 #1435 합의 대응) | 판정 |
+| --- | --- | --- |
+| 1 | **하드웨어 WebGL2 태양 근접** (`?t=2456748.626305&speed=0&focus=sun` + 반경 2.6 배) — `__gpuTier === 'b'` · LOD override `auto` · 태양 LOD `high` · `sun-corona` · `sun-prominences` 메시 `isVisible` · 원판 px ≥ 예상 원의 99 % (본 환경 기대값 111,883 / 112,328) · 알림 `tier-c-graceful-degradation` **미발행** (Q4) | 브라우저 실측 + 스크린샷 |
+| 2 | **저성능 보호 유지** — (a) swiftshader: `__isSoftwareRenderer === true` · `__gpuTier === 'c'` · override `low` · 기본 화면 (`?t=…&speed=0`) develop 대비 **0 px** (b) 모바일 UA + `navigator.gpu` 제거: tier c + 알림 발행 (`browser-verify-mobile-p7d.mjs --scenarios=3,4` PASS) (c) URL `?gpu=c`: override `low` 유지 (`browser-verify-756-surface.mjs` DoD 4 PASS) | 브라우저 실측 + 기존 가드 |
+| 3 | **WebGPU 픽셀 변화 0** — 기본 화면 · 태양 · 지구 · 목성 근접 4 시나리오 develop 대비 **0 px** | 브라우저 실측 |
+| 4 | **하드웨어 WebGL2 기본 화면 fps 기록** — 파라미터 없는 기본 화면 + 태양 근접, rAF 5 s × 2 회 (vsync 그대로) 와 측정 환경 (기기 · 디스플레이 Hz) 을 PR 에 기록. 본 환경 기대값 60 / 60 | 로컬 실측 기록 |
+| 5 | **렌더러 판독 3상태** (Q2 (c)) — 소프트웨어 문자열 → c · 하드웨어 문자열 → b · 확장 없음 + `gl.RENDERER` 하드웨어 문자열 → b · 둘 다 판독 불가 (`null` / 빈 문자열) → c | 단위 테스트 |
+| 6 | **`packages/core/src` 변경 0** (§4 예측 1) | `git diff --stat develop...HEAD -- packages/core/src` |
+
+#### 갱신해야 하는 가드 · 테스트 (구현 PR 에 포함)
+
+- [ ] `apps/web/src/core/detect-gpu-tier.test.ts` — fixture [10] 「구형 WebGL2-only 데스크톱 → c」 를 「하드웨어 WebGL2 데스크톱 → b」 로 바꾸고, 신규 fixture 3개: 「소프트웨어 WebGL2 → c」 · 「판독 불가 (`null`) WebGL2 → c」 · 「모바일 비-WebGPU + 하드웨어 렌더러 → c」 (분기 1 이 분기 2 보다 먼저임을 단언)
+- [ ] **3상태 소프트웨어 판정 순수 함수** 신설 + 단위 테스트 — 「`null` → `null`」 · 「`''` → `null`」 · 「SwiftShader 문자열 → `true`」 · 「ANGLE Metal 문자열 → `false`」. `detectSoftwareRenderer()` 를 판독 불가에 직접 쓰지 않는다 (그 함수는 `null` 에 `false` 를 돌려준다 — 합의 1). #745 의 별 배경 · 띠 · 코로나 등 게이트 입력은 **바꾸지 않는다**
+- [ ] Q2 (c) 폴백 (확장 → `gl.RENDERER`) 의 문자열 선택 로직 단위 테스트 — 「확장 있음 → UNMASKED 값」 · 「확장 없음 → `gl.RENDERER` 값」 · 「둘 다 없음 → `null`」 (gl 목 객체)
+- [ ] `apps/web/scripts/browser-verify-glow-marker.mjs` 축 6 — 진입 직후 `__isSoftwareRenderer === true` 가 아니면 **전제 위반 `exit 2`** (하드웨어 렌더러에서는 tier b 가 되어 tier-c race 재현 자체가 성립하지 않는다). 확인: 로컬 하드웨어 실행 1회가 `exit 2` 로 끝나는 로그 + CI (swiftshader) 판정 불변
+- [ ] 주석 계약 4곳 (절차 3) — `detect-gpu-tier.ts` 계약 2 · 계약 6 · `detectGpuTier` JSDoc 분기 목록 / `sim-canvas.tsx` tier 감지 블록 / `detect-software-renderer.ts` 헤더 「`detect-gpu-tier.ts` 는 무수정」
+- [ ] 기존 CI 가드 판정 불변 확인 — `verify-fps-baseline.mjs` · `r1-ui-regression-guard.mjs` · `browser-verify-glow-marker.mjs` · `browser-verify-mobile-p7d.mjs` 3/4 · `browser-verify-756-surface.mjs` (§4 예측 3)
+- [ ] CHANGELOG `[Unreleased]` — `### Behavior Changes` 에 「WebGPU 미지원 + 하드웨어 렌더 데스크톱은 tier b (LOD 거리 판정 · 절차 표면 · 태양 효과 표시, 저성능 알림 없음)」 (제품 행동 변화 → MINOR)
+
 ### 박제 대상 문구 (raw text — `detect-gpu-tier.ts` 주석 계약 2 교체안)
 
 ```text
@@ -276,7 +309,7 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 ### 명시적 비-범위
 
 - tier 프로파일의 미배선 축 (particles / shadow / aa / postProc / `lod.high·mid`) 배선 — 소비처 0 상태 유지.
-- 런타임 fps 기반 tier 재감지 (Q3 (b) 면 후속 이슈).
+- 런타임 fps 기반 tier 재감지 — Q3 (b) 결정으로 후속 이슈 [#1437](https://github.com/coseo12/astro-simulator/issues/1437) 로 분리.
 - billboard 크기 정책 (#333) 변경.
 - 모바일 비-WebGPU 판정 변경.
 
@@ -297,13 +330,23 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 
 ## §7 Amendment 라운드
 
-(사용자 결정 · cross-validate 반영 시 추가)
+### Amendment 1 (2026-11-18, 트리거: 사용자 결정 Q1~Q5)
+
+#### 결정 추가 / 갱신
+
+- Q1~Q5 전부 권고안으로 확정 (§5 「사용자 결정」 표). 상태 `Provisional` → `Accepted (cross-validate 2026-11-18)`.
+- 구현 DoD 6항 + 갱신 가드 · 테스트 목록을 §5 에 추가했다. 완료 기준 1~4 는 이슈 합의의 4개를 측정 가능한 술어로 옮긴 것이고, 5 · 6 은 cross-validate 합의 1 (3상태 변환) 과 §4 예측 1 을 구현 계약으로 승격한 것이다.
+- 원 ADR [`20260424-tier-preset-design`](20260424-tier-preset-design.md) 헤더 포인터를 「부분 개정 제안 (Provisional)」 에서 「부분 개정 (Accepted)」 으로 갱신했다. 원 ADR 의 상태는 Accepted 그대로이고, §축 1 분기 2 만 본 ADR 이 대체한다. 코드 반영은 구현 PR 머지 시점이다.
+
+#### 정정
+
+- 이슈 #1435 본문의 태양 과장 배율 「×75」 는 현행 `SUN_SCALE = 50` 이 맞다 (§1 측정 1 에 이미 기록 · 이슈 코멘트로 정정). 인과와 결정에는 영향 없다.
 
 ---
 
 ## §8 후속 / 분리 이슈
 
-- (Q3 (b) 채택 시) 런타임 fps 기반 tier 하향 — `deferred:no-incident`.
+- 런타임 fps 기반 tier 하향 (Q3 (b) 결정) — 후속 이슈 [#1437](https://github.com/coseo12/astro-simulator/issues/1437) (`deferred:no-incident`). 해제 트리거는 §6 재검토 트리거 1 (하드웨어 WebGL2 tier b 환경의 idle fps < 30 실피해 보고).
 - 범위 밖 관찰 (기록만, cross-validate 고유 발견 1): WebGPU 가 **지원되는데** 어댑터가 소프트웨어인 환경은 분기 3 에서 미지 vendor → integrated → tier b 가 된다. 본 이슈 범위 (WebGPU 미지원) 밖이고 CI ubuntu 는 `requestAdapter()` 가 `null` 이라 해당하지 않는다. 실피해 0 이라 이슈화하지 않는다.
 - 범위 밖 관찰 (기록만): `TIER_PROFILES.c.lod.{high, mid}` 와 `lod.ts` `pixelThresholds` 주입 경로는 소비처 0 이다 (§1 판독 3). `tier-profile.ts` 헤더는 「lod 축만 수동 소비」 라고 적지만 실제로는 lod 축 중 `forceOverride` 만 소비된다. 실피해 0 이라 이슈화하지 않는다.
 
