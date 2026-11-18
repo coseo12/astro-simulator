@@ -31,6 +31,7 @@ import {
   openBodyMenu,
   buildLaunchOptions,
   parseWindowPositionArgs,
+  applyWindowPosition,
   collectConsoleErrors,
   pressTimePlay,
   resolveBaseUrl,
@@ -929,6 +930,30 @@ await run('buildLaunchOptions — BROWSER_VERIFY_WINDOW 는 headed 에서만 적
     buildLaunchOptions({ env: { HEADED: '1', BROWSER_VERIFY_WINDOW: '40,40' }, gpu: 'metal' }),
     { headless: false, args: ['--use-angle=metal', '--window-position=40,40'], channel: 'chrome' },
   );
+});
+
+await run('buildLaunchOptions — 창 위치 인자는 options.args 뒤 (환경변수 우선)', () => {
+  assert.deepEqual(
+    buildLaunchOptions({
+      env: { HEADED: '1', BROWSER_VERIFY_WINDOW: '40,40' },
+      gpu: 'metal',
+      args: ['--foo'],
+    }).args,
+    ['--use-angle=metal', '--foo', '--window-position=40,40'],
+  );
+});
+
+await run('applyWindowPosition — withBrowser 직접 옵션: headed 만 적용, 중복 없음', () => {
+  const env = { BROWSER_VERIFY_WINDOW: '40,40' };
+  assert.deepEqual(applyWindowPosition({}, env), {});
+  assert.deepEqual(applyWindowPosition({ headless: true }, env), { headless: true });
+  assert.deepEqual(applyWindowPosition({ headless: false }, {}), { headless: false });
+  assert.deepEqual(applyWindowPosition({ headless: false }, env), {
+    headless: false,
+    args: ['--window-position=40,40'],
+  });
+  const built = { headless: false, args: ['--window-position=1,2'] };
+  assert.equal(applyWindowPosition(built, env), built);
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);

@@ -300,6 +300,7 @@ export function buildLaunchOptions(options = {}) {
   const args = [...GPU_LAUNCH_ARGS[gpu], ...(options.args ?? [])];
   // headed 창을 어느 모니터에 띄울지는 기계마다 다르므로 코드가 아니라 환경변수로 받는다.
   // headless 에는 창이 없어 무의미하고, CI 는 headless 라 영향이 없다.
+  // 맨 뒤에 붙인다 — Chromium 은 같은 스위치의 마지막 값을 쓰므로 환경변수가 `options.args` 보다 우선한다.
   if (headful) args.push(...parseWindowPositionArgs(env.BROWSER_VERIFY_WINDOW));
   /** @type {{ headless: boolean, args?: string[], channel?: string }} */
   const launchOptions = { headless: !headful };
@@ -378,7 +379,24 @@ export async function withBrowser(launchOptions = {}, fn, options = {}) {
 /** `withBrowser` 기본 launcher — `launchBrowser` 와 동일하게 playwright 를 동적 import. */
 async function defaultLaunch(launchOptions) {
   const { chromium } = await import('playwright');
-  return chromium.launch(launchOptions);
+  return chromium.launch(applyWindowPosition(launchOptions));
+}
+
+/**
+ * `withBrowser` 에 `buildLaunchOptions` 를 거치지 않은 옵션(`{ headless: !HEADED }` 등)이 들어와도
+ * headed 창이면 `BROWSER_VERIFY_WINDOW` 를 적용한다. headless(기본 포함)이거나 이미
+ * `--window-position` 이 있으면(`buildLaunchOptions` 경유) 원본을 그대로 돌려준다.
+ *
+ * @param {{ headless?: boolean, args?: string[] }} launchOptions
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function applyWindowPosition(launchOptions, env = process.env) {
+  if (launchOptions.headless !== false) return launchOptions;
+  const args = launchOptions.args ?? [];
+  if (args.some((arg) => arg.startsWith('--window-position='))) return launchOptions;
+  const extra = parseWindowPositionArgs(env.BROWSER_VERIFY_WINDOW);
+  if (extra.length === 0) return launchOptions;
+  return { ...launchOptions, args: [...args, ...extra] };
 }
 
 /**
