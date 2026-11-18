@@ -1,6 +1,6 @@
 # ADR 20261118-1435 — 하드웨어 WebGL2 데스크톱의 GPU tier: tier c 일괄 판정을 소프트웨어 렌더로 좁힌다
 
-- **상태**: Accepted (cross-validate 2026-11-18) — 사용자 결정 Q1~Q5 전부 권고안 (2026-11-18, §5 · §7 Amendment 1)
+- **상태**: Accepted (cross-validate 2026-11-18) — 사용자 결정 Q1~Q5 전부 권고안 (2026-11-18, §5 · §7 Amendment 1) · 가드 확인 항목 재조정 (§7 Amendment 2) · `gl.RENDERER` 일반 이름 = 판독 불가 (§7 Amendment 3)
 - **날짜**: 2026-11-18
 - **결정자**: architect (이슈 [#1435](https://github.com/coseo12/astro-simulator/issues/1435))
 - **관련**:
@@ -318,7 +318,7 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 ## §6 위험 / 재검토 트리거
 
 1. **약한 하드웨어 GPU 의 fps (미실측)** — WebGPU 가 기본 비활성인 환경 (Linux Chrome · Firefox · macOS 26 이전 Safari 등 [가정 — 브라우저별 WebGPU 기본값은 측정하지 않음]) 의 하드웨어 GPU 가 tier b 가 된다. 이 집단에는 develop 에서 이미 tier b 인 WebGPU integrated GPU 보다 약한 기기가 섞일 수 있다. 완화: `?gpu=c` 수동 하향 경로 유지 · Q3.
-2. **렌더러 문자열 위장** — 브라우저가 렌더러 문자열을 일반화된 이름으로 바꿔 소프트웨어 렌더를 하드웨어처럼 보이게 하면 tier b 가 된다 (Q2 (c) 폴백이 이 경로를 넓힌다). `detectSoftwareRenderer` 키워드 (swiftshader / llvmpipe / swrast 등) 에 걸리지 않는 소프트웨어 렌더러는 측정하지 않았다 [가정].
+2. **렌더러 문자열 위장** — 브라우저가 렌더러 문자열을 일반화된 이름으로 바꿔 소프트웨어 렌더를 하드웨어처럼 보이게 하면 tier b 가 된다 (Q2 (c) 폴백이 이 경로를 넓힌다). **[실측 2026-11-18, PR #1440 qa]** Chrome 157 의 `gl.RENDERER` 는 metal · SwiftShader 모두 상수 `WebKit WebGL` 이라, 확장 차단 시 폴백이 정보를 주지 않았다 (swiftshader + 확장 숨김 → tier b). §7 Amendment 3 이 이 일반 이름을 판독 불가 (→ c) 로 처리해 닫았다. 남는 것: 목록 (`MASKED_RENDERER_NAMES`) 에 없는 일반 이름, 그리고 `detectSoftwareRenderer` 키워드 (swiftshader / llvmpipe / swrast 등) 에 걸리지 않는 소프트웨어 렌더러는 측정하지 않았다 [가정].
 3. **로컬 하드웨어에서 도는 가드의 전제 변화** — `navigator.gpu` 를 지워 tier c 를 만들던 로컬 재현 (glow-marker 축 6 · PR #1432 qa 방식) 이 하드웨어 렌더러에서는 더 이상 tier c 가 아니다. tier c 재현은 `?gpu=c` 또는 swiftshader 로 해야 한다.
 
 ### 재검토 트리거
@@ -341,6 +341,16 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 #### 정정
 
 - 이슈 #1435 본문의 태양 과장 배율 「×75」 는 현행 `SUN_SCALE = 50` 이 맞다 (§1 측정 1 에 이미 기록 · 이슈 코멘트로 정정). 인과와 결정에는 영향 없다.
+
+### Amendment 2 (2026-11-18, 트리거: 구현 PR #1440 실측 · 사용자 합의 2026-11-18)
+
+- §5 가드 체크리스트의 「로컬 하드웨어 실행 1회가 `exit 2` 로 끝나는 로그」 를 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이 끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 재조정한다. 하드웨어 실행의 전체 종료 코드는 축 1 · 5 의 하드웨어 선재 FAIL (별 배경 cluster 혼입, `?gpu=a` 라 tier 무관) 때문에 `1` 이며, 기록만 한다 (`browser-verify-glow-marker.mjs` 헤더 · PR #1440 본문 · CHANGELOG `[Unreleased]` Notes).
+
+### Amendment 3 (2026-11-18, 트리거: PR #1440 qa 실측 · 사용자 Q2 재질의 결정 2026-11-18)
+
+- **근거 [실측]**: PR #1440 qa ([코멘트](https://github.com/coseo12/astro-simulator/pull/1440#issuecomment-6970896269) 권고 1) — Chrome 157 의 `gl.RENDERER` 는 metal · SwiftShader 모두 `WebKit WebGL` 상수다. 그래서 Q2 (c) 폴백이 Chrome 에서는 정보를 주지 않았고, swiftshader + `WEBGL_debug_renderer_info` 숨김이 tier **b** 로 판정됐다 (Q2 에서 기각한 (b) 와 같은 결과).
+- **결정 (사용자)**: 브라우저가 가린 일반 이름 (`WebKit WebGL` 등) 은 판독 불가로 본다 → tier c. Q2 (c) 의 취지 (모르면 c) 를 Chrome 에서도 지킨다. 구현은 `tier-renderer-signal.ts` 의 `MASKED_RENDERER_NAMES` (정규화 비교 — 소문자 · 공백 1칸) 이고, `gl.RENDERER` 폴백에만 적용한다 (확장으로 읽은 UNMASKED 값에는 적용 안 함 — 하드웨어 WebGL2 판정 불변).
+- **의도된 결과 [실측, 실 Chrome 157 headed]**: 하드웨어 WebGL2 (확장 정상) → tier b · swiftshader + 확장 숨김 → tier c · **하드웨어 + 확장 숨김 → tier c**. 마지막 경우는 Q2 (c) 가 살리려던 「프라이버시 설정을 쓴 하드웨어 사용자」 가 Chrome 에서는 다시 tier c 가 된다는 뜻이고, 사용자가 이 결과를 수용했다. `gl.RENDERER` 에 실제 렌더러 이름을 주는 브라우저에서는 폴백이 여전히 tier b 를 준다 (단위 테스트).
 
 ---
 

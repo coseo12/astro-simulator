@@ -49,6 +49,13 @@ import {
   resolveRendererString,
 } from '@/core/resolve-renderer-string';
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
+// #1435 — tier 판정용 렌더러 신호 (3상태 + gl.RENDERER 폴백). #745 게이트 입력과 분리.
+import {
+  EMPTY_WEBGL_RENDERER_READOUT,
+  readWebglRendererStrings,
+  resolveTierRendererIsSoftware,
+  type WebglRendererReadout,
+} from '@/core/tier-renderer-signal';
 import { SimCommandProvider } from '@/core/sim-context';
 import { BodyLabels, type LabelDragThresholdPx } from './layout/body-labels';
 import { useSimStore, type FocusViewRequest } from '@/store/sim-store';
@@ -62,28 +69,29 @@ import { render as renderApi } from '@astro-simulator/core';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 /**
- * #745 — WebGL `UNMASKED_RENDERER_WEBGL` 문자열을 **임시 canvas** 로 동기 추출.
+ * #745 — WebGL renderer 문자열을 **임시 canvas** 로 동기 추출.
  *
- * 소프트웨어 렌더 (swiftshader/llvmpipe/swrast) 감지의 주(primary) 신뢰 소스. CI swiftshader 는
- * WebGL2 경로 (WebGPU 미지원) 이고 RENDERER 에 `SwiftShader` 문자열이 확실히 포함된다 (실측 확정).
- * 임시 canvas 는 Babylon engine lifecycle 결합도 0 — 실측상 임시 canvas 와 실 engine context 가
- * 동일 SwiftShader 를 반환한다 (ADR §Amendment 2 agy Q3 수용). 추출 실패 시 null (보수적 — 별 표시).
+ * `unmasked` (`UNMASKED_RENDERER_WEBGL`) 는 소프트웨어 렌더 (swiftshader/llvmpipe/swrast) 감지의
+ * 주(primary) 신뢰 소스. CI swiftshader 는 WebGL2 경로 (WebGPU 미지원) 이고 RENDERER 에
+ * `SwiftShader` 문자열이 확실히 포함된다 (실측 확정). 임시 canvas 는 Babylon engine lifecycle
+ * 결합도 0 — 실측상 임시 canvas 와 실 engine context 가 동일 SwiftShader 를 반환한다
+ * (ADR §Amendment 2 agy Q3 수용). 추출 실패 시 `unmasked: null` (보수적 — 별 표시).
+ *
+ * #1435 — 같은 임시 컨텍스트에서 `gl.RENDERER` (`basic`) 도 읽는다 (확장이 비었을 때만). tier 판정
+ * 전용 폴백이다 (ADR 20261118-1435 §5 Q2 (c)). 호출마다 컨텍스트를 하나 만들므로 마운트 effect 안의
+ * memo (`getWebglRendererReadout`) 로 **1회만** 부른다 — tier 체인과 scene 체인이 공유한다.
  */
-function extractWebglRendererString(): string | null {
-  if (typeof document === 'undefined') return null;
+function probeWebglRenderer(): WebglRendererReadout {
+  if (typeof document === 'undefined') return EMPTY_WEBGL_RENDERER_READOUT;
   try {
     const canvas = document.createElement('canvas');
     const gl =
       (canvas.getContext('webgl2') as WebGL2RenderingContext | null) ??
       (canvas.getContext('webgl') as WebGLRenderingContext | null);
-    if (!gl) return null;
-    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!debugInfo) return null;
-    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-    return typeof renderer === 'string' ? renderer : null;
+    return readWebglRendererStrings(gl);
   } catch {
-    // context 생성/확장 실패 — 보수적으로 null (별 표시 유지).
-    return null;
+    // context 생성/확장 실패 — 보수적으로 둘 다 null (별 표시 유지 · tier 는 판독 불가 → c).
+    return EMPTY_WEBGL_RENDERER_READOUT;
   }
 }
 
@@ -358,14 +366,28 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     // 1순위(WebGL UNMASKED)도 2순위(adapterInfo)도 비어 있었다. late-arrival 판정에 쓴다.
     let sceneRendererString: string | null | undefined;
 
+    // #1435 — 임시 WebGL 컨텍스트 판독의 마운트 단위 memo. tier 체인 (`gpuCapPromise.then`) 과
+    // scene 체인 중 어느 쪽이 먼저 도는지는 비결정적이라, 먼저 부른 쪽이 만들고 다른 쪽은 재사용한다
+    // — #1435 이전 (scene 체인만 1회) 대비 컨텍스트 증가 0.
+    let webglRendererReadout: WebglRendererReadout | undefined;
+    const getWebglRendererReadout = (): WebglRendererReadout =>
+      (webglRendererReadout ??= probeWebglRenderer());
+
     // #738 — GPU tier 판정 SSoT (URL ?gpu= override > detectGpuTier 자동 감지). LOD 강제/알림용.
     // (#745 부터 별 배경 비활성은 tier 가 아닌 소프트웨어 렌더 감지 기준 — resolveGpuTier 와 무관.)
+    // #1435 — WebGPU 미지원이면 렌더러 3상태를 넘긴다 (하드웨어 → b · 소프트웨어/판독 불가 → c).
+    // WebGPU 지원 경로는 detectGpuTier 가 이 값을 읽지 않으므로 판독하지 않는다 — 임시 컨텍스트
+    // 생성 시점이 #1435 이전과 같게 남는다 (WebGPU 픽셀 불변, ADR §5 구현 DoD 3).
     const resolveGpuTier = (cap: Awaited<typeof gpuCapPromise>): GpuTier => {
       const gpuUrlParam = new URLSearchParams(window.location.search).get('gpu');
       const parsedGpu = parseGpuTier(gpuUrlParam);
       if (parsedGpu !== 'auto') return parsedGpu;
+      const rendererIsSoftware = cap.webgpu
+        ? null
+        : resolveTierRendererIsSoftware(getWebglRendererReadout());
       return detectGpuTier({
         webgpu: { supported: cap.webgpu, adapterInfo: cap.adapterInfo ?? null },
+        rendererIsSoftware,
         hardwareConcurrency: navigator.hardwareConcurrency ?? 0,
         navigator: { userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints },
       });
@@ -418,11 +440,14 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       //
       // P7-D/P7-E 의 모바일 best-effort 분기를 tier 프로파일 감지로 승격. 기존 키
       // `mobile-webgpu-best-effort` 는 `tier-c-graceful-degradation` 으로 치환되며
-      // 저성능 데스크톱(WebGL2-only)도 tier-c 경로에 포함된다 (ADR §위험 2 + 알림 키 SSoT §1).
+      // WebGPU 미지원 데스크톱 중 **소프트웨어 렌더 또는 렌더러 판독 불가**도 tier-c 경로에
+      // 포함된다 (ADR §위험 2 + 알림 키 SSoT §1). 하드웨어 렌더로 판독된 WebGPU 미지원 데스크톱은
+      // #1435 부터 tier-b 다 — LOD 거리 판정 · 태양 효과가 WebGPU 와 같고 알림도 뜨지 않는다
+      // (ADR 20261118-1435 §5 Q1 A · Q4).
       //
-      // 감지 순서 (ADR §결정 §1 축 1):
+      // 감지 순서 (ADR §결정 §1 축 1 — 분기 2 는 ADR 20261118-1435 가 부분 개정):
       //   1. URL `?gpu=a|b|c` 가 있으면 tier 강제 (invalid 는 'auto' 폴백 + console.warn)
-      //   2. 그 외 → `detectGpuTier(input)` 자동 감지
+      //   2. 그 외 → `detectGpuTier(input)` 자동 감지 (WebGPU 미지원이면 렌더러 3상태 포함)
       //   3. tier-c 시 LOD 'low' 강제 + 알림 키 'tier-c-graceful-degradation' 표시
       //
       // SSR 디폴트는 `GPU_TIER_SSR_DEFAULT='b'` 중립. hydration 후 실측으로 덮어쓴다.
@@ -438,10 +463,11 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
           writable: false,
         });
 
-        // tier-c → 자동 최대 억제 조합 (ADR §축 5 후보 A — DoD #5).
+        // tier-c → 자동 억제 (ADR §축 5 후보 A — DoD #5).
         //   - LOD 'low' 강제 (단, URL `?lod=` 가 있으면 URL 우선)
         //   - 알림 키 'tier-c-graceful-degradation' 표시
-        //   - 파티클/shadow/post-proc OFF 는 tier profile 소비자가 scene 구성 시 반영
+        //   - 프로파일의 파티클/shadow/post-proc 축은 소비처가 0 이다 (#845 정정 — 실제 억제는
+        //     LOD 하나, ADR 20261118-1435 §1 판독 2)
         if (detectedTier === 'c') {
           const profile = renderApi.TIER_PROFILES.c;
           const lodParam = new URLSearchParams(window.location.search).get('lod');
@@ -518,7 +544,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
     //
     // 실제 의존은 그 선언보다 훨씬 약하다 [직접 재확인 — 아래 `rendererString` 산출부]:
     // scene 체인이 `gpuCap` 에서 읽는 것은 **`adapterInfo?.description` 한 필드**이고, 그것도
-    // **2순위 폴백**이다 (1순위는 동기 `extractWebglRendererString()`). 그래서 계약을 이렇게
+    // **2순위 폴백**이다 (1순위는 동기 `probeWebglRenderer()` 의 `unmasked`). 그래서 계약을 이렇게
     // 바꾼다 — **scene 체인은 gpuCap 의 settle 을 기다리지 않는다. 그 시점까지 도착한 값을
     // `gpuCapSnapshot` 으로 읽고, 안 왔으면 1순위만으로 판정한다.**
     //
@@ -778,12 +804,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
         // (= 별 표시 유지) 이다. 합성식이 순수 함수인 이유는 **이 분기가 CI 에서 도달하지
         // 않기 때문**이다 (swiftshader 는 1순위가 항상 값을 준다) — `resolve-renderer-string.ts`
         // §왜 순수 함수로 빼는가. `sceneRendererString` 은 late-arrival 판정용 기록.
-        const rendererString = resolveRendererString(extractWebglRendererString(), gpuCapSnapshot);
+        // #1435 — 1순위는 memo 의 `unmasked` (종전 `extractWebglRendererString()` 반환값과 같다).
+        // `basic` (gl.RENDERER) 은 tier 판정 전용이라 여기서는 쓰지 않는다 — #745 게이트 입력 불변.
+        const rendererString = resolveRendererString(
+          getWebglRendererReadout().unmasked,
+          gpuCapSnapshot,
+        );
         sceneRendererString = rendererString;
         const isSoftwareRenderer = detectSoftwareRenderer(rendererString);
-        // #1234 C2-H3 — `extractWebglRendererString()` 은 UNMASKED_RENDERER 를 읽으려고 **별도
+        // #1234 C2-H3 — `probeWebglRenderer()` 는 UNMASKED_RENDERER 를 읽으려고 **별도
         // WebGL 컨텍스트를 하나 더 만든다**. 엔진 컨텍스트 생성과 같은 자원을 쓰므로 이 구간을
         // 엔진 구간과 따로 재지 않으면 둘이 한 덩어리로 뭉친다.
+        // #1435 — 판독은 memo 라 tier 체인 (WebGPU 미지원 시) 이 먼저 만들었으면 이 구간은 재사용만
+        // 잰다. 그 경우 컨텍스트 생성 비용은 `web:gpu-capability` 뒤 tier 체인 쪽에 실린다.
         markPhase('web:renderer-detect');
         const starfieldVisible = resolveStarfieldVisible(starsParamVisible, !isSoftwareRenderer);
         // #756 — 절차적 행성 표면 셰이더 기본 ON + `?surface=off` 옵트아웃 (ADR 20260628-756 §결정 4).
