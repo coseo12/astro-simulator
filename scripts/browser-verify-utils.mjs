@@ -251,6 +251,28 @@ export function resolveBaseUrl(fallback = DEFAULT_BASE_URL, env = process.env) {
   return value.replace(/\/+$/, '');
 }
 
+/** `BROWSER_VERIFY_WINDOW` 형식 — 화면 좌표 `x,y` (정수, 보조 모니터 배치에 따라 음수 가능). */
+const WINDOW_POSITION_PATTERN = /^\s*(-?\d+)\s*,\s*(-?\d+)\s*$/;
+
+/**
+ * `BROWSER_VERIFY_WINDOW="x,y"` → `['--window-position=x,y']`. 미지정·빈 값이면 `[]`.
+ *
+ * 형식이 틀리면 throw 한다 — 조용히 무시하면 창이 엉뚱한 모니터에 떠도 원인을 알 수 없다.
+ *
+ * @param {string | undefined} raw
+ * @returns {string[]}
+ */
+export function parseWindowPositionArgs(raw) {
+  if (raw === undefined || raw.trim() === '') return [];
+  const match = WINDOW_POSITION_PATTERN.exec(raw);
+  if (match === null) {
+    throw new Error(
+      `[browser-verify-utils] BROWSER_VERIFY_WINDOW 형식 오류 '${raw}' — 'x,y' 정수 (예: 40,40)`,
+    );
+  }
+  return [`--window-position=${match[1]},${match[2]}`];
+}
+
 /**
  * `chromium.launch` 옵션을 조립 (순수 함수 — 브라우저 기동 없이 단위 테스트 가능).
  *
@@ -276,6 +298,9 @@ export function buildLaunchOptions(options = {}) {
   }
 
   const args = [...GPU_LAUNCH_ARGS[gpu], ...(options.args ?? [])];
+  // headed 창을 어느 모니터에 띄울지는 기계마다 다르므로 코드가 아니라 환경변수로 받는다.
+  // headless 에는 창이 없어 무의미하고, CI 는 headless 라 영향이 없다.
+  if (headful) args.push(...parseWindowPositionArgs(env.BROWSER_VERIFY_WINDOW));
   /** @type {{ headless: boolean, args?: string[], channel?: string }} */
   const launchOptions = { headless: !headful };
   if (args.length > 0) launchOptions.args = args;

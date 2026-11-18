@@ -30,6 +30,7 @@ import {
   hideDomOverlays,
   openBodyMenu,
   buildLaunchOptions,
+  parseWindowPositionArgs,
   collectConsoleErrors,
   pressTimePlay,
   resolveBaseUrl,
@@ -900,6 +901,34 @@ await run('setTimePlayback — 알 수 없는 mode 는 throw (상속 키 포함)
       `mode=${bad}`,
     );
   }
+});
+
+// --- BROWSER_VERIFY_WINDOW (headed 창 위치) ----------------------------------
+await run('parseWindowPositionArgs — 미지정·빈 값은 인자 없음', () => {
+  assert.deepEqual(parseWindowPositionArgs(undefined), []);
+  assert.deepEqual(parseWindowPositionArgs(''), []);
+  assert.deepEqual(parseWindowPositionArgs('  '), []);
+});
+
+await run('parseWindowPositionArgs — x,y 정수(음수 포함) → --window-position', () => {
+  assert.deepEqual(parseWindowPositionArgs('40,40'), ['--window-position=40,40']);
+  assert.deepEqual(parseWindowPositionArgs(' -1800 , 40 '), ['--window-position=-1800,40']);
+});
+
+await run('parseWindowPositionArgs — 형식 오류는 throw (조용한 무시 차단)', () => {
+  for (const bad of ['40', '40,', 'a,b', '40,40,1', '40.5,10']) {
+    assert.throws(() => parseWindowPositionArgs(bad), /BROWSER_VERIFY_WINDOW 형식 오류/);
+  }
+});
+
+await run('buildLaunchOptions — BROWSER_VERIFY_WINDOW 는 headed 에서만 적용', () => {
+  assert.deepEqual(buildLaunchOptions({ env: { BROWSER_VERIFY_WINDOW: '40,40' } }), {
+    headless: true,
+  });
+  assert.deepEqual(
+    buildLaunchOptions({ env: { HEADED: '1', BROWSER_VERIFY_WINDOW: '40,40' }, gpu: 'metal' }),
+    { headless: false, args: ['--use-angle=metal', '--window-position=40,40'], channel: 'chrome' },
+  );
 });
 
 console.log(`\n  ${passed} passed${process.exitCode ? ' — FAIL 있음' : ''}\n`);
