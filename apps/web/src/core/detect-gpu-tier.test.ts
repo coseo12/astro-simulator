@@ -20,7 +20,10 @@ import {
  *  - intel-integrated (Iris Xe) → integrated → tier-b
  *  - qualcomm (Snapdragon 8 Gen 3) → integrated (모바일 WebGPU → tier-b)
  *  - iPhone 15 + Safari 17.4 flag OFF → WebGPU 미지원 → tier-c
- *  - 구형 WebGL2 데스크톱 → WebGPU 미지원 → tier-c
+ *  - 하드웨어 WebGL2 데스크톱 → WebGPU 미지원 + 하드웨어 렌더 → tier-b (#1435 — 종전 tier-c)
+ *
+ * `rendererIsSoftware` 는 분기 2 (WebGPU 미지원 데스크톱) 에서만 읽힌다. WebGPU 지원 fixture 는
+ * `null` 로 두고, 그 값이 판정에 쓰이지 않음은 아래 #1435 describe 가 따로 단언한다.
  */
 
 const DESKTOP_NAV = {
@@ -68,6 +71,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'NVIDIA GeForce RTX 3070',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 16,
       navigator: DESKTOP_NAV,
     };
@@ -84,6 +88,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'AMD Radeon RX 6800',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 12,
       navigator: DESKTOP_NAV,
     };
@@ -100,6 +105,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Apple M2 Pro',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 10,
       navigator: MAC_NAV,
     };
@@ -116,6 +122,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Apple M3 Max',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 14,
       navigator: MAC_NAV,
     };
@@ -132,6 +139,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Intel Arc A770',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 16,
       navigator: DESKTOP_NAV,
     };
@@ -148,6 +156,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Apple M1',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 8,
       navigator: IPAD_NAV,
     };
@@ -164,6 +173,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Intel Iris Xe Graphics',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 4,
       navigator: DESKTOP_NAV,
     };
@@ -183,6 +193,7 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
           description: 'Qualcomm Adreno 750',
         },
       },
+      rendererIsSoftware: null,
       hardwareConcurrency: 8,
       navigator: ANDROID_NAV,
     };
@@ -192,19 +203,70 @@ describe('detectGpuTier — 10 mock fixture (ADR §결정 §2)', () => {
   it('[9] iPhone 15 + Safari 17.4 WebGPU flag OFF → tier-c (hard reject)', () => {
     const input: GpuDetectionInput = {
       webgpu: { supported: false, adapterInfo: null },
+      rendererIsSoftware: null,
       hardwareConcurrency: 6,
       navigator: IPHONE_NAV,
     };
     expect(detectGpuTier(input)).toBe('c');
   });
 
-  it('[10] 구형 WebGL2-only 데스크톱 (WebGPU 미지원) → tier-c (WebGL2 fallback)', () => {
+  it('[10] 하드웨어 WebGL2 데스크톱 (WebGPU 미지원 + 하드웨어 렌더) → tier-b (#1435)', () => {
     const input: GpuDetectionInput = {
       webgpu: { supported: false, adapterInfo: null },
+      rendererIsSoftware: false,
+      hardwareConcurrency: 4,
+      navigator: DESKTOP_NAV,
+    };
+    expect(detectGpuTier(input)).toBe('b');
+  });
+});
+
+describe('#1435 — WebGPU 미지원 데스크톱의 렌더러 분기 (ADR 20261118-1435 §5)', () => {
+  it('소프트웨어 WebGL2 데스크톱 → tier-c (저성능 보호 유지)', () => {
+    const input: GpuDetectionInput = {
+      webgpu: { supported: false, adapterInfo: null },
+      rendererIsSoftware: true,
       hardwareConcurrency: 4,
       navigator: DESKTOP_NAV,
     };
     expect(detectGpuTier(input)).toBe('c');
+  });
+
+  it('판독 불가 (null) WebGL2 데스크톱 → tier-c (보수 — Q2)', () => {
+    const input: GpuDetectionInput = {
+      webgpu: { supported: false, adapterInfo: null },
+      rendererIsSoftware: null,
+      hardwareConcurrency: 16,
+      navigator: DESKTOP_NAV,
+    };
+    expect(detectGpuTier(input)).toBe('c');
+  });
+
+  it('모바일 비-WebGPU + 하드웨어 렌더러 → tier-c (분기 1 이 분기 2 보다 먼저)', () => {
+    for (const navigator of [IPHONE_NAV, ANDROID_NAV, IPAD_NAV]) {
+      const input: GpuDetectionInput = {
+        webgpu: { supported: false, adapterInfo: null },
+        rendererIsSoftware: false,
+        hardwareConcurrency: 8,
+        navigator,
+      };
+      expect(detectGpuTier(input)).toBe('c');
+    }
+  });
+
+  it('WebGPU 지원 경로는 rendererIsSoftware 를 보지 않는다 (WebGPU 판정 불변)', () => {
+    for (const rendererIsSoftware of [true, false, null]) {
+      const input: GpuDetectionInput = {
+        webgpu: {
+          supported: true,
+          adapterInfo: { vendor: 'intel', architecture: 'gen-12lp', description: 'Iris Xe' },
+        },
+        rendererIsSoftware,
+        hardwareConcurrency: 4,
+        navigator: DESKTOP_NAV,
+      };
+      expect(detectGpuTier(input)).toBe('b');
+    }
   });
 });
 

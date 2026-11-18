@@ -6,8 +6,14 @@
  *  tier-c 정의가 "WebGPU 미지원 데스크톱 전부" (소프트웨어 swiftshader + WebGL2 **하드웨어**
  *  가속 무구분) 라 WebGPU 미지원 + 하드웨어 가속 PC 에서도 별이 사라지는 **과잉 비활성 회귀**
  *  (v0.35.0 production). 비활성 진짜 기준은 **소프트웨어 렌더 (fill-rate 한계)** 이므로 tier 와
- *  분리된 독립 helper (SRP) 로 software 만 감지한다. `detect-gpu-tier.ts` 는 무수정 — tier 는
- *  LOD 억제 등 기존 graceful degradation 에 계속 쓰인다.
+ *  분리된 독립 helper (SRP) 로 software 만 감지한다. 도입 당시 (#745) `detect-gpu-tier.ts` 는
+ *  무수정이었다 — tier 는 LOD 억제 등 기존 graceful degradation 에 계속 쓰인다.
+ *
+ *  #1435 (ADR `20261118-1435-webgl2-hardware-tier.md`) 이후 tier 판정도 같은 과잉을 정정했다 —
+ *  WebGPU 미지원 데스크톱은 렌더러가 하드웨어로 판독되면 tier b 다. 그 판정은 본 함수를 **직접**
+ *  쓰지 않고 `tier-renderer-signal.ts` 의 3상태 `classifyRendererSoftware` 를 거친다. 본 함수는
+ *  판독 불가에 `false` (= 하드웨어) 를 돌려주는데, 이 보수 방향 (별을 켠다) 이 tier 판정의 보수
+ *  방향 (tier c) 과 반대이기 때문이다. 본 함수의 계약과 #745 게이트 입력은 바뀌지 않았다.
  *
  * 설계 결정 (실측 근거 — Playwright chromium.launch 플래그 차이):
  *  - CI swiftshader 는 WebGL2 경로 (WebGPU 미지원) 이고 `UNMASKED_RENDERER_WEBGL` 에 `SwiftShader`

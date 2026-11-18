@@ -5,13 +5,14 @@
  *
  * GPU tier 감지 계약 (ADR 20260424-tier-preset-design §결정):
  *   1. tier 값 domain: 'a' | 'b' | 'c' 만 허용. 추가 시 ADR Amendment 선박제
- *   2. 감지 순서: hard reject (모바일+!WebGPU → c) → WebGPU 미지원 (→ c) → adapter 분류
- *      (discrete+8코어 → a, 그 외 → b)
+ *   2. 감지 순서: hard reject (모바일+!WebGPU → c) → WebGPU 미지원 + 소프트웨어 렌더 또는 렌더러 판독 불가 (→ c)
+ *      → WebGPU 미지원 + 하드웨어 렌더 (→ b, #1435) → adapter 분류 (discrete+8코어 → a, 그 외 → b)
  *   3. 미지 vendor 는 integrated 취급 (보수적) + console.warn (drift 탐지)
  *   4. SSR 디폴트 'b' — hydration 후 실측 덮어씀. suppressHydrationWarning 사용 금지
  *   5. URL ?gpu= 는 자동 감지를 덮어씀. invalid 값은 'auto' fallback + console.warn (DoD #3)
- *   6. tier-c 자동 억제: LOD low 강제 + 파티클 0 + shadow OFF + post-proc OFF + bloom OFF
- *      (축 5 후보 A — DoD #5)
+ *   6. tier-c 자동 억제: LOD low 강제 (`TIER_PROFILES.c.lod.forceOverride`). 프로파일의 파티클 ·
+ *      shadow · post-proc · bloom 축은 선언만 있고 소비처가 0 이다 (#845 정정 — `tier-profile.ts`
+ *      헤더). 실제로 억제되는 것은 LOD 하나다 (ADR 20261118-1435 §1 판독 2)
  *   7. 알림 키는 반드시 'tier-c-graceful-degradation' 사용. 구 키 'mobile-webgpu-best-effort' 금지
  * 위 계약 위배 변경은 즉시 버그로 간주 (CLAUDE.md "주석 계약 vs 구현 drift" 교훈, volt #49).
  */
@@ -36,6 +37,13 @@ export interface GpuDetectionInput {
     supported: boolean;
     adapterInfo: { vendor: string; architecture: string; description: string } | null;
   };
+  /**
+   * #1435 — WebGL 렌더러가 소프트웨어인가 (3상태). `true` = 소프트웨어 · `false` = 하드웨어 ·
+   * `null` = 판독 불가. `tier-renderer-signal.ts` 의 `classifyRendererSoftware` 로 만든다.
+   * 분기 2 (WebGPU 미지원 데스크톱) 에서만 읽는다 — WebGPU 지원 경로는 이 값을 보지 않는다.
+   * ⚠️ `detectSoftwareRenderer()` 를 그대로 넣지 말 것 — 판독 불가를 `false` (하드웨어) 로 접는다.
+   */
+  rendererIsSoftware: boolean | null;
   /** `navigator.hardwareConcurrency` — 논리 코어 수. 감지 실패 시 0. */
   hardwareConcurrency: number;
   /** `navigator.userAgent` / `maxTouchPoints` — mobile 감지용 (is-mobile.ts 재사용). */
@@ -135,7 +143,9 @@ export function classifyAdapterIsDiscrete(
  *
  * 분기 순서:
  *  1. Hard reject: isMobile && !WebGPU → tier-c (iOS Safari <17.4 다수)
- *  2. WebGPU 미지원 (데스크톱 포함) → tier-c (WebGL2 fallback)
+ *  2. WebGPU 미지원 데스크톱 (WebGL2 fallback) — 렌더러로 갈린다 (#1435, ADR 20261118-1435):
+ *     - 하드웨어 렌더 (`rendererIsSoftware === false`) → tier-b
+ *     - 소프트웨어 렌더 (`true`) 또는 판독 불가 (`null`) → tier-c
  *  3. WebGPU 지원 + discrete + 8코어+ → tier-a
  *  4. 그 외 (WebGPU 지원) → tier-b
  *
@@ -149,9 +159,10 @@ export function detectGpuTier(input: GpuDetectionInput): GpuTier {
     return 'c';
   }
 
-  // 분기 2: WebGPU 미지원 데스크톱
+  // 분기 2: WebGPU 미지원 데스크톱 — 하드웨어 렌더로 **판독된** 경우만 tier-b (#1435).
+  // 판독 불가 (`null`) 는 소프트웨어와 같이 tier-c 로 둔다 (보수 — ADR §5 Q2).
   if (!input.webgpu.supported) {
-    return 'c';
+    return input.rendererIsSoftware === false ? 'b' : 'c';
   }
 
   // 분기 3: WebGPU 지원 — adapter 기반 discrete vs integrated 판정

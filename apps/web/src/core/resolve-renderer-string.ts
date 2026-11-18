@@ -28,7 +28,8 @@ export interface RendererCapabilitySnapshot {
  * `adapterInfo.description` (빈 `{}` 인 브라우저가 있어 신뢰가 낮다). C3-B 가 바꾼 것은
  * 우선순위가 아니라 **2순위의 가용성**이다: 대기하지 않으므로 `null` (미도착) 일 수 있다.
  *
- * @param primary `extractWebglRendererString()` 결과 (1순위).
+ * @param primary `probeWebglRenderer()` 의 `unmasked` (1순위 — `sim-canvas.tsx`, #1435 전 이름은
+ *   `extractWebglRendererString()`).
  * @param snapshot 그 시점까지 도착한 GPU capability. **미도착이면 `null`** — 대기하지 않는다.
  * @returns renderer 문자열, 또는 어느 소스도 값을 주지 못하면 `null`.
  *   `null` 의 결말은 `detectSoftwareRenderer(null) === false` = **별 표시 유지**이고, 이는

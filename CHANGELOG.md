@@ -5,6 +5,23 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+### Changed
+
+- **[#1435] WebGPU 가 없는 하드웨어 GPU 데스크톱을 GPU tier b 로 판정한다** ([#1435](https://github.com/coseo12/astro-simulator/issues/1435)). ADR [`20261118-1435`](docs/decisions/20261118-1435-webgl2-hardware-tier.md) §5 결정 (사용자 결정 Q1 A · Q2 (c) · Q4 (a)). ADR [`20260424-tier-preset-design`](docs/decisions/20260424-tier-preset-design.md) §축 1 분기 2 를 부분 개정한다.
+  - 종전에는 `navigator.gpu` 가 없으면 데스크톱도 무조건 tier c 였다. tier c 는 LOD 를 전부 `low` 로 강제한다. low 변형 (billboard) 은 과장 배율 (`bodyScale`) 을 곱하지 않으므로, 하드웨어 WebGL2 에서는 기본 화면부터 태양이 점으로 보였다. 지구 · 목성도 근접 시 점이었다.
+  - `detectGpuTier` 입력에 `rendererIsSoftware: boolean | null` (3상태) 를 추가했다. 분기 2 는 `rendererIsSoftware === false` (하드웨어로 판독됨) 일 때만 `'b'` 이고, 소프트웨어 렌더 · 판독 불가는 `'c'` 그대로다. 모바일 비-WebGPU (분기 1) 는 바뀌지 않는다.
+  - 신규 `tier-renderer-signal.ts` — 임시 WebGL 컨텍스트에서 `UNMASKED_RENDERER_WEBGL` 을 읽고, 확장이 없거나 값이 비면 `gl.RENDERER` 를 한 번 더 읽는다 (Q2 (c)). 3상태 변환은 `detectSoftwareRenderer()` 를 그대로 쓰지 않는다 — 그 함수는 판독 불가에 `false` (= 하드웨어) 를 돌려준다. #745 소프트웨어 렌더 게이트 (별 배경 · 띠 · 코로나 등) 의 입력은 바뀌지 않는다.
+  - 임시 컨텍스트 판독은 마운트당 1회 memo 로 tier 체인과 장면 체인이 공유한다. WebGPU 지원 경로는 tier 판정에서 판독하지 않는다.
+  - `verify:675-glow-marker` 축 6 (tier-c LOD race) 에 소프트웨어 렌더 전제를 추가했다. 하드웨어 렌더러에서는 tier b 라 이 축을 재현할 수 없으므로, 단언 대신 전제 위반 (`blocked` → exit 2 기여) 으로 끊는다. `BROWSER_VERIFY_GPU` 가 있을 때만 렌더러 인자를 붙인다 (미설정이면 launch 인자 불변 — CI 경로).
+  - 남은 위험 (ADR §6): WebGPU 없는 약한 하드웨어 GPU 의 fps 는 측정하지 않았다 (런타임 하향은 #1437 로 분리). 브라우저가 일반화된 렌더러 이름 (예: `WebKit WebGL`) 만 돌려주는 소프트웨어 렌더는 하드웨어로 판정된다.
+
+### Behavior Changes
+
+- **WebGPU 가 없는 하드웨어 GPU 데스크톱에서 태양 · 행성이 WebGPU 와 같은 모습으로 보인다** (#1435). LOD 가 거리로 정해지고 (태양 근접 시 `high`), 태양 코로나 · 홍염 메시가 보인다 (실측 `isVisible`). 절차 표면 · 흑점처럼 high/mid 메시에 묶인 효과도 함께 그려진다. 「저성능 환경 감지」 알림 (`tier-c-graceful-degradation`) 은 더 뜨지 않는다. `?gpu=c` 로 종전 동작을 수동으로 고를 수 있다. 로컬 실측 (macOS · Apple M1 Pro · Chrome 157 headed · 1280×720 · DPR 1 · `--use-angle=metal` + `navigator.gpu` 제거, develop `42569478` 대조):
+  - 태양 근접 (`?t=2456748.626305&speed=0&focus=sun`, 반경 2.6 배) — tier `c` → `b`, 원판 픽셀 352 → 111,883 (예상 원 112,328 의 99.6 %, WebGPU 와 같은 값). 지구 975 → 37,228 · 목성 885 → 45,621 (둘 다 WebGPU 와 같은 값).
+  - 기본 화면 fps (vsync, 60 Hz 디스플레이) — develop · 본 변경 모두 60 / 60.
+- 소프트웨어 렌더 (swiftshader) · 모바일 비-WebGPU · `?gpu=c` 는 바뀌지 않는다 — swiftshader 기본 화면 develop 대비 0 px (tier c · override `low`), `verify:mobile-p7d --scenarios=3,4` 10/10, `verify:756-surface` DoD 4 PASS. WebGPU 경로는 기본 · 태양 · 지구 · 목성 4 화면 모두 develop 대비 0 px 이다.
+
 ## [0.109.0] - 2026-11-08
 
 ### Added

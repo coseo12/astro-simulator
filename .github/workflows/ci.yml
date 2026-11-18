@@ -706,9 +706,10 @@ jobs:
       #   (1) `?bh=2` JD 진행 + 콘솔 에러 0                            ← 로컬 전용
       #   (2) `?bh=2&integrator=yoshida4` 조합 5초 재생 무에러         ← 로컬 전용
       #
-      # 배선 축(3/4)은 `navigator.gpu` 를 addInitScript 로 **명시 차단**하므로 호스트 adapter 유무와
-      #   무관하다 — detectGpuTier() 분기 1/2 양쪽이 tier-c 를 반환하고 adapter 분류(분기 3)에
-      #   도달하지 않는다 (순수 함수 증명). 그래서 ubuntu 에서도 결정적이다.
+      # 배선 축(3/4)은 모바일 UA + `navigator.gpu` 를 addInitScript 로 **명시 차단**하므로 호스트
+      #   adapter · 렌더러와 무관하다 — detectGpuTier() 분기 1(모바일+WebGPU 미지원)이 tier-c 를
+      #   반환하고 분기 2(#1435 — 데스크톱 렌더러 판정)·3(adapter 분류)에 도달하지 않는다
+      #   (순수 함수 증명). 그래서 ubuntu 에서도 결정적이다.
       # 로컬 전용 축(1/2)은 launch 인자 `--enable-unsafe-webgpu` 때문에 `navigator.gpu` 는 존재하나
       #   ubuntu 러너는 `requestAdapter()` 가 null → Babylon WebGPUEngine 생성 fatal → 시나리오 1 의
       #   `콘솔 에러 0건`/`pageerror 0건` 위반 + 시나리오 2 탭 크래시 (run 30751043285 실측).
