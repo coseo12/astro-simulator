@@ -17,9 +17,13 @@
  * ## Q2 (c) — 확장이 없으면 `gl.RENDERER` 로 한 번 더 읽는다
  *
  * `WEBGL_debug_renderer_info` 가 없는 브라우저 (프라이버시 설정 등) 는 대부분 하드웨어다. 그
- * 사용자를 tier c 로 되돌리지 않으려고 `gl.RENDERER` 를 2순위로 읽는다. 잔여 위험 (ADR §6 위험 2):
- * 브라우저가 일반화된 이름 (예: Chrome 의 `"WebKit WebGL"`) 을 돌려주면 소프트웨어 렌더도
- * 하드웨어로 판정된다 — 사용자 결정 Q2 (c) 가 수용한 위험이다.
+ * 사용자를 tier c 로 되돌리지 않으려고 `gl.RENDERER` 를 2순위로 읽는다.
+ *
+ * 단 `gl.RENDERER` 가 브라우저가 가린 **일반 이름** (`MASKED_RENDERER_NAMES`) 이면 판독 불가로
+ * 본다 (ADR §7 Amendment 3 — 사용자 Q2 재질의 결정 2026-11-18). PR #1440 qa 실측에서 Chrome 157 의
+ * `gl.RENDERER` 는 metal · SwiftShader 모두 `WebKit WebGL` 상수였다. 이 이름을 하드웨어로 읽으면
+ * 「확장 차단 + 소프트웨어 렌더」 가 tier b 로 새어 나가 Q2 (c) 의 취지 (모르면 c) 가 깨진다.
+ * 일반 이름이 아닌 실제 렌더러 이름을 주는 브라우저에서만 이 폴백이 정보를 준다.
  */
 
 import { detectSoftwareRenderer } from './detect-software-renderer';
@@ -79,12 +83,35 @@ export function readWebglRendererStrings(gl: WebglRendererSource | null): WebglR
 }
 
 /**
- * tier 판정에 쓸 renderer 문자열 — UNMASKED 우선, 비었으면 `gl.RENDERER` (Q2 (c)).
+ * 브라우저가 실제 렌더러를 가리고 돌려주는 `gl.RENDERER` 일반 이름 (정규화 — 소문자 · 공백 1칸).
  *
- * @returns 둘 다 비었으면 (`null` / 빈 문자열) `null` = 판독 불가
+ * - `webkit webgl` — [실측] Chrome 157 (macOS, `--use-angle=metal` · `--use-angle=swiftshader` 둘 다
+ *   같은 값, PR #1440 qa 2026-11-18). Safari 도 같은 문자열을 준다 [가정 — 측정 안 함].
+ *
+ * 측정하지 않은 브라우저의 문자열을 더할 때는 [가정] 으로 표기한다. 이 목록은 `gl.RENDERER`
+ * 폴백에만 쓴다 — 확장으로 읽은 UNMASKED 값에는 적용하지 않는다 (하드웨어 WebGL2 판정 불변).
+ */
+export const MASKED_RENDERER_NAMES: readonly string[] = Object.freeze(['webkit webgl']);
+
+function normalizeRendererName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** `gl.RENDERER` 값이 브라우저가 가린 일반 이름인가 (`MASKED_RENDERER_NAMES`). */
+export function isMaskedRendererName(name: string): boolean {
+  return MASKED_RENDERER_NAMES.includes(normalizeRendererName(name));
+}
+
+/**
+ * tier 판정에 쓸 renderer 문자열 — UNMASKED 우선, 비었으면 `gl.RENDERER` (Q2 (c)).
+ * `gl.RENDERER` 가 일반 이름 (`MASKED_RENDERER_NAMES`) 이면 쓰지 않는다 (Amendment 3).
+ *
+ * @returns 판독 불가 (`null` / 빈 문자열 / 일반 이름뿐) 면 `null`
  */
 export function selectTierRendererString(readout: WebglRendererReadout): string | null {
-  return readout.unmasked || readout.basic || null;
+  if (readout.unmasked) return readout.unmasked;
+  if (readout.basic && !isMaskedRendererName(readout.basic)) return readout.basic;
+  return null;
 }
 
 /**

@@ -15,6 +15,8 @@ import { detectGpuTier, type GpuDetectionInput } from './detect-gpu-tier';
 import {
   classifyRendererSoftware,
   EMPTY_WEBGL_RENDERER_READOUT,
+  isMaskedRendererName,
+  MASKED_RENDERER_NAMES,
   readWebglRendererStrings,
   resolveTierRendererIsSoftware,
   selectTierRendererString,
@@ -172,5 +174,46 @@ describe('#1435 구현 DoD 5 — 렌더러 판독 3상태 → WebGPU 미지원 �
 
   it('컨텍스트 생성 실패 → c', () => {
     expect(tierFromGl(null)).toBe('c');
+  });
+});
+
+describe('#1435 Amendment 3 — gl.RENDERER 일반 이름은 판독 불가 (Q2 재질의 2026-11-18)', () => {
+  /** PR #1440 qa 실측 — Chrome 157 의 gl.RENDERER (metal · SwiftShader 공통 상수). */
+  const CHROME_MASKED = 'WebKit WebGL';
+
+  function tierFromGl(gl: WebglRendererSource | null) {
+    return detectGpuTier(
+      webgl2Desktop(resolveTierRendererIsSoftware(readWebglRendererStrings(gl))),
+    );
+  }
+
+  it('확장 없음 + gl.RENDERER `WebKit WebGL` → c (Chrome 확장 차단 — 소프트웨어 렌더 누출 차단)', () => {
+    expect(tierFromGl(mockGl({ extension: false, renderer: CHROME_MASKED }).gl)).toBe('c');
+  });
+
+  it('대소문자 · 앞뒤/연속 공백이 달라도 일반 이름으로 본다', () => {
+    for (const renderer of ['webkit webgl', '  WEBKIT   WebGL ', 'WebKit\tWebGL']) {
+      expect(tierFromGl(mockGl({ extension: false, renderer }).gl)).toBe('c');
+    }
+  });
+
+  it('확장 없음 + gl.RENDERER 하드웨어 실 이름 → b (폴백은 실 이름에서만 정보를 준다)', () => {
+    expect(tierFromGl(mockGl({ extension: false, renderer: ANGLE_METAL }).gl)).toBe('b');
+  });
+
+  it('UNMASKED 하드웨어 → b 불변 (gl.RENDERER 가 일반 이름이어도 UNMASKED 가 우선)', () => {
+    expect(
+      tierFromGl(mockGl({ extension: true, unmasked: ANGLE_METAL, renderer: CHROME_MASKED }).gl),
+    ).toBe('b');
+  });
+
+  it('UNMASKED 값에는 일반 이름 판정을 적용하지 않는다', () => {
+    expect(selectTierRendererString({ unmasked: CHROME_MASKED, basic: null })).toBe(CHROME_MASKED);
+  });
+
+  it('isMaskedRendererName — 실 렌더러 이름 · 부분 일치는 일반 이름이 아니다', () => {
+    expect(isMaskedRendererName(ANGLE_METAL)).toBe(false);
+    expect(isMaskedRendererName('WebKit WebGL 2.0 (ANGLE)')).toBe(false);
+    expect(MASKED_RENDERER_NAMES).toContain('webkit webgl');
   });
 });
