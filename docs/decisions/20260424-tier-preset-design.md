@@ -1,6 +1,7 @@
 # ADR: P11-C Tier Preset 설계 — GPU 감지 + 프로파일 + Graceful Degradation
 
 - **상태**: Accepted
+- **부분 개정 제안**: §축 1 분기 2 (WebGPU 미지원 데스크톱 → tier-c) — [ADR 20261118-1435](20261118-1435-webgl2-hardware-tier.md) (Provisional, 사용자 결정 대기). 확정 전까지 본 ADR 의 분기 2 가 현행이다
 - **날짜**: 2026-04-24
 - **결정자**: architect (P11-C #290 재계약 박제)
 - **관련**: #290 (본 Phase), #289 P11-B (LOD 선행 완료), #310 (네이밍 정책 선행 완료), #288 P11-A (Floating Origin 선행), #298 P12 (Scale Tier + 단일 모드 전환), #219 (iOS Yoshida4 실기기 bench — close 하지 않음 유지), ADR `20260420-mobile-support-suspension.md` §3 §4 (Graceful Degradation 전제), ADR `20260424-tier-naming-policy.md` (`?gpu=` SSoT), ADR `20260424-p11-b-lod-design.md` (LOD 임계 상수 → tier 프로파일 승격 경로), ADR `../deprecated/decisions/20260423-display-relative-scale-unification.md` (Scale Tier 직교 전제), 원칙 `docs/deprecated/principles/fact-first.md`

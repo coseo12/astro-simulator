@@ -1,0 +1,88 @@
+diff --git a/apps/web/src/components/sim-canvas.tsx b/apps/web/src/components/sim-canvas.tsx
+index 3f0ce85d..19f218fe 100644
+--- a/apps/web/src/components/sim-canvas.tsx
++++ b/apps/web/src/components/sim-canvas.tsx
+@@ -364,11 +364,19 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
+       const gpuUrlParam = new URLSearchParams(window.location.search).get('gpu');
+       const parsedGpu = parseGpuTier(gpuUrlParam);
+       if (parsedGpu !== 'auto') return parsedGpu;
+-      return detectGpuTier({
++      const autoTier = detectGpuTier({
+         webgpu: { supported: cap.webgpu, adapterInfo: cap.adapterInfo ?? null },
+         hardwareConcurrency: navigator.hardwareConcurrency ?? 0,
+         navigator: { userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints },
+       });
++      // POC1435 A — 측정 전용 (커밋 금지): 하드웨어 WebGL2 데스크톱 → b
++      if (window.location.search.includes('poc1435=A') && autoTier === 'c' && !cap.webgpu) {
++        const rs = extractWebglRendererString();
++        const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
++        (window as unknown as { __poc1435Renderer?: unknown }).__poc1435Renderer = rs;
++        if (rs !== null && !detectSoftwareRenderer(rs) && !mobile) return 'b';
++      }
++      return autoTier;
+     };
+ 
+     gpuCapPromise.then((cap) => {
+@@ -446,7 +454,13 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
+           const profile = renderApi.TIER_PROFILES.c;
+           const lodParam = new URLSearchParams(window.location.search).get('lod');
+           const hasLodOverride = lodParam !== null && lodParam !== '';
+-          if (!hasLodOverride && profile.lod.forceOverride) {
++          // POC1435 B/Bp — 측정 전용 (커밋 금지)
++          const pocB = /poc1435=Bp?(&|$)/.test(window.location.search);
++          if (window.location.search.includes('poc1435=Bp')) {
++            (globalThis as { __poc1435Thresholds?: { high: number; mid: number } }).__poc1435Thresholds =
++              { high: profile.lod.high, mid: profile.lod.mid };
++          }
++          if (!pocB && !hasLodOverride && profile.lod.forceOverride) {
+             // LOD 'low' 강제 — 적용 경로 2중화 (#677 forensic fix).
+             //
+             // 본 then (capability 감지) 과 instance.start().then (handler 등록 + 플래그 읽기) 은
+diff --git a/packages/core/src/scene/body-mesh-factory.ts b/packages/core/src/scene/body-mesh-factory.ts
+index 6c88b4d1..402a3807 100644
+--- a/packages/core/src/scene/body-mesh-factory.ts
++++ b/packages/core/src/scene/body-mesh-factory.ts
+@@ -200,7 +200,9 @@ export function createBodyBillboard(
+   // ADR `docs/decisions/20260425-r1-sun-visualization.md` §"Phase 2 결정 (#333) — billboard 에서 bodyScale 제거 (후보 A 채택)" 참조.
+   // bodyScale 인자 자체는 시그니처 호환성 유지 위해 보존 (호출부 통일 + 미래 변경 가능성).
+   void bodyScale; // Phase 2 #333 — 시그니처 보존, 식에서 미사용 명시.
+-  const diameter = body.radius * 2 * renderScaleForTier(tier);
++  // POC1435 — 측정 전용 (커밋 금지)
++  const poc1435C = String((globalThis as { location?: { search?: string } }).location?.search ?? '').includes('poc1435=C');
++  const diameter = body.radius * 2 * renderScaleForTier(tier) * (poc1435C ? bodyScale(body.id) : 1);
+   const mesh = MeshBuilder.CreatePlane(
+     `${body.id}-lod-low`,
+     { size: diameter, sideOrientation: 2 /* DOUBLESIDE */ },
+diff --git a/packages/core/src/scene/solar-system-scene.ts b/packages/core/src/scene/solar-system-scene.ts
+index 932aaf1e..d77140c7 100644
+--- a/packages/core/src/scene/solar-system-scene.ts
++++ b/packages/core/src/scene/solar-system-scene.ts
+@@ -3185,6 +3185,14 @@ export function createSolarSystemScene(
+         screenCoverage: coverage,
+         isFocused,
+         override: lodOverride,
++        // POC1435 — 측정 전용 (커밋 금지)
++        ...((globalThis as { __poc1435Thresholds?: { high: number; mid: number } })
++          .__poc1435Thresholds
++          ? {
++              pixelThresholds: (globalThis as unknown as { __poc1435Thresholds: { high: number; mid: number } })
++                .__poc1435Thresholds,
++            }
++          : {}),
+       });
+ 
+       // #546 — parent-focus aware satellite LOD floor + 4 px guard (외부 가드 후처리, SRP 단방향).
+@@ -3259,7 +3267,12 @@ export function createSolarSystemScene(
+         glowMarker,
+         nextLevel,
+         pxDiameter,
+-        bodyScaleVal,
++        // POC1435 C — billboard 가 이미 bodyScale 반영이면 glow 환산은 1 (측정 전용)
++        bodyScaleVal: String(
++          (globalThis as { location?: { search?: string } }).location?.search ?? '',
++        ).includes('poc1435=C')
++          ? 1
++          : bodyScaleVal,
+         parentId: body.parentId,
+         kind: body.kind,
+         satelliteRatio: glowMarkerSatelliteRatio,

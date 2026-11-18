@@ -1,0 +1,274 @@
+// #1435 POC 측정 스크립트 — 재현용 사본 (실행 경로 아님). 원본은 스크래치에서 실행했다.
+// 사용: node measure.mjs <mode> where mode = hw | webgpu | sw
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const WT = process.env.WT; // POC worktree 경로 (develop 6252b96e + 아래 POC 패치)
+const require = createRequire(`${WT}/package.json`);
+const { chromium } = require('playwright');
+const { PNG } = require('pngjs');
+
+const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), 'out');
+fs.mkdirSync(OUT, { recursive: true });
+const BASE = 'http://localhost:3010';
+const T = 't=2456748.626305&speed=0';
+const MODE = process.argv[2] ?? 'hw';
+const VARIANTS = (process.argv[3] ?? 'base,A,B,Bp,C').split(',');
+const FPS_MS = 5000;
+const WARM_MS = 2000;
+
+const results = [];
+const log = (o) => {
+  results.push(o);
+  console.log(JSON.stringify(o));
+};
+
+const q = (v, extra) => {
+  const parts = [];
+  if (extra) parts.push(extra);
+  if (v !== 'base') parts.push(`poc1435=${v}`);
+  return parts.length ? `/?${parts.join('&')}` : '/';
+};
+
+const decode = (buf) => PNG.sync.read(buf);
+const lum = (d, i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+// 예상 구 화면 원 (getBodyScreenInfo — 과장 반경 기준) 안에서 body 색 픽셀 수
+function discCount(png, kind, scr) {
+  let n = 0;
+  let inCircle = 0;
+  const d = png.data;
+  const { x: cx, y: cy, radius: rr } = scr;
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      if (dx * dx + dy * dy > rr * rr) continue;
+      inCircle += 1;
+      const i = (y * png.width + x) * 4;
+      if (kind === 'sun' ? lum(d, i) > 0.3 : Math.max(d[i], d[i + 1], d[i + 2]) > 40) n += 1;
+    }
+  }
+  return { n, inCircle, frac: Math.round((n / Math.max(inCircle, 1)) * 1000) / 1000, r: Math.round(rr) };
+}
+function diffCount(a, b) {
+  if (a.data.length !== b.data.length) return { error: 'size' };
+  let any = 0;
+  let gt2 = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    const m = Math.max(
+      Math.abs(a.data[i] - b.data[i]),
+      Math.abs(a.data[i + 1] - b.data[i + 1]),
+      Math.abs(a.data[i + 2] - b.data[i + 2]),
+    );
+    if (m > 0) any += 1;
+    if (m > 2) gt2 += 1;
+  }
+  return { any, gt2 };
+}
+
+async function newPage(browser, webgl2) {
+  const context = await browser.newContext({ viewport: { width: Number(process.env.VW ?? 1280), height: Number(process.env.VH ?? 720) }, deviceScaleFactor: Number(process.env.DPR ?? 1) });
+  if (webgl2) {
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
+    });
+  }
+  // 온보딩 모달 자동 표시 차단 (자동화 감지 경로가 있으나 이중 방어)
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem('astro-onboarding-dismissed', '1');
+    } catch {}
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text().slice(0, 200));
+  });
+  return { context, page, errors };
+}
+
+async function load(page, url) {
+  await page.goto(BASE + url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await page.waitForFunction(
+    () => window.__solarScene && window.__gpuTier !== undefined && window.__isSoftwareRenderer !== undefined,
+    null,
+    { timeout: 120000, polling: 200 },
+  );
+  await page.waitForTimeout(3500); // focus tween + LOD 정착
+}
+
+async function state(page, bodyId) {
+  return page.evaluate((id) => {
+    const scene = window.__simCore.scene;
+    const s = window.__solarScene;
+    const stats = s.getLodStats ? s.getLodStats() : null;
+    const info = s.getLodInfo ? s.getLodInfo().find((x) => x.id === id || x.bodyId === id) : null;
+    const vis = (n) => {
+      const m = scene.getMeshByName(n);
+      return m ? { en: m.isEnabled(), vis: m.isVisible } : null;
+    };
+    const scr = s.getBodyScreenInfo ? s.getBodyScreenInfo().find((x) => x.id === id) : null;
+    return {
+      scr: scr ? { x: scr.x, y: scr.y, radius: scr.radius } : null,
+      tier: window.__gpuTier,
+      sw: window.__isSoftwareRenderer,
+      engine: window.__simCore.engine?.constructor?.name ?? scene.getEngine().constructor.name,
+      renderer: window.__poc1435Renderer ?? null,
+      thresholds: globalThis.__poc1435Thresholds ?? null,
+      lod: stats ? { o: stats.override, h: stats.high, m: stats.mid, l: stats.low } : null,
+      body: info
+        ? { level: info.level ?? info.lodLevel, px: Math.round((info.pxDiameter ?? 0) * 10) / 10 }
+        : null,
+      meshes: id
+        ? {
+            high: vis(id),
+            mid: vis(`${id}-lod-mid`),
+            low: vis(`${id}-lod-low`),
+            corona: id === 'sun' ? vis('sun-corona') : undefined,
+            prom: id === 'sun' ? vis('sun-prominences') : undefined,
+          }
+        : undefined,
+    };
+  }, bodyId);
+}
+
+async function approach(page, bodyId, factor) {
+  return page.evaluate(
+    async ({ id, f }) => {
+      const scene = window.__simCore.scene;
+      const cam = scene.activeCamera;
+      const m = scene.getMeshByName(id);
+      m.computeWorldMatrix(true);
+      const r = m.getBoundingInfo().boundingSphere.radiusWorld;
+      cam.lowerRadiusLimit = Math.min(cam.lowerRadiusLimit ?? 0, r * f * 0.5);
+      cam.radius = r * f;
+      await new Promise((res) => setTimeout(res, 1500));
+      return { rWorld: r, camRadius: cam.radius, ratio: cam.radius / r };
+    },
+    { id: bodyId, f: factor },
+  );
+}
+
+async function fps(page) {
+  await page.waitForTimeout(WARM_MS);
+  return page.evaluate(
+    (ms) =>
+      new Promise((res) => {
+        let n = 0;
+        let t0 = null;
+        const f = (t) => {
+          if (t0 === null) t0 = t;
+          else n += 1;
+          if (t - t0 < ms) requestAnimationFrame(f);
+          else res(Math.round((n / ((t - t0) / 1000)) * 10) / 10);
+        };
+        requestAnimationFrame(f);
+      }),
+    FPS_MS,
+  );
+}
+
+
+// render-capacity — rAF 우회 동기 scene.render() 루프 (verify-fps-baseline #820 방식).
+// sync=true 면 매 render 후 1px readPixels 로 GPU 완료까지 대기 (GPU-bound 비용 포함).
+async function capacity(page, sync) {
+  return page.evaluate(
+    ({ sync, windowMs }) => {
+      const scene = window.__simCore.scene;
+      const eng = scene.getEngine();
+      const gl = eng._gl;
+      const buf = new Uint8Array(4);
+      const one = () => {
+        scene.render();
+        if (sync && gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      };
+      const w0 = performance.now();
+      while (performance.now() - w0 < 200) one();
+      let n = 0;
+      const s0 = performance.now();
+      while (performance.now() - s0 < windowMs && n < 20000) {
+        one();
+        n += 1;
+      }
+      return Math.round(((n * 1000) / (performance.now() - s0)) * 10) / 10;
+    },
+    { sync, windowMs: 1500 },
+  );
+}
+
+async function shot(page, name) {
+  const buf = await page.screenshot({ type: 'png' });
+  fs.writeFileSync(path.join(OUT, `${name}.png`), buf);
+  return decode(buf);
+}
+
+const webgl2 = MODE !== 'webgpu' && MODE !== 'cap-webgpu';
+const launchArgs = MODE === 'sw' || MODE === 'cap-sw' ? ['--use-angle=swiftshader'] : ['--use-angle=metal'];
+if (MODE.startsWith('cap')) launchArgs.push('--disable-gpu-vsync', '--disable-frame-rate-limit');
+if (MODE === 'webgpu' || MODE === 'cap-webgpu') launchArgs.push('--enable-unsafe-webgpu');
+
+let browser;
+try {
+  browser = await chromium.launch({ headless: false, channel: 'chrome', args: launchArgs });
+  log({ mode: MODE, chrome: browser.version(), args: launchArgs });
+  const refs = {};
+  if (MODE.startsWith('cap')) {
+    for (const v of VARIANTS) {
+      for (const [sc, factor] of [['default-live', null], ['sun', 2.6]]) {
+        const { context, page, errors } = await newPage(browser, webgl2);
+        await load(page, sc === 'sun' ? q(v, `${T}&focus=sun`) : q(v));
+        if (factor) await approach(page, 'sun', factor);
+        const st = await state(page, 'sun');
+        const raf = [await fps(page), await fps(page), await fps(page)];
+        log({ mode: MODE, v, scen: sc, rafFps: raf, tier: st.tier, sw: st.sw, lod: st.lod, body: st.body, errors: errors.length });
+        await context.close();
+      }
+    }
+  }
+  for (const v of MODE.startsWith('cap') ? [] : VARIANTS) {
+    // (1) 기본 화면 fps (파라미터 없음 — poc 만)
+    if (MODE !== 'webgpu') {
+      const { context, page, errors } = await newPage(browser, webgl2);
+      await load(page, q(v));
+      const st = await state(page, 'sun');
+      const f1 = await fps(page);
+      const f2 = await fps(page);
+      log({ mode: MODE, v, scen: 'default-live', fps: [f1, f2], ...st, errors: errors.length });
+      await context.close();
+    }
+    // (2) 기본 화면 정지 스냅샷 + (3) 근접 시나리오
+    const scens = MODE === 'sw' ? [['default', null]] : [['default', null], ['sun', 2.6], ['earth', 2.6], ['jupiter', 2.6]];
+    for (const [sc, factor] of scens) {
+      const { context, page, errors } = await newPage(browser, webgl2);
+      const extra = sc === 'default' ? T : `${T}&focus=${sc}`;
+      await load(page, q(v, extra));
+      let ap = null;
+      if (factor) ap = await approach(page, sc, factor);
+      const st = await state(page, sc === 'default' ? 'sun' : sc);
+      const png = await shot(page, `${MODE}-${v}-${sc}`);
+      const disc = sc === 'default' || !st.scr ? null : discCount(png, sc === 'sun' ? 'sun' : 'other', st.scr);
+      const key = `${sc}`;
+      let diff = null;
+      if (v === 'base') refs[key] = png;
+      else if (refs[key]) diff = diffCount(refs[key], png);
+      let f = null;
+      if (sc === 'sun' && MODE === 'hw') f = await fps(page);
+      log({ mode: MODE, v, scen: sc, approach: ap, disc, diffVsBase: diff, fps: f, ...st, errors: errors.length, errSample: errors.slice(0, 2) });
+      // 잡음 기준 — base 재로드
+      if (v === 'base') {
+        const p2 = await newPage(browser, webgl2);
+        await load(p2.page, q(v, extra));
+        if (factor) await approach(p2.page, sc, factor);
+        const png2 = decode(await p2.page.screenshot({ type: 'png' }));
+        log({ mode: MODE, v: 'base-reload', scen: sc, diffVsBase: diffCount(png, png2) });
+        await p2.context.close();
+      }
+      await context.close();
+    }
+  }
+} finally {
+  if (browser) await browser.close();
+  fs.writeFileSync(path.join(OUT, `results-${MODE}.json`), JSON.stringify(results, null, 2));
+}
