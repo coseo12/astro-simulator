@@ -19,15 +19,27 @@
  *      가 정착하는지 검증. 회귀 시 override 'auto' 영구 잔존 → sun high + mid sphere 렌더 →
  *      CI fps-baseline-guard flaky FAIL (develop push 27412497611 desktop 28.1 FPS 선행 사례).
  *      재현 여부는 가정하지 않고 **전제로 검사**한다 (§#1239 — 미재현은 `exit 2`).
- *      #1435 — 소프트웨어 렌더 (`__isSoftwareRenderer === true`) 도 전제다. 하드웨어 렌더러는
- *      `navigator.gpu` 를 지워도 tier b 라 이 축을 재현할 수 없다 → `exit 2` (CI swiftshader 는 불변).
+ *      #1435 — 소프트웨어 렌더 (`__isSoftwareRenderer === true`) 도 전제다 (로그 라벨 「전제 R」).
+ *      이 축은 `requestAdapter` 가 null 을 돌려주는 stub 으로 WebGPU 미지원을 만드는데, 하드웨어
+ *      렌더러에서는 그래도 tier b 라 (ADR 20261118-1435 §5) 재현할 상황 자체가 없다. 그때 축 6 은
+ *      **단언 없이 전제 위반 (`blocked`) 으로 끊긴다** — #677 회귀로 오보하지 않는다. 전체 종료 코드는
+ *      다른 축 결과를 따른다 (하단 `exitCode` — 확정 FAIL 이 측정 불가보다 우선). CI (swiftshader) 는
+ *      전제가 서므로 판정 불변이다.
+ *
+ *      ⚠️ 계약 재조정 (#1435, 사용자 합의 2026-11-18): ADR §5 가드 체크리스트의 「로컬 하드웨어 실행
+ *      1회가 `exit 2` 로 끝나는 로그」 는 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이
+ *      끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 바뀌었다. 하드웨어 실행의 전체 종료 코드는 `1`
+ *      이다 — 축 1 · 5 (식별 천체 증가분) 가 하드웨어에서 FAIL 하기 때문이다 (별 배경이 cluster 에
+ *      섞인다. 축 1 · 5 는 `?gpu=a` 라 tier 판정과 무관하고, 본 스크립트를 develop 앱 서버에 돌려도
+ *      같은 수치다). 그 FAIL 은 기록만 하고 고치지 않았다 (#1435 범위 밖).
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-glow-marker.mjs
  *   BASE_URL=http://localhost:3000 node apps/web/scripts/browser-verify-glow-marker.mjs
  *   CAPTURE_DIR=docs/reports node ...  # 캡처 PNG 저장 (PR 박제용 — 미지정 시 저장 생략)
- *   BROWSER_VERIFY_GPU=metal node ...  # 렌더러 축 지정 (#1435 — 하드웨어에서 축 6 이 exit 2 로
- *                                      #   끊기는지 확인용). 미설정이면 launch 인자 불변 (CI 경로)
+ *   BROWSER_VERIFY_GPU=metal node ...  # 렌더러 축 지정 (#1435 — 하드웨어에서 축 6 이 전제 위반으로
+ *                                      #   끊기는지 확인용. 전체 exit 은 축 1·5 하드웨어 FAIL 로 1).
+ *                                      #   미설정이면 launch 인자 불변 (CI 경로)
  *
  * dev 빌드 의존: `window.__solarScene` / `window.__simStore` / `window.__simCore` (sim-canvas.tsx).
  * `?gpu=a` 고정 — headless GPU adapter 부재 시 tier-c LOD low 아티팩트 함정 회피 (R7 선례).
@@ -546,11 +558,13 @@ async function main() {
       const page = await context.newPage();
       await page.goto(buildUrl(''), { waitUntil: 'networkidle', timeout: 60_000 });
 
-      // 전제 0 (#1435) — 소프트웨어 렌더여야 tier-c 가 된다. #1435 부터 WebGPU 미지원 데스크톱은
-      // 렌더러가 **하드웨어**로 판독되면 tier b 라 (ADR 20261118-1435 §5), 하드웨어 렌더러에서
-      // 이 축을 돌리면 재현하려는 상황 (tier-c 강제 low 의 race) 자체가 성립하지 않는다. 그 결과는
-      // 「override 가 low 로 정착하지 않음」이라는 **#677 회귀와 같은 모양의 FAIL** 이므로, 판정
-      // 전에 전제로 끊는다 (`exit 2` — 측정 불가). CI (swiftshader) 는 `true` 라 판정 불변이다.
+      // 전제 R (#1435, 렌더러) — 소프트웨어 렌더여야 tier-c 가 된다. #1435 부터 WebGPU 미지원
+      // 데스크톱은 렌더러가 **하드웨어**로 판독되면 tier b 라 (ADR 20261118-1435 §5), 하드웨어
+      // 렌더러에서 이 축을 돌리면 재현하려는 상황 (tier-c 강제 low 의 race) 자체가 성립하지 않는다.
+      // 그 결과는 「override 가 low 로 정착하지 않음」이라는 **#677 회귀와 같은 모양의 FAIL** 이므로,
+      // 판정 전에 전제로 끊는다 (`blocked` — 측정 불가. 전체 종료 코드는 다른 축 결과를 따른다).
+      // CI (swiftshader) 는 `true` 라 판정 불변이다. 「0) 측정 전제」 · 아래 전제 1 · 2 와 다른 축이라
+      // 번호 대신 R 을 쓴다.
       // `__isSoftwareRenderer` 는 scene 체인이 노출한다 — 게이트가 `__solarScene` 을 기다리므로
       // 이 대기는 게이트와 순환하지 않는다.
       let softwareRenderer = null;
@@ -566,15 +580,23 @@ async function main() {
       } catch {
         // 노출 자체가 안 됐다 — 아래에서 전제 위반으로 처리 (softwareRenderer === null).
       }
-      if (softwareRenderer !== true) {
+      if (softwareRenderer === null) {
+        // 미노출 — 렌더러 종류의 문제가 아니라 scene 체인이 `__isSoftwareRenderer` 노출 전에 멈췄거나
+        // throw 했다. 「하드웨어」 로 안내하면 원인을 잘못 가리킨다 (PR #1440 리뷰 권고 4).
         blocked = true;
         console.log(
-          `  ? 전제 위반 — __isSoftwareRenderer=${softwareRenderer} (true 필요). 하드웨어 렌더러에서는 ` +
-            '#1435 부터 tier b 라 tier-c race 를 재현할 수 없다 — swiftshader 로 실행하라 ' +
-            '(ADR 20261118-1435 §6 위험 3). 이 축의 단언은 건너뛴다.',
+          '  ? 전제 R 위반 — __isSoftwareRenderer 미노출 (30 s). scene 체인이 노출 전에 멈췄거나 ' +
+            'throw 했다 — 렌더러 판정 이전 단계를 먼저 확인하라. 이 축의 단언은 건너뛴다.',
+        );
+      } else if (softwareRenderer !== true) {
+        blocked = true;
+        console.log(
+          `  ? 전제 R 위반 — __isSoftwareRenderer=${softwareRenderer} (하드웨어 렌더러). ` +
+            '#1435 부터 하드웨어 렌더러는 tier b 라 tier-c race 를 재현할 수 없다 — swiftshader 로 ' +
+            '실행하라 (ADR 20261118-1435 §6 위험 3). 이 축의 단언은 건너뛴다.',
         );
       } else {
-        console.log('  · 전제 0 성립 — __isSoftwareRenderer=true (소프트웨어 렌더)');
+        console.log('  · 전제 R 성립 — __isSoftwareRenderer=true (소프트웨어 렌더)');
 
         let settled = false;
         try {

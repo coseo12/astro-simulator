@@ -17,10 +17,14 @@ Semantic Versioning을 따른다.
 
 ### Behavior Changes
 
-- **WebGPU 가 없는 하드웨어 GPU 데스크톱에서 태양 · 행성이 WebGPU 와 같은 모습으로 보인다** (#1435). LOD 가 거리로 정해지고 (태양 근접 시 `high`), 태양 코로나 · 홍염 메시가 보인다 (실측 `isVisible`). 절차 표면 · 흑점처럼 high/mid 메시에 묶인 효과도 함께 그려진다. 「저성능 환경 감지」 알림 (`tier-c-graceful-degradation`) 은 더 뜨지 않는다. `?gpu=c` 로 종전 동작을 수동으로 고를 수 있다. 로컬 실측 (macOS · Apple M1 Pro · Chrome 157 headed · 1280×720 · DPR 1 · `--use-angle=metal` + `navigator.gpu` 제거, develop `42569478` 대조):
+- **WebGPU 가 없는 하드웨어 GPU 데스크톱에서 태양 · 행성이 WebGPU 와 같은 LOD · 효과로 그려진다** (#1435). 실측으로 같다고 확인한 것은 LOD (거리 판정 — 태양 근접 시 `high`), 태양 코로나 · 홍염 메시의 `isVisible`, 근접 원판 픽셀 수다 (아래). WebGL2 ↔ WebGPU 사이의 픽셀 대조는 하지 않았다. 절차 표면 · 흑점이 함께 그려지는 것은 그 효과들이 high/mid 메시에 묶여 있다는 코드 판독이 근거다 (ADR §1 판독 5 — 실측 아님). 「저성능 환경 감지」 알림 (`tier-c-graceful-degradation`) 은 더 뜨지 않는다. `?gpu=c` 로 종전 동작을 수동으로 고를 수 있다. 로컬 실측 (macOS · Apple M1 Pro · Chrome 157 headed · 1280×720 · DPR 1 · `--use-angle=metal` + `navigator.gpu` 제거, develop `42569478` 대조):
   - 태양 근접 (`?t=2456748.626305&speed=0&focus=sun`, 반경 2.6 배) — tier `c` → `b`, 원판 픽셀 352 → 111,883 (예상 원 112,328 의 99.6 %, WebGPU 와 같은 값). 지구 975 → 37,228 · 목성 885 → 45,621 (둘 다 WebGPU 와 같은 값).
   - 기본 화면 fps (vsync, 60 Hz 디스플레이) — develop · 본 변경 모두 60 / 60.
 - 소프트웨어 렌더 (swiftshader) · 모바일 비-WebGPU · `?gpu=c` 는 바뀌지 않는다 — swiftshader 기본 화면 develop 대비 0 px (tier c · override `low`), `verify:mobile-p7d --scenarios=3,4` 10/10, `verify:756-surface` DoD 4 PASS. WebGPU 경로는 기본 · 태양 · 지구 · 목성 4 화면 모두 develop 대비 0 px 이다.
+
+### Notes
+
+- **[#1435] 스프린트 계약 재조정 — 가드 확인 항목 1건 (사용자 합의 2026-11-18)**. ADR [`20261118-1435`](docs/decisions/20261118-1435-webgl2-hardware-tier.md) §5 가드 체크리스트의 「`verify:675-glow-marker` 로컬 하드웨어 실행 1회가 `exit 2` 로 끝나는 로그」 를 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이 끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 바꿨다 (ADR §7 Amendment 2). 하드웨어 실행 (`BROWSER_VERIFY_GPU=metal`) 의 전체 종료 코드는 `1` 이다. 축 1 · 5 (식별 천체 증가분 — 40 AU `+8` < `+10`, 100 AU `+10` < `+11`) 가 하드웨어에서 FAIL 하기 때문이다. 별 배경이 cluster 에 섞이는 것이 원인이고, 축 1 · 5 는 `?gpu=a` 라 tier 판정과 무관하다. 본 PR 스크립트를 develop 앱 서버에 돌려도 같은 수치였다. 이 FAIL 은 기록만 하고 고치지 않았다. CI (swiftshader) 판정은 바뀌지 않는다. 계약 본문은 스크립트 헤더 주석에도 있다.
 
 ## [0.109.0] - 2026-11-08
 

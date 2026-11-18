@@ -99,3 +99,16 @@ export function classifyRendererSoftware(
   if (!rendererString) return null;
   return detectSoftwareRenderer(rendererString);
 }
+
+/**
+ * tier 판정에 넘길 `rendererIsSoftware` — `sim-canvas.tsx` `resolveGpuTier` 가 부르는 **유일한** 합성.
+ *
+ * UNMASKED → `gl.RENDERER` 폴백 (Q2 (c)) 다음에 3상태 변환을 한다. 호출부는 이 함수 하나만 부른다.
+ * 테스트도 같은 함수를 거치므로, 합성이 바뀌면 (예: 폴백을 건너뛰고 `unmasked` 만 쓰기) 테스트가
+ * 잡는다 (PR #1440 리뷰 권고 1 — 테스트 안에 합성 사본을 두면 호출부 변이를 못 잡았다).
+ *
+ * @returns `true` = 소프트웨어 · `false` = 하드웨어 · `null` = 판독 불가
+ */
+export function resolveTierRendererIsSoftware(readout: WebglRendererReadout): boolean | null {
+  return classifyRendererSoftware(selectTierRendererString(readout));
+}

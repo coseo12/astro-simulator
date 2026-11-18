@@ -4,6 +4,11 @@
  * 하드웨어 WebGL2 tier 판정의 함정 (판독 불가가 하드웨어로 접히는 것 — cross-validate 합의 1) 을
  * 여기서 잠근다. CI 브라우저 가드는 swiftshader 라 UNMASKED 가 항상 값을 주므로 폴백 · 판독 불가
  * 경로에 도달하지 않는다 — 이 파일이 그 경로의 유일한 증거다.
+ *
+ * 범위: 아래 DoD 5 describe 는 `sim-canvas.tsx` `resolveGpuTier` 가 부르는 합성 함수
+ * `resolveTierRendererIsSoftware` 를 **그대로** 거친다 (PR #1440 리뷰 권고 1 — 종전에는 테스트 안에
+ * 합성 사본을 두어 호출부 합성 변이를 못 잡았다). 호출부가 이 함수 대신 **다른 함수를 부르는** 변이
+ * (예: `detectSoftwareRenderer`) 는 여전히 이 파일 밖이다 — 호출부를 1줄로 줄여 그 표면을 좁혔을 뿐이다.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { detectGpuTier, type GpuDetectionInput } from './detect-gpu-tier';
@@ -11,6 +16,7 @@ import {
   classifyRendererSoftware,
   EMPTY_WEBGL_RENDERER_READOUT,
   readWebglRendererStrings,
+  resolveTierRendererIsSoftware,
   selectTierRendererString,
   type WebglRendererSource,
 } from './tier-renderer-signal';
@@ -126,13 +132,19 @@ describe('readWebglRendererStrings — Q2 (c) 폴백 문자열 선택', () => {
 
 describe('#1435 구현 DoD 5 — 렌더러 판독 3상태 → WebGPU 미지원 데스크톱 tier', () => {
   /** sim-canvas `resolveGpuTier` 와 같은 합성 — gl → 문자열 → 3상태 → tier. */
+  /** sim-canvas `resolveGpuTier` 와 **같은 함수** — gl → 판독 → `resolveTierRendererIsSoftware` → tier. */
   function tierFromGl(gl: WebglRendererSource | null) {
     return detectGpuTier(
-      webgl2Desktop(
-        classifyRendererSoftware(selectTierRendererString(readWebglRendererStrings(gl))),
-      ),
+      webgl2Desktop(resolveTierRendererIsSoftware(readWebglRendererStrings(gl))),
     );
   }
+
+  it('resolveTierRendererIsSoftware — 3상태를 그대로 돌려준다 (판독 불가 → null)', () => {
+    expect(resolveTierRendererIsSoftware(EMPTY_WEBGL_RENDERER_READOUT)).toBeNull();
+    expect(resolveTierRendererIsSoftware({ unmasked: SWIFTSHADER, basic: null })).toBe(true);
+    expect(resolveTierRendererIsSoftware({ unmasked: null, basic: ANGLE_METAL })).toBe(false);
+    expect(resolveTierRendererIsSoftware({ unmasked: '', basic: '' })).toBeNull();
+  });
 
   it('소프트웨어 문자열 → c', () => {
     expect(tierFromGl(mockGl({ extension: true, unmasked: SWIFTSHADER }).gl)).toBe('c');

@@ -1,6 +1,6 @@
 # ADR 20261118-1435 — 하드웨어 WebGL2 데스크톱의 GPU tier: tier c 일괄 판정을 소프트웨어 렌더로 좁힌다
 
-- **상태**: Accepted (cross-validate 2026-11-18) — 사용자 결정 Q1~Q5 전부 권고안 (2026-11-18, §5 · §7 Amendment 1)
+- **상태**: Accepted (cross-validate 2026-11-18) — 사용자 결정 Q1~Q5 전부 권고안 (2026-11-18, §5 · §7 Amendment 1) · 가드 확인 항목 재조정 (§7 Amendment 2)
 - **날짜**: 2026-11-18
 - **결정자**: architect (이슈 [#1435](https://github.com/coseo12/astro-simulator/issues/1435))
 - **관련**:
@@ -341,6 +341,10 @@ CI 의 fps-baseline-guard · r1-ui-regression-guard · glow-marker 축 6 · mobi
 #### 정정
 
 - 이슈 #1435 본문의 태양 과장 배율 「×75」 는 현행 `SUN_SCALE = 50` 이 맞다 (§1 측정 1 에 이미 기록 · 이슈 코멘트로 정정). 인과와 결정에는 영향 없다.
+
+### Amendment 2 (2026-11-18, 트리거: 구현 PR #1440 실측 · 사용자 합의 2026-11-18)
+
+- §5 가드 체크리스트의 「로컬 하드웨어 실행 1회가 `exit 2` 로 끝나는 로그」 를 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이 끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 재조정한다. 하드웨어 실행의 전체 종료 코드는 축 1 · 5 의 하드웨어 선재 FAIL (별 배경 cluster 혼입, `?gpu=a` 라 tier 무관) 때문에 `1` 이며, 기록만 한다 (`browser-verify-glow-marker.mjs` 헤더 · PR #1440 본문 · CHANGELOG `[Unreleased]` Notes).
 
 ---
 

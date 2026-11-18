@@ -51,10 +51,9 @@ import {
 import { detectGpuTier, type GpuTier } from '@/core/detect-gpu-tier';
 // #1435 — tier 판정용 렌더러 신호 (3상태 + gl.RENDERER 폴백). #745 게이트 입력과 분리.
 import {
-  classifyRendererSoftware,
   EMPTY_WEBGL_RENDERER_READOUT,
   readWebglRendererStrings,
-  selectTierRendererString,
+  resolveTierRendererIsSoftware,
   type WebglRendererReadout,
 } from '@/core/tier-renderer-signal';
 import { SimCommandProvider } from '@/core/sim-context';
@@ -385,7 +384,7 @@ export function SimCanvas({ children }: { children?: ReactNode }) {
       if (parsedGpu !== 'auto') return parsedGpu;
       const rendererIsSoftware = cap.webgpu
         ? null
-        : classifyRendererSoftware(selectTierRendererString(getWebglRendererReadout()));
+        : resolveTierRendererIsSoftware(getWebglRendererReadout());
       return detectGpuTier({
         webgpu: { supported: cap.webgpu, adapterInfo: cap.adapterInfo ?? null },
         rendererIsSoftware,
