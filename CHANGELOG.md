@@ -5,6 +5,29 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.110.0] - 2026-11-23
+
+### Changed
+
+- **[#1435] WebGPU 가 없는 하드웨어 GPU 데스크톱을 GPU tier b 로 판정한다** ([#1435](https://github.com/coseo12/astro-simulator/issues/1435)). ADR [`20261118-1435`](docs/decisions/20261118-1435-webgl2-hardware-tier.md) §5 결정 (사용자 결정 Q1 A · Q2 (c) · Q4 (a)). ADR [`20260424-tier-preset-design`](docs/decisions/20260424-tier-preset-design.md) §축 1 분기 2 를 부분 개정한다.
+  - 종전에는 `navigator.gpu` 가 없으면 데스크톱도 무조건 tier c 였다. tier c 는 LOD 를 전부 `low` 로 강제한다. low 변형 (billboard) 은 과장 배율 (`bodyScale`) 을 곱하지 않으므로, 하드웨어 WebGL2 에서는 기본 화면부터 태양이 점으로 보였다. 지구 · 목성도 근접 시 점이었다.
+  - `detectGpuTier` 입력에 `rendererIsSoftware: boolean | null` (3상태) 를 추가했다. 분기 2 는 `rendererIsSoftware === false` (하드웨어로 판독됨) 일 때만 `'b'` 이고, 소프트웨어 렌더 · 판독 불가는 `'c'` 그대로다. 모바일 비-WebGPU (분기 1) 는 바뀌지 않는다.
+  - 신규 `tier-renderer-signal.ts` — 임시 WebGL 컨텍스트에서 `UNMASKED_RENDERER_WEBGL` 을 읽고, 확장이 없거나 값이 비면 `gl.RENDERER` 를 한 번 더 읽는다 (Q2 (c)). 단 `gl.RENDERER` 가 브라우저가 가린 일반 이름 (`MASKED_RENDERER_NAMES` — 현재 `WebKit WebGL`, 대소문자 · 공백 정규화) 이면 판독 불가 (→ tier c) 로 본다 (ADR §7 Amendment 3, 사용자 Q2 재질의 결정 2026-11-18). Chrome 157 의 `gl.RENDERER` 는 metal · SwiftShader 모두 `WebKit WebGL` 이라 [실측 — PR #1440 qa], 이 처리가 없으면 「확장 차단 + 소프트웨어 렌더」 가 tier b 로 새어 나갔다. 확장으로 읽은 UNMASKED 값에는 적용하지 않는다. 3상태 변환은 `detectSoftwareRenderer()` 를 그대로 쓰지 않는다 — 그 함수는 판독 불가에 `false` (= 하드웨어) 를 돌려준다. #745 소프트웨어 렌더 게이트 (별 배경 · 띠 · 코로나 등) 의 입력은 바뀌지 않는다.
+  - 임시 컨텍스트 판독은 마운트당 1회 memo 로 tier 체인과 장면 체인이 공유한다. WebGPU 지원 경로는 tier 판정에서 판독하지 않는다.
+  - `verify:675-glow-marker` 축 6 (tier-c LOD race) 에 소프트웨어 렌더 전제를 추가했다. 하드웨어 렌더러에서는 tier b 라 이 축을 재현할 수 없으므로, 단언 대신 전제 위반 (`blocked` → exit 2 기여) 으로 끊는다. `BROWSER_VERIFY_GPU` 가 있을 때만 렌더러 인자를 붙인다 (미설정이면 launch 인자 불변 — CI 경로).
+  - 남은 위험 (ADR §6): WebGPU 없는 약한 하드웨어 GPU 의 fps 는 측정하지 않았다 (런타임 하향은 #1437 로 분리). `MASKED_RENDERER_NAMES` 에 없는 일반 이름만 돌려주는 소프트웨어 렌더는 하드웨어로 판정된다 [가정 — 측정한 일반 이름은 Chrome 157 의 `WebKit WebGL` 뿐].
+
+### Behavior Changes
+
+- **WebGPU 가 없는 하드웨어 GPU 데스크톱에서 태양 · 행성이 WebGPU 와 같은 LOD · 효과로 그려진다** (#1435). 실측으로 같다고 확인한 것은 LOD (거리 판정 — 태양 근접 시 `high`), 태양 코로나 · 홍염 메시의 `isVisible`, 근접 원판 픽셀 수다 (아래). WebGL2 ↔ WebGPU 사이의 픽셀 대조는 하지 않았다. 절차 표면 · 흑점이 함께 그려지는 것은 그 효과들이 high/mid 메시에 묶여 있다는 코드 판독이 근거다 (ADR §1 판독 5 — 실측 아님). 「저성능 환경 감지」 알림 (`tier-c-graceful-degradation`) 은 더 뜨지 않는다. `?gpu=c` 로 종전 동작을 수동으로 고를 수 있다. 단 `WEBGL_debug_renderer_info` 확장이 막힌 Chrome (프라이버시 확장 · 정책) 은 하드웨어 GPU 라도 종전처럼 tier c 다 — `gl.RENDERER` 가 일반 이름이라 렌더러를 알 수 없기 때문이다 (사용자 결정, ADR §7 Amendment 3 — 실 Chrome 157 실측: 하드웨어 + 확장 숨김 → c, swiftshader + 확장 숨김 → c). 로컬 실측 (macOS · Apple M1 Pro · Chrome 157 headed · 1280×720 · DPR 1 · `--use-angle=metal` + `navigator.gpu` 제거, develop `42569478` 대조):
+  - 태양 근접 (`?t=2456748.626305&speed=0&focus=sun`, 반경 2.6 배) — tier `c` → `b`, 원판 픽셀 352 → 111,883 (예상 원 112,328 의 99.6 %, WebGPU 와 같은 값). 지구 975 → 37,228 · 목성 885 → 45,621 (둘 다 WebGPU 와 같은 값).
+  - 기본 화면 fps (vsync, 60 Hz 디스플레이) — develop · 본 변경 모두 60 / 60.
+- 소프트웨어 렌더 (swiftshader) · 모바일 비-WebGPU · `?gpu=c` 는 바뀌지 않는다 — swiftshader 기본 화면 develop 대비 0 px (tier c · override `low`), `verify:mobile-p7d --scenarios=3,4` 10/10, `verify:756-surface` DoD 4 PASS. WebGPU 경로는 기본 · 태양 · 지구 · 목성 4 화면 모두 develop 대비 0 px 이다.
+
+### Notes
+
+- **[#1435] 스프린트 계약 재조정 — 가드 확인 항목 1건 (사용자 합의 2026-11-18)**. ADR [`20261118-1435`](docs/decisions/20261118-1435-webgl2-hardware-tier.md) §5 가드 체크리스트의 「`verify:675-glow-marker` 로컬 하드웨어 실행 1회가 `exit 2` 로 끝나는 로그」 를 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이 끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 바꿨다 (ADR §7 Amendment 2). 하드웨어 실행 (`BROWSER_VERIFY_GPU=metal`) 의 전체 종료 코드는 `1` 이다. 축 1 · 5 (식별 천체 증가분 — 40 AU `+8` < `+10`, 100 AU `+10` < `+11`) 가 하드웨어에서 FAIL 하기 때문이다. 별 배경이 cluster 에 섞이는 것이 원인이고, 축 1 · 5 는 `?gpu=a` 라 tier 판정과 무관하다. 본 PR 스크립트를 develop 앱 서버에 돌려도 같은 수치였다. 이 FAIL 은 기록만 하고 고치지 않았다. CI (swiftshader) 판정은 바뀌지 않는다. 계약 본문은 스크립트 헤더 주석에도 있다.
+
 ## [0.109.0] - 2026-11-08
 
 ### Added

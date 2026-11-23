@@ -251,6 +251,28 @@ export function resolveBaseUrl(fallback = DEFAULT_BASE_URL, env = process.env) {
   return value.replace(/\/+$/, '');
 }
 
+/** `BROWSER_VERIFY_WINDOW` 형식 — 화면 좌표 `x,y` (정수, 보조 모니터 배치에 따라 음수 가능). */
+const WINDOW_POSITION_PATTERN = /^\s*(-?\d+)\s*,\s*(-?\d+)\s*$/;
+
+/**
+ * `BROWSER_VERIFY_WINDOW="x,y"` → `['--window-position=x,y']`. 미지정·빈 값이면 `[]`.
+ *
+ * 형식이 틀리면 throw 한다 — 조용히 무시하면 창이 엉뚱한 모니터에 떠도 원인을 알 수 없다.
+ *
+ * @param {string | undefined} raw
+ * @returns {string[]}
+ */
+export function parseWindowPositionArgs(raw) {
+  if (raw === undefined || raw.trim() === '') return [];
+  const match = WINDOW_POSITION_PATTERN.exec(raw);
+  if (match === null) {
+    throw new Error(
+      `[browser-verify-utils] BROWSER_VERIFY_WINDOW 형식 오류 '${raw}' — 'x,y' 정수 (예: 40,40)`,
+    );
+  }
+  return [`--window-position=${match[1]},${match[2]}`];
+}
+
 /**
  * `chromium.launch` 옵션을 조립 (순수 함수 — 브라우저 기동 없이 단위 테스트 가능).
  *
@@ -276,6 +298,10 @@ export function buildLaunchOptions(options = {}) {
   }
 
   const args = [...GPU_LAUNCH_ARGS[gpu], ...(options.args ?? [])];
+  // headed 창을 어느 모니터에 띄울지는 기계마다 다르므로 코드가 아니라 환경변수로 받는다.
+  // headless 에는 창이 없어 무의미하고, CI 는 headless 라 영향이 없다.
+  // 맨 뒤에 붙인다 — Chromium 은 같은 스위치의 마지막 값을 쓰므로 환경변수가 `options.args` 보다 우선한다.
+  if (headful) args.push(...parseWindowPositionArgs(env.BROWSER_VERIFY_WINDOW));
   /** @type {{ headless: boolean, args?: string[], channel?: string }} */
   const launchOptions = { headless: !headful };
   if (args.length > 0) launchOptions.args = args;
@@ -353,7 +379,24 @@ export async function withBrowser(launchOptions = {}, fn, options = {}) {
 /** `withBrowser` 기본 launcher — `launchBrowser` 와 동일하게 playwright 를 동적 import. */
 async function defaultLaunch(launchOptions) {
   const { chromium } = await import('playwright');
-  return chromium.launch(launchOptions);
+  return chromium.launch(applyWindowPosition(launchOptions));
+}
+
+/**
+ * `withBrowser` 에 `buildLaunchOptions` 를 거치지 않은 옵션(`{ headless: !HEADED }` 등)이 들어와도
+ * headed 창이면 `BROWSER_VERIFY_WINDOW` 를 적용한다. headless(기본 포함)이거나 이미
+ * `--window-position` 이 있으면(`buildLaunchOptions` 경유) 원본을 그대로 돌려준다.
+ *
+ * @param {{ headless?: boolean, args?: string[] }} launchOptions
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function applyWindowPosition(launchOptions, env = process.env) {
+  if (launchOptions.headless !== false) return launchOptions;
+  const args = launchOptions.args ?? [];
+  if (args.some((arg) => arg.startsWith('--window-position='))) return launchOptions;
+  const extra = parseWindowPositionArgs(env.BROWSER_VERIFY_WINDOW);
+  if (extra.length === 0) return launchOptions;
+  return { ...launchOptions, args: [...args, ...extra] };
 }
 
 /**

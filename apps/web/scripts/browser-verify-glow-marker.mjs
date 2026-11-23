@@ -19,11 +19,27 @@
  *      가 정착하는지 검증. 회귀 시 override 'auto' 영구 잔존 → sun high + mid sphere 렌더 →
  *      CI fps-baseline-guard flaky FAIL (develop push 27412497611 desktop 28.1 FPS 선행 사례).
  *      재현 여부는 가정하지 않고 **전제로 검사**한다 (§#1239 — 미재현은 `exit 2`).
+ *      #1435 — 소프트웨어 렌더 (`__isSoftwareRenderer === true`) 도 전제다 (로그 라벨 「전제 R」).
+ *      이 축은 `requestAdapter` 가 null 을 돌려주는 stub 으로 WebGPU 미지원을 만드는데, 하드웨어
+ *      렌더러에서는 그래도 tier b 라 (ADR 20261118-1435 §5) 재현할 상황 자체가 없다. 그때 축 6 은
+ *      **단언 없이 전제 위반 (`blocked`) 으로 끊긴다** — #677 회귀로 오보하지 않는다. 전체 종료 코드는
+ *      다른 축 결과를 따른다 (하단 `exitCode` — 확정 FAIL 이 측정 불가보다 우선). CI (swiftshader) 는
+ *      전제가 서므로 판정 불변이다.
+ *
+ *      ⚠️ 계약 재조정 (#1435, 사용자 합의 2026-11-18): ADR §5 가드 체크리스트의 「로컬 하드웨어 실행
+ *      1회가 `exit 2` 로 끝나는 로그」 는 「로컬 하드웨어 실행에서 축 6 이 전제 위반으로 단언 없이
+ *      끊긴다 (#677 회귀로 오보하지 않음) 로그」 로 바뀌었다. 하드웨어 실행의 전체 종료 코드는 `1`
+ *      이다 — 축 1 · 5 (식별 천체 증가분) 가 하드웨어에서 FAIL 하기 때문이다 (별 배경이 cluster 에
+ *      섞인다. 축 1 · 5 는 `?gpu=a` 라 tier 판정과 무관하고, 본 스크립트를 develop 앱 서버에 돌려도
+ *      같은 수치다). 그 FAIL 은 기록만 하고 고치지 않았다 (#1435 범위 밖).
  *
  * 사용법:
  *   node apps/web/scripts/browser-verify-glow-marker.mjs
  *   BASE_URL=http://localhost:3000 node apps/web/scripts/browser-verify-glow-marker.mjs
  *   CAPTURE_DIR=docs/reports node ...  # 캡처 PNG 저장 (PR 박제용 — 미지정 시 저장 생략)
+ *   BROWSER_VERIFY_GPU=metal node ...  # 렌더러 축 지정 (#1435 — 하드웨어에서 축 6 이 전제 위반으로
+ *                                      #   끊기는지 확인용. 전체 exit 은 축 1·5 하드웨어 FAIL 로 1).
+ *                                      #   미설정이면 launch 인자 불변 (CI 경로)
  *
  * dev 빌드 의존: `window.__solarScene` / `window.__simStore` / `window.__simCore` (sim-canvas.tsx).
  * `?gpu=a` 고정 — headless GPU adapter 부재 시 tier-c LOD low 아티팩트 함정 회피 (R7 선례).
@@ -133,6 +149,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  buildLaunchOptions,
   hideDomOverlays,
   withBrowser,
   waitForLodSettle,
@@ -342,7 +359,14 @@ async function main() {
 
   // #940 — 브라우저 수명주기를 `withBrowser` 로 위임 (에러 경로 close 도달 보장).
   // launch 인자는 원본 그대로 전달한다 (렌더러 축 불변 — docs/ops/browser-verify-helpers.md).
-  await withBrowser({ headless: true }, async (browser) => {
+  // #1435 — `BROWSER_VERIFY_GPU` 가 있을 때만 렌더러 인자를 붙인다 (오타는 buildLaunchOptions 가
+  // fail-fast). 미설정이면 종전과 같은 `{ headless: true }` 그대로다. headful · channel 은 명시해
+  // `HEADFUL` env 가 끼어들지 않게 한다.
+  const gpuAxis = process.env.BROWSER_VERIFY_GPU;
+  const launchOptions = gpuAxis
+    ? buildLaunchOptions({ gpu: gpuAxis, headful: false, channel: null })
+    : { headless: true };
+  await withBrowser(launchOptions, async (browser) => {
     console.log('\n=== #675 glow pixel marker 회귀 가드 ===');
     console.log(`BASE_URL=${BASE_URL}\n`);
 
@@ -478,7 +502,7 @@ async function main() {
     // (b) 가 (a) 보다 먼저 끝나면 (저속/headless 환경에서 requestAdapter 가 느린 경우) 강제 low 가
     // 영구 유실된다 (#677 forensic — fix 는 (a) 에서 command 직접 발행으로 양방향 커버).
     // 여기서는 requestAdapter 가 **scene 초기화 완료 (`__solarScene` 노출 = handler 등록 동일
-    // sync 블록) 이후에만** adapter null (→ detectGpuTier 분기 2 = tier 'c') 을 반환하도록 폴링
+    // sync 블록) 이후에만** adapter null (→ detectGpuTier 분기 2 — 소프트웨어 렌더면 tier 'c') 을 반환하도록 폴링
     // 게이트를 걸어 race-lost 방향을 시간 무관하게 구조적으로 강제한다 (고정 지연은 cold context
     // 의 scene 초기화가 더 느리면 race 를 이겨버려 negative 재현 실패 — 2026-06-13 실측).
     // gpu/lod URL 파라미터 없이 자동 감지 경로 사용 (modes 의 ?gpu=a 함정 회피와 정반대 — 의도).
@@ -533,98 +557,141 @@ async function main() {
       });
       const page = await context.newPage();
       await page.goto(buildUrl(''), { waitUntil: 'networkidle', timeout: 60_000 });
-      let settled = false;
+
+      // 전제 R (#1435, 렌더러) — 소프트웨어 렌더여야 tier-c 가 된다. #1435 부터 WebGPU 미지원
+      // 데스크톱은 렌더러가 **하드웨어**로 판독되면 tier b 라 (ADR 20261118-1435 §5), 하드웨어
+      // 렌더러에서 이 축을 돌리면 재현하려는 상황 (tier-c 강제 low 의 race) 자체가 성립하지 않는다.
+      // 그 결과는 「override 가 low 로 정착하지 않음」이라는 **#677 회귀와 같은 모양의 FAIL** 이므로,
+      // 판정 전에 전제로 끊는다 (`blocked` — 측정 불가. 전체 종료 코드는 다른 축 결과를 따른다).
+      // CI (swiftshader) 는 `true` 라 판정 불변이다. 「0) 측정 전제」 · 아래 전제 1 · 2 와 다른 축이라
+      // 번호 대신 R 을 쓴다.
+      // `__isSoftwareRenderer` 는 scene 체인이 노출한다 — 게이트가 `__solarScene` 을 기다리므로
+      // 이 대기는 게이트와 순환하지 않는다.
+      let softwareRenderer = null;
       try {
         await page.waitForFunction(
-          () => window.__gpuTier === 'c' && window.__solarScene?.getLodStats?.().override === 'low',
-          // ⚠️ 두 번째 인자는 **`arg`** 이고 옵션은 세 번째다 — 종전 판본은 `{ timeout: 15_000 }`
-          // 을 `arg` 자리에 넘겨 선언값이 한 번도 적용되지 않았고 실제 상한은 playwright 기본
-          // 30 s 였다 [실측 2026-09-23 — FAIL 변이의 대기가 30004 ms]. 값을 `30_000` 으로 적어
-          // **선언 = 실제**로 맞춘다 (동작 무변경. 같은 파일 `openSim` 의 핸들 대기와 같은 값이고,
-          // 그쪽은 선언값이 기본값과 우연히 같아 드리프트가 드러나지 않았다).
+          () => typeof window.__isSoftwareRenderer === 'boolean',
           undefined,
-          { timeout: 30_000 },
+          {
+            timeout: 30_000,
+          },
         );
-        settled = true;
+        softwareRenderer = await page.evaluate(() => window.__isSoftwareRenderer);
       } catch {
-        // timeout → settled=false 로 FAIL 처리 (아래 check)
+        // 노출 자체가 안 됐다 — 아래에서 전제 위반으로 처리 (softwareRenderer === null).
       }
-      const state = await page.evaluate(() => {
-        // 전제 계측은 앱이 이미 남기는 부트 마크를 읽는다 (#1234 C2) — 가드가 새로 재지 않는다.
-        const phases = window.__bootPhases?.phases ?? null;
-        // 살아남은 마운트 체인 = `__solarScene` 을 노출한 체인. dev StrictMode 는 체인을 둘
-        // 발급하고 첫 체인은 cleanup 으로 버려지므로, 체인을 고르지 않으면 버려진 쪽의 마크를
-        // 읽고 「지연됐다」고 오판한다 (그게 종전 축 6 이 순번으로 걸려 있던 자리다).
-        const exposed = phases?.find((p) => p.name === 'web:solar-scene-exposed') ?? null;
-        const capability = exposed
-          ? (phases.find((p) => p.chain === exposed.chain && p.name === 'web:gpu-capability') ??
-            null)
-          : null;
-        return {
-          tier: window.__gpuTier ?? null,
-          override: window.__solarScene?.getLodStats?.().override ?? null,
-          counters: window.__axis6 ?? null,
-          chain: exposed?.chain ?? null,
-          sceneAtMs: exposed?.atMs ?? null,
-          capabilityAtMs: capability?.atMs ?? null,
-        };
-      });
-
-      // 전제 1 — 게이트가 실제로 걸렸는가 (호출자 판별 붕괴 감지). `detect` 가 곧 게이트 발화
-      // 횟수다 (위 init script 주석 — 둘로 갈릴 경로가 없어 카운터 하나로 합쳤다).
-      const gated = state.counters?.detect ?? 0;
-      // 갈리는 쪽. `detect > resolved` = 게이트가 아직 `__solarScene` 을 기다리는 중이다.
-      const gatesPending = gated - (state.counters?.resolved ?? 0);
-      if (gated < 1) {
+      if (softwareRenderer === null) {
+        // 미노출 — 렌더러 종류의 문제가 아니라 scene 체인이 `__isSoftwareRenderer` 노출 전에 멈췄거나
+        // throw 했다. 「하드웨어」 로 안내하면 원인을 잘못 가리킨다 (PR #1440 리뷰 권고 4).
         blocked = true;
         console.log(
-          `  ? 전제 붕괴 — 게이트가 한 번도 안 걸렸다 (detect=${state.counters?.detect ?? 'n/a'} ` +
-            `probe=${state.counters?.probe ?? 'n/a'}). 호출자 판별(스택 함수명)이 깨졌을 수 있다.`,
+          '  ? 전제 R 위반 — __isSoftwareRenderer 미노출 (30 s). scene 체인이 노출 전에 멈췄거나 ' +
+            'throw 했다 — 렌더러 판정 이전 단계를 먼저 확인하라. 이 축의 단언은 건너뛴다.',
         );
-      }
-      // 전제 2 — race-lost 방향이 실제로 재현됐는가. 「capability 가 scene 노출보다 늦게 왔다」가
-      // 이 축이 재려는 상황 그 자체이고, 순서가 뒤집혀 있으면 아래 단언은 **쉬운 방향**을 잰 것이라
-      // PASS 가 무의미하다 (#1201 클래스 — 전제 미성립을 통과로 읽지 않는다).
-      const reproduced =
-        state.sceneAtMs !== null &&
-        state.capabilityAtMs !== null &&
-        state.capabilityAtMs > state.sceneAtMs;
-      if (!reproduced) {
+      } else if (softwareRenderer !== true) {
         blocked = true;
         console.log(
-          `  ? 전제 붕괴 — race-lost 방향 미재현 (chain=${state.chain} ` +
-            `scene@${state.sceneAtMs} capability@${state.capabilityAtMs}). ` +
-            '부트 마크 부재이거나 capability 가 scene 보다 먼저 도착했다.',
+          `  ? 전제 R 위반 — __isSoftwareRenderer=${softwareRenderer} (하드웨어 렌더러). ` +
+            '#1435 부터 하드웨어 렌더러는 tier b 라 tier-c race 를 재현할 수 없다 — swiftshader 로 ' +
+            '실행하라 (ADR 20261118-1435 §6 위험 3). 이 축의 단언은 건너뛴다.',
         );
       } else {
-        console.log(
-          `  · 전제 성립 — chain=${state.chain} scene@${state.sceneAtMs}ms → ` +
-            `capability@${state.capabilityAtMs}ms (지연 ${Math.round(state.capabilityAtMs - state.sceneAtMs)}ms) · ` +
-            `게이트 ${gated}회`,
+        console.log('  · 전제 R 성립 — __isSoftwareRenderer=true (소프트웨어 렌더)');
+
+        let settled = false;
+        try {
+          await page.waitForFunction(
+            () =>
+              window.__gpuTier === 'c' && window.__solarScene?.getLodStats?.().override === 'low',
+            // ⚠️ 두 번째 인자는 **`arg`** 이고 옵션은 세 번째다 — 종전 판본은 `{ timeout: 15_000 }`
+            // 을 `arg` 자리에 넘겨 선언값이 한 번도 적용되지 않았고 실제 상한은 playwright 기본
+            // 30 s 였다 [실측 2026-09-23 — FAIL 변이의 대기가 30004 ms]. 값을 `30_000` 으로 적어
+            // **선언 = 실제**로 맞춘다 (동작 무변경. 같은 파일 `openSim` 의 핸들 대기와 같은 값이고,
+            // 그쪽은 선언값이 기본값과 우연히 같아 드리프트가 드러나지 않았다).
+            undefined,
+            { timeout: 30_000 },
+          );
+          settled = true;
+        } catch {
+          // timeout → settled=false 로 FAIL 처리 (아래 check)
+        }
+        const state = await page.evaluate(() => {
+          // 전제 계측은 앱이 이미 남기는 부트 마크를 읽는다 (#1234 C2) — 가드가 새로 재지 않는다.
+          const phases = window.__bootPhases?.phases ?? null;
+          // 살아남은 마운트 체인 = `__solarScene` 을 노출한 체인. dev StrictMode 는 체인을 둘
+          // 발급하고 첫 체인은 cleanup 으로 버려지므로, 체인을 고르지 않으면 버려진 쪽의 마크를
+          // 읽고 「지연됐다」고 오판한다 (그게 종전 축 6 이 순번으로 걸려 있던 자리다).
+          const exposed = phases?.find((p) => p.name === 'web:solar-scene-exposed') ?? null;
+          const capability = exposed
+            ? (phases.find((p) => p.chain === exposed.chain && p.name === 'web:gpu-capability') ??
+              null)
+            : null;
+          return {
+            tier: window.__gpuTier ?? null,
+            override: window.__solarScene?.getLodStats?.().override ?? null,
+            counters: window.__axis6 ?? null,
+            chain: exposed?.chain ?? null,
+            sceneAtMs: exposed?.atMs ?? null,
+            capabilityAtMs: capability?.atMs ?? null,
+          };
+        });
+
+        // 전제 1 — 게이트가 실제로 걸렸는가 (호출자 판별 붕괴 감지). `detect` 가 곧 게이트 발화
+        // 횟수다 (위 init script 주석 — 둘로 갈릴 경로가 없어 카운터 하나로 합쳤다).
+        const gated = state.counters?.detect ?? 0;
+        // 갈리는 쪽. `detect > resolved` = 게이트가 아직 `__solarScene` 을 기다리는 중이다.
+        const gatesPending = gated - (state.counters?.resolved ?? 0);
+        if (gated < 1) {
+          blocked = true;
+          console.log(
+            `  ? 전제 붕괴 — 게이트가 한 번도 안 걸렸다 (detect=${state.counters?.detect ?? 'n/a'} ` +
+              `probe=${state.counters?.probe ?? 'n/a'}). 호출자 판별(스택 함수명)이 깨졌을 수 있다.`,
+          );
+        }
+        // 전제 2 — race-lost 방향이 실제로 재현됐는가. 「capability 가 scene 노출보다 늦게 왔다」가
+        // 이 축이 재려는 상황 그 자체이고, 순서가 뒤집혀 있으면 아래 단언은 **쉬운 방향**을 잰 것이라
+        // PASS 가 무의미하다 (#1201 클래스 — 전제 미성립을 통과로 읽지 않는다).
+        const reproduced =
+          state.sceneAtMs !== null &&
+          state.capabilityAtMs !== null &&
+          state.capabilityAtMs > state.sceneAtMs;
+        if (!reproduced) {
+          blocked = true;
+          console.log(
+            `  ? 전제 붕괴 — race-lost 방향 미재현 (chain=${state.chain} ` +
+              `scene@${state.sceneAtMs} capability@${state.capabilityAtMs}). ` +
+              '부트 마크 부재이거나 capability 가 scene 보다 먼저 도착했다.',
+          );
+        } else {
+          console.log(
+            `  · 전제 성립 — chain=${state.chain} scene@${state.sceneAtMs}ms → ` +
+              `capability@${state.capabilityAtMs}ms (지연 ${Math.round(state.capabilityAtMs - state.sceneAtMs)}ms) · ` +
+              `게이트 ${gated}회`,
+          );
+        }
+
+        // 오귀인 차단 (PR #1255 reviewer 권고 2). 이 게이트는 **자기 자신이 순환을 만들 수 있다** —
+        // #1234 C3-B (장면 체인이 `gpuCapPromise` 의 settle 을 기다리지 않는다) 가 되돌려지면
+        // scene 이 capability 를, 게이트가 scene 을 서로 기다려 `__solarScene` 이 영영 안 나온다.
+        // 그때 나오는 결과는 #677 회귀와 **같은 모양의 FAIL** 이라, 힌트가 없으면 제품 회귀로 읽힌다.
+        // ⚠️ 판정은 바꾸지 않는다 (확정 FAIL 우선 — 여전히 `exit 1`). 동반 출력만 붙인다.
+        const misattributionHint =
+          gated < 1 || !reproduced
+            ? ` ⚠️ 단 이 FAIL 은 전제가 무너진 채 나왔다 (게이트 발화 ${gated}회 · 미해소 ` +
+              `${gatesPending}회 · chain=${state.chain} scene@${state.sceneAtMs} ` +
+              `capability@${state.capabilityAtMs}) — #677 회귀가 아니라 **게이트 자신이 만든 순환**일 ` +
+              '수 있다. #1234 C3-B (장면 체인의 gpuCapPromise 대기 분리) 가 살아 있는지 먼저 확인하라.'
+            : '';
+
+        check(
+          `지연 tier-c 감지 후 override='${state.override}' (tier='${state.tier}')`,
+          settled,
+          settled
+            ? undefined
+            : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)" +
+                misattributionHint,
         );
       }
-
-      // 오귀인 차단 (PR #1255 reviewer 권고 2). 이 게이트는 **자기 자신이 순환을 만들 수 있다** —
-      // #1234 C3-B (장면 체인이 `gpuCapPromise` 의 settle 을 기다리지 않는다) 가 되돌려지면
-      // scene 이 capability 를, 게이트가 scene 을 서로 기다려 `__solarScene` 이 영영 안 나온다.
-      // 그때 나오는 결과는 #677 회귀와 **같은 모양의 FAIL** 이라, 힌트가 없으면 제품 회귀로 읽힌다.
-      // ⚠️ 판정은 바꾸지 않는다 (확정 FAIL 우선 — 여전히 `exit 1`). 동반 출력만 붙인다.
-      const misattributionHint =
-        gated < 1 || !reproduced
-          ? ` ⚠️ 단 이 FAIL 은 전제가 무너진 채 나왔다 (게이트 발화 ${gated}회 · 미해소 ` +
-            `${gatesPending}회 · chain=${state.chain} scene@${state.sceneAtMs} ` +
-            `capability@${state.capabilityAtMs}) — #677 회귀가 아니라 **게이트 자신이 만든 순환**일 ` +
-            '수 있다. #1234 C3-B (장면 체인의 gpuCapPromise 대기 분리) 가 살아 있는지 먼저 확인하라.'
-          : '';
-
-      check(
-        `지연 tier-c 감지 후 override='${state.override}' (tier='${state.tier}')`,
-        settled,
-        settled
-          ? undefined
-          : "override 가 'low' 로 정착하지 않음 — tier-c 강제 LOD race 회귀 (#677)" +
-              misattributionHint,
-      );
       await context.close();
     }
   });

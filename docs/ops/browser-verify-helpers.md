@@ -34,6 +34,20 @@ import {
 } from '../../../scripts/browser-verify-utils.mjs'; // apps/web/scripts 기준 상대 경로
 ```
 
+### headed 창 위치 — `BROWSER_VERIFY_WINDOW`
+
+headed(`HEADED=1`/`HEADFUL=1`) 실행에서 창을 띄울 화면 좌표를 `BROWSER_VERIFY_WINDOW="x,y"` 로 지정한다
+(`--window-position=x,y` 로 전달). 어느 모니터를 쓸지는 기계마다 달라 코드가 아니라 환경변수로 받는다.
+
+- 미지정이면 인자를 붙이지 않는다 (Chrome 기본 위치). headless 에서는 무시한다 — CI 영향 없음.
+- 형식이 틀리면 throw 한다 (조용히 무시하면 창이 엉뚱한 모니터에 떠도 원인을 모른다).
+- 적용 경로는 둘이다. ① `buildLaunchOptions` (`launchBrowser` 포함) — headed 면 `args` 맨 뒤에 붙인다
+  (같은 스위치는 마지막 값이 이기므로 `options.args` 보다 우선). ② `withBrowser` 의 기본 launch — 넘어온
+  옵션이 `headless: false` 이고 `--window-position` 이 아직 없으면 붙인다. `withBrowser({ headless: true }, …)`
+  · `withBrowser({}, …)` 처럼 headless 로 띄우는 호출은 창이 없으므로 해당 없다.
+- `chromium.launch(...)` 를 직접 부르는 스크립트와 에이전트의 임시 측정 스크립트는 읽지 않는다 — `args` 에
+  직접 넣어야 한다.
+
 ### 클릭 헬퍼 — 조용한 실패 금지 ([#1209](https://github.com/coseo12/astro-simulator/issues/1209))
 
 `page.click(sel).catch(() => {})` 는 **셀렉터가 사라져도 스크립트를 통과시킨다**. 그러면 이후 측정은
