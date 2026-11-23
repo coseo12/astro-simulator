@@ -5,6 +5,8 @@ Semantic Versioning을 따른다.
 
 ## [Unreleased]
 
+## [0.110.0] - 2026-11-23
+
 ### Changed
 
 - **[#1435] WebGPU 가 없는 하드웨어 GPU 데스크톱을 GPU tier b 로 판정한다** ([#1435](https://github.com/coseo12/astro-simulator/issues/1435)). ADR [`20261118-1435`](docs/decisions/20261118-1435-webgl2-hardware-tier.md) §5 결정 (사용자 결정 Q1 A · Q2 (c) · Q4 (a)). ADR [`20260424-tier-preset-design`](docs/decisions/20260424-tier-preset-design.md) §축 1 분기 2 를 부분 개정한다.
